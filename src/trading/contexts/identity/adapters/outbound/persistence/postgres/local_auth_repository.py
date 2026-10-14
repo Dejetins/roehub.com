@@ -18,6 +18,7 @@ from trading.contexts.identity.application.ports.local_auth_repository import (
     LocalPasskey,
     RecoveryCodeHash,
 )
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import UserId
 
 _RATE_WINDOW = timedelta(minutes=15)
@@ -400,9 +401,7 @@ class PostgresLocalAuthRepository(LocalAuthRepository):
                 (new_sign_count, completed_at, credential_id),
             )
 
-    def list_recovery_code_hashes(
-        self, *, user_id: UserId
-    ) -> tuple[RecoveryCodeHash, ...]:
+    def list_recovery_code_hashes(self, *, user_id: UserId) -> tuple[RecoveryCodeHash, ...]:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -516,7 +515,7 @@ class PostgresLocalAuthRepository(LocalAuthRepository):
             )
 
     def _connect(self) -> psycopg.Connection[Any]:
-        return psycopg.connect(self._dsn, row_factory=cast(Any, dict_row))
+        return budget_connect(self._dsn, row_factory=cast(Any, dict_row))
 
     @staticmethod
     def _consume_challenge(

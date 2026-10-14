@@ -1,0 +1,772 @@
+{
+  "alembic_version": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "artifact_store_gc_candidates": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_leases": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_manifest_entries": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_manifests": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_object_locations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_objects": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_org_blobs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_pins": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "artifact_store_quotas": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "backtest_artifact_attempts": {
+    "unchanged": false,
+    "before_count": 391,
+    "after_count": 394
+  },
+  "backtest_artifact_build_requests": {
+    "unchanged": false,
+    "before_count": 399,
+    "after_count": 404
+  },
+  "backtest_artifact_builds": {
+    "unchanged": false,
+    "before_count": 391,
+    "after_count": 394
+  },
+  "backtest_artifact_cadence": {
+    "unchanged": false,
+    "before_count": 105,
+    "after_count": 107
+  },
+  "backtest_artifact_commands": {
+    "unchanged": false,
+    "before_count": 5,
+    "after_count": 8
+  },
+  "backtest_artifact_dispatch_state": {
+    "unchanged": false,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "backtest_artifact_events": {
+    "unchanged": false,
+    "before_count": 16749,
+    "after_count": 17181
+  },
+  "backtest_artifact_installation_settings": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "backtest_artifact_legacy_demands": {
+    "unchanged": true,
+    "before_count": 101,
+    "after_count": 101
+  },
+  "backtest_artifact_policies": {
+    "unchanged": false,
+    "before_count": 3,
+    "after_count": 8
+  },
+  "backtest_artifact_profiles": {
+    "unchanged": false,
+    "before_count": 3,
+    "after_count": 8
+  },
+  "backtest_artifact_requests": {
+    "unchanged": false,
+    "before_count": 737,
+    "after_count": 745
+  },
+  "backtest_artifact_slot_ownership": {
+    "unchanged": false,
+    "before_count": 202,
+    "after_count": 202
+  },
+  "backtest_artifact_slot_readers": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "backtest_artifact_source_state": {
+    "unchanged": false,
+    "before_count": 102,
+    "after_count": 102
+  },
+  "backtest_artifact_storage_commands": {
+    "unchanged": true,
+    "before_count": 2,
+    "after_count": 2
+  },
+  "backtest_artifact_storage_previews": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "backtest_job_stage_a_shortlist": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "backtest_job_top_variants": {
+    "unchanged": true,
+    "before_count": 12,
+    "after_count": 12
+  },
+  "backtest_jobs": {
+    "unchanged": true,
+    "before_count": 3,
+    "after_count": 3
+  },
+  "backtest_lazy_trades_materializations": {
+    "unchanged": true,
+    "before_count": 12,
+    "after_count": 12
+  },
+  "control_operation_audit_cursor": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "control_operation_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_account_config_guard_results": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_account_snapshots": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_balance_snapshots": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_connections": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_credential_versions": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_execution_process_heartbeats": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_execution_request_observations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_instrument_filter_snapshots": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_open_order_snapshots": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_position_snapshots": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "exchange_private_stream_sessions": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_account_safety_state": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_fills": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_funding_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_gateway_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_intents": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_kill_switch_state": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_ledger_pitr_drills": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_ledger_retention_policies": {
+    "unchanged": true,
+    "before_count": 5,
+    "after_count": 5
+  },
+  "execution_mainnet_approvals": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_notification_outbox": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_order_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_orders": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_provider_allowlist": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_reconciliation_runs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_risk_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "execution_source_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_plugin_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_plugin_installations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_plugin_instances": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_plugin_operations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_plugin_packages": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "extensions_publisher_keys": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_administrative_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_audit_events": {
+    "unchanged": true,
+    "before_count": 11,
+    "after_count": 11
+  },
+  "identity_browser_devices": {
+    "unchanged": false,
+    "before_count": 8,
+    "after_count": 9
+  },
+  "identity_exchange_keys": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_external_identities": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_installation_owners": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_installations": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_integrations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_invitations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_local_accounts": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_local_auth_challenges": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_local_auth_events": {
+    "unchanged": false,
+    "before_count": 19,
+    "after_count": 20
+  },
+  "identity_local_auth_rate_limits": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_local_bootstrap_tickets": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_local_recovery_codes": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_memberships": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_notification_preferences": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_oidc_auth_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_oidc_login_attempts": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_organizations": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_plugin_permissions": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_sessions": {
+    "unchanged": false,
+    "before_count": 19,
+    "after_count": 20
+  },
+  "identity_support_access_grants": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_telegram_channels": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "identity_user_preferences": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_user_profile_overrides": {
+    "unchanged": true,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_users": {
+    "unchanged": false,
+    "before_count": 1,
+    "after_count": 1
+  },
+  "identity_webauthn_credentials": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "job_runtime_attempts": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "job_runtime_jobs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "market_data_candle_repair_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "market_data_catalog_refresh_state": {
+    "unchanged": false,
+    "before_count": 4,
+    "after_count": 1
+  },
+  "market_data_catalog_snapshots": {
+    "unchanged": false,
+    "before_count": 6,
+    "after_count": 0
+  },
+  "market_data_coordinator_owners": {
+    "unchanged": false,
+    "before_count": 0,
+    "after_count": 1
+  },
+  "market_data_history_bounds": {
+    "unchanged": false,
+    "before_count": 29,
+    "after_count": 5
+  },
+  "market_data_instrument_history_bounds": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "market_data_instrument_selection_audit_events": {
+    "unchanged": true,
+    "before_count": 37,
+    "after_count": 37
+  },
+  "market_data_instrument_selections": {
+    "unchanged": true,
+    "before_count": 5,
+    "after_count": 5
+  },
+  "market_data_provider_permits": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "market_data_provider_scopes": {
+    "unchanged": false,
+    "before_count": 1,
+    "after_count": 2
+  },
+  "market_data_provider_windows": {
+    "unchanged": false,
+    "before_count": 4,
+    "after_count": 6
+  },
+  "market_data_storage_cooldown": {
+    "unchanged": false,
+    "before_count": 1,
+    "after_count": 0
+  },
+  "market_data_stream_connections": {
+    "unchanged": false,
+    "before_count": 5,
+    "after_count": 0
+  },
+  "market_data_stream_events": {
+    "unchanged": true,
+    "before_count": 312,
+    "after_count": 312
+  },
+  "market_data_stream_recovery": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "market_data_subscription_requirements": {
+    "unchanged": true,
+    "before_count": 1341,
+    "after_count": 1341
+  },
+  "market_data_work_batches": {
+    "unchanged": true,
+    "before_count": 3,
+    "after_count": 3
+  },
+  "market_data_work_events": {
+    "unchanged": false,
+    "before_count": 2755,
+    "after_count": 2791
+  },
+  "market_data_work_requests": {
+    "unchanged": false,
+    "before_count": 141,
+    "after_count": 142
+  },
+  "notification_deliveries": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_delivery_attempts": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_provider_instances": {
+    "unchanged": true,
+    "before_count": 2,
+    "after_count": 2
+  },
+  "notification_provider_packages": {
+    "unchanged": true,
+    "before_count": 3,
+    "after_count": 3
+  },
+  "notification_report_runs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_routes": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_telegram_binding_codes": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_telegram_command_registry": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_telegram_recipient_bindings": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_telegram_update_cursors": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "notification_telegram_updates": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "paper_fills": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "paper_orders": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_live_ticker_activations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_live_ticker_entitlement_overrides": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_risk_sizing_policies": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_risk_sizing_policy_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_artifact_lifecycle_policies": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_calibration_packs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_dataset_versions": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_model_activations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_model_registry_audit_events": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_model_versions": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "rl_trading_training_runs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "roehub_storage_migrations": {
+    "unchanged": false,
+    "before_count": 56,
+    "after_count": 76
+  },
+  "strategy_backtest_variant_provenance": {
+    "unchanged": true,
+    "before_count": 2,
+    "after_count": 2
+  },
+  "strategy_capital_reservations": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_events": {
+    "unchanged": true,
+    "before_count": 3,
+    "after_count": 3
+  },
+  "strategy_exchange_bindings": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_live_profiles": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_paper_accounting": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_paper_scenario_coverage_results": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_position_ownership": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_runs": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_signals": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  },
+  "strategy_strategies": {
+    "unchanged": true,
+    "before_count": 3,
+    "after_count": 3
+  },
+  "strategy_variant_compatibility_checks": {
+    "unchanged": true,
+    "before_count": 1341,
+    "after_count": 1341
+  },
+  "strategy_variant_scenario_matrix_rows": {
+    "unchanged": true,
+    "before_count": 0,
+    "after_count": 0
+  }
+}

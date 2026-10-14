@@ -14,14 +14,11 @@ OrganizationPermission = Literal[
     "members.read",
     "members.manage",
     "roles.manage",
-    "plugins.read",
-    "plugins.manage",
     "operations.execute",
     "trading.execute",
     "mainnet.approve",
     "audit.read",
 ]
-PluginPermission = Literal["read", "configure", "operate"]
 
 _ROLE_PERMISSIONS: Final[dict[OrganizationRole, frozenset[OrganizationPermission]]] = {
     "owner": frozenset(
@@ -31,9 +28,7 @@ _ROLE_PERMISSIONS: Final[dict[OrganizationRole, frozenset[OrganizationPermission
             "members.read",
             "members.manage",
             "roles.manage",
-            "plugins.read",
-            "plugins.manage",
-            "operations.execute",
+                    "operations.execute",
             "trading.execute",
             "mainnet.approve",
             "audit.read",
@@ -46,9 +41,7 @@ _ROLE_PERMISSIONS: Final[dict[OrganizationRole, frozenset[OrganizationPermission
             "members.read",
             "members.manage",
             "roles.manage",
-            "plugins.read",
-            "plugins.manage",
-            "operations.execute",
+                    "operations.execute",
             "audit.read",
         }
     ),
@@ -56,8 +49,7 @@ _ROLE_PERMISSIONS: Final[dict[OrganizationRole, frozenset[OrganizationPermission
         {
             "organization.read",
             "members.read",
-            "plugins.read",
-            "operations.execute",
+                    "operations.execute",
             "audit.read",
         }
     ),
@@ -65,11 +57,10 @@ _ROLE_PERMISSIONS: Final[dict[OrganizationRole, frozenset[OrganizationPermission
         {
             "organization.read",
             "members.read",
-            "plugins.read",
-            "trading.execute",
+                    "trading.execute",
         }
     ),
-    "viewer": frozenset({"organization.read", "members.read", "plugins.read"}),
+    "viewer": frozenset({"organization.read", "members.read"}),
 }
 
 
@@ -121,13 +112,6 @@ class OrganizationInvitation:
     created_at: datetime
 
 
-@dataclass(frozen=True, slots=True)
-class PluginPermissionGrant:
-    organization_id: OrganizationId
-    plugin_id: str
-    user_id: UserId
-    permission: PluginPermission
-    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)

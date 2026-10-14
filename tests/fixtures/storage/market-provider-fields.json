@@ -1,0 +1,468 @@
+{
+  "ref_market": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "exchange_name": {
+      "nullable": false,
+      "type": null
+    },
+    "market_type": {
+      "nullable": false,
+      "type": null
+    },
+    "market_code": {
+      "nullable": false,
+      "type": null
+    },
+    "is_enabled": {
+      "nullable": false,
+      "type": null
+    },
+    "count_symbols": {
+      "nullable": false,
+      "type": null
+    },
+    "updated_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  },
+  "ref_instruments": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "status": {
+      "nullable": false,
+      "type": null
+    },
+    "is_tradable": {
+      "nullable": false,
+      "type": null
+    },
+    "base_asset": {
+      "nullable": true,
+      "type": null
+    },
+    "quote_asset": {
+      "nullable": true,
+      "type": null
+    },
+    "price_step": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "qty_step": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "min_notional": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "updated_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  },
+  "raw_binance_klines_1m": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "open_time": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "open": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "high": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "low": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "close": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "volume": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "close_time": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "quote_asset_volume": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "number_of_trades": {
+      "nullable": false,
+      "type": null
+    },
+    "taker_buy_base_asset_volume": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "taker_buy_quote_asset_volume": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  },
+  "raw_bybit_klines_1m": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "interval_min": {
+      "nullable": false,
+      "type": null
+    },
+    "start_time_ms": {
+      "nullable": false,
+      "type": null
+    },
+    "start_time_utc": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "open": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "high": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "low": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "close": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "volume": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "turnover": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  },
+  "canonical_candles_1m": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "ts_open": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ts_close": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "open": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "high": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "low": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "close": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "volume_base": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "volume_quote": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "trades_count": {
+      "nullable": true,
+      "type": null
+    },
+    "taker_buy_volume_base": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "taker_buy_volume_quote": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  },
+  "funding_instrument_universe": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "exchange": {
+      "nullable": false,
+      "type": null
+    },
+    "market_type": {
+      "nullable": false,
+      "type": null
+    },
+    "status": {
+      "nullable": false,
+      "type": null
+    },
+    "is_tradable": {
+      "nullable": false,
+      "type": null
+    },
+    "base_asset": {
+      "nullable": true,
+      "type": null
+    },
+    "quote_asset": {
+      "nullable": true,
+      "type": null
+    },
+    "funding_interval_minutes": {
+      "nullable": true,
+      "type": null
+    },
+    "funding_interval_source": {
+      "nullable": true,
+      "type": null
+    },
+    "funding_cap": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "funding_floor": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "updated_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  },
+  "raw_binance_funding_rates": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_time": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "funding_rate": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "funding_interval_minutes": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_interval_source": {
+      "nullable": false,
+      "type": null
+    },
+    "mark_price": {
+      "nullable": true,
+      "type": "double precision"
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  },
+  "raw_bybit_funding_rates": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "category": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_time": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "funding_rate": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "funding_interval_minutes": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_interval_source": {
+      "nullable": false,
+      "type": null
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  },
+  "canonical_funding_rates": {
+    "market_id": {
+      "nullable": false,
+      "type": null
+    },
+    "symbol": {
+      "nullable": false,
+      "type": null
+    },
+    "instrument_key": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_time": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "funding_rate": {
+      "nullable": false,
+      "type": "double precision"
+    },
+    "funding_interval_minutes": {
+      "nullable": false,
+      "type": null
+    },
+    "funding_interval_source": {
+      "nullable": false,
+      "type": null
+    },
+    "source": {
+      "nullable": false,
+      "type": null
+    },
+    "ingested_at": {
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    "ingest_id": {
+      "nullable": true,
+      "type": null
+    }
+  }
+}

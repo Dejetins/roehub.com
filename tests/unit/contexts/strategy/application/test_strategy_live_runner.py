@@ -302,7 +302,7 @@ class _ClosedTailProviderFromCanonicalStub:
         _ = correlation_id
         time_range = TimeRange(start=start_ts_open, end=end_ts_open)
         rows = tuple(
-            ClosedCandleTailRow(candle=row, source="clickhouse")
+            ClosedCandleTailRow(candle=row, source="canonical_store")
             for row in self._canonical_reader.read_1m(instrument_id, time_range)
             if row.meta.instrument_key == instrument_key
         )
@@ -313,7 +313,7 @@ class _ClosedTailProviderFromCanonicalStub:
             candles=rows,
             sources_attempted=(
                 CandleRepairSourceAttempt(
-                    source="clickhouse",
+                    source="canonical_store",
                     status="succeeded" if rows else "miss",
                 ),
             ),

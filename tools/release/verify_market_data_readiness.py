@@ -14,9 +14,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
-_SAMPLE = re.compile(
-    r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{[^}]*\})?\s+(?P<value>[-+0-9.eE]+)$"
-)
+_SAMPLE = re.compile(r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{[^}]*\})?\s+(?P<value>[-+0-9.eE]+)$")
 
 
 class MarketDataReadinessError(RuntimeError):
@@ -140,15 +138,13 @@ def _newest_candle_timestamp(compose: list[str]) -> float | None:
             *compose,
             "exec",
             "-T",
-            "clickhouse",
-            "sh",
-            "-ec",
-            (
-                "clickhouse-client --user default "
-                "--password \"$(cat /run/roehub-secrets/clickhouse-password)\" "
-                "--query \"SELECT toUnixTimestamp(max(ts_close)) "
-                "FROM roehub.canonical_candles_1m\""
-            ),
+            "api",
+            "python",
+            "-c",
+            "import os; from trading.platform.postgres_budget import connect; "
+            "c=connect(os.environ['POSTGRES_DSN']); "
+            "print(c.execute('SELECT coalesce(extract(epoch FROM max(ts_close)),0) "
+            "FROM market_data.canonical_candles_1m').fetchone()[0]); c.close()",
         ]
     ).strip()
     if output in {"", "0"}:

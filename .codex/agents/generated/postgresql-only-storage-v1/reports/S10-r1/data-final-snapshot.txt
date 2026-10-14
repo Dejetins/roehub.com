@@ -1,0 +1,620 @@
+### Page
+- Page URL: http://127.0.0.1:20120/data?market=2&symbol=0GUSDT&job=08d53510-1442-4403-b7bd-0ae6ae25cb15
+- Page Title: Data · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f15e8]:
+  - link "Skip to content" [ref=f15e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - complementary [ref=f15e10]:
+    - generic "RoeHub" [ref=f15e11]: R
+    - navigation "Navigation" [ref=f15e12]:
+      - link "Overview" [ref=f15e13] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f15e20] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f15e24] [cursor=pointer]:
+        - /url: /strategies
+      - link "Data" [ref=f15e28] [cursor=pointer]:
+        - /url: /data
+      - link "Connections" [ref=f15e34] [cursor=pointer]:
+        - /url: /connections
+      - link "Monitoring" [ref=f15e38] [cursor=pointer]:
+        - /url: /monitoring
+      - link "Settings" [ref=f15e42] [cursor=pointer]:
+        - /url: /settings/profile
+    - group [ref=f15e47]:
+      - 'generic "Language: EN" [ref=f15e48] [cursor=pointer]': EN
+    - link "Sign out" [ref=f15e51] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f15e56]:
+    - generic [ref=f15e57]:
+      - text: Data
+      - generic [ref=f15e58]: Navigator
+    - generic [ref=f15e59]:
+      - complementary [ref=f15e60]:
+        - heading "Exchanges" [level=2] [ref=f15e63]
+        - navigation "Exchanges" [ref=f15e65]:
+          - link "Binance" [ref=f15e66] [cursor=pointer]:
+            - /url: /data?exchange=binance&market=1
+          - link "Bybit" [ref=f15e70] [cursor=pointer]:
+            - /url: /data?exchange=bybit&market=3
+      - heading "Data" [level=1] [ref=f15e74]
+      - region "Instrument catalog" [ref=f15e75]:
+        - navigation "Data view" [ref=f15e76]:
+          - link "Candles" [ref=f15e77] [cursor=pointer]:
+            - /url: /data?market=2&symbol=0GUSDT&job=08d53510-1442-4403-b7bd-0ae6ae25cb15
+          - link "Artifacts" [ref=f15e78] [cursor=pointer]:
+            - /url: /data?market=2&symbol=0GUSDT&job=08d53510-1442-4403-b7bd-0ae6ae25cb15&view=artifacts
+        - generic [ref=f15e79]:
+          - generic [ref=f15e80]:
+            - generic [ref=f15e81]: Search instruments
+            - searchbox "Search instruments" [ref=f15e82]
+          - button "Market" [ref=f15e84] [cursor=pointer]: All markets
+          - button "History" [ref=f15e88] [cursor=pointer]: "History: all"
+          - button "Stream" [ref=f15e92] [cursor=pointer]: "Stream: all"
+        - generic [ref=f15e95]:
+          - generic [ref=f15e96]: All available history · 1m · through the latest closed minute
+          - generic [ref=f15e97]:
+            - button "Show log" [ref=f15e98] [cursor=pointer]
+            - button "Refresh" [ref=f15e99] [cursor=pointer]
+        - generic "Catalog rows" [ref=f15e106]:
+          - table [ref=f15e107]:
+            - rowgroup [ref=f15e108]:
+              - row [ref=f15e109]:
+                - columnheader [ref=f15e110]:
+                  - checkbox "Select this page for download" [ref=f15e111]
+                - columnheader [ref=f15e112]:
+                  - button "Instrument" [ref=f15e113] [cursor=pointer]
+                - columnheader [ref=f15e116]:
+                  - button "Market" [ref=f15e117] [cursor=pointer]
+                - columnheader [ref=f15e121]:
+                  - button "History / download" [ref=f15e122] [cursor=pointer]
+                - columnheader [ref=f15e126]:
+                  - button "Stream" [ref=f15e127] [cursor=pointer]
+            - rowgroup [ref=f15e131]:
+              - row [ref=f15e132] [cursor=pointer]:
+                - cell [ref=f15e133]:
+                  - checkbox "Download 0GTRY · Spot" [ref=f15e134]
+                - cell "0GTRY" [ref=f15e135]
+                - cell "Spot" [ref=f15e137]
+                - cell "History start unknown Download 0GTRY · Spot" [ref=f15e138]:
+                  - generic [ref=f15e140]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e141]: History start unknown
+                    - button "Download 0GTRY · Spot" [ref=f15e146]
+                - cell "Disabled" [ref=f15e150]
+              - row [ref=f15e154] [cursor=pointer]:
+                - cell [ref=f15e155]:
+                  - checkbox "Download 0GUSDC · Spot" [ref=f15e156]
+                - cell "0GUSDC" [ref=f15e157]
+                - cell "Spot" [ref=f15e159]
+                - cell "History start unknown Download 0GUSDC · Spot" [ref=f15e160]:
+                  - generic [ref=f15e162]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e163]: History start unknown
+                    - button "Download 0GUSDC · Spot" [ref=f15e168]
+                - cell "Disabled" [ref=f15e172]
+              - row [ref=f15e176] [cursor=pointer]:
+                - cell [ref=f15e177]:
+                  - checkbox "Download 0GUSDT · Spot" [disabled] [ref=f15e178]
+                - cell "0GUSDT" [ref=f15e179]
+                - cell "Spot" [ref=f15e181]
+                - 'cell "Full history: 100% 100" [ref=f15e182]':
+                  - generic "557231 / 557231 · closed candles across the full available history" [ref=f15e1235]:
+                    - generic [ref=f15e189]:
+                      - generic [ref=f15e190]: "Full history: 100%"
+                      - progressbar "Candle coverage" [ref=f15e191]
+                - cell "Running" [ref=f15e192]
+              - row [active] [ref=f15e196] [cursor=pointer]:
+                - cell [ref=f15e197]:
+                  - checkbox "Download 0GUSDT · Futures" [disabled] [ref=f15e198]
+                - cell "0GUSDT" [ref=f15e199]
+                - cell "Futures" [ref=f15e201]
+                - 'cell "Full history: 100% 100" [ref=f15e202]':
+                  - generic "564086 / 564086 · closed candles across the full available history" [ref=f15e1236]:
+                    - generic [ref=f15e209]:
+                      - generic [ref=f15e210]: "Full history: 100%"
+                      - progressbar "Candle coverage" [ref=f15e211]
+                - cell "Running" [ref=f15e212]
+              - row [ref=f15e216] [cursor=pointer]:
+                - cell [ref=f15e217]:
+                  - checkbox "Download 1000000MOGUSDT · Futures" [ref=f15e218]
+                - cell "1000000MOGUSDT" [ref=f15e219]
+                - cell "Futures" [ref=f15e221]
+                - cell "History start unknown Download 1000000MOGUSDT · Futures" [ref=f15e222]:
+                  - generic [ref=f15e224]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e225]: History start unknown
+                    - button "Download 1000000MOGUSDT · Futures" [ref=f15e230]
+                - cell "Disabled" [ref=f15e234]
+              - row [ref=f15e238] [cursor=pointer]:
+                - cell [ref=f15e239]:
+                  - checkbox "Download 1000BONKUSDC · Futures" [ref=f15e240]
+                - cell "1000BONKUSDC" [ref=f15e241]
+                - cell "Futures" [ref=f15e243]
+                - cell "History start unknown Download 1000BONKUSDC · Futures" [ref=f15e244]:
+                  - generic [ref=f15e246]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e247]: History start unknown
+                    - button "Download 1000BONKUSDC · Futures" [ref=f15e252]
+                - cell "Disabled" [ref=f15e256]
+              - row [ref=f15e260] [cursor=pointer]:
+                - cell [ref=f15e261]:
+                  - checkbox "Download 1000BONKUSDT · Futures" [ref=f15e262]
+                - cell "1000BONKUSDT" [ref=f15e263]
+                - cell "Futures" [ref=f15e265]
+                - cell "History start unknown Download 1000BONKUSDT · Futures" [ref=f15e266]:
+                  - generic [ref=f15e268]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e269]: History start unknown
+                    - button "Download 1000BONKUSDT · Futures" [ref=f15e274]
+                - cell "Disabled" [ref=f15e278]
+              - row [ref=f15e282] [cursor=pointer]:
+                - cell [ref=f15e283]:
+                  - checkbox "Download 1000CATTRY · Spot" [ref=f15e284]
+                - cell "1000CATTRY" [ref=f15e285]
+                - cell "Spot" [ref=f15e287]
+                - cell "History start unknown Download 1000CATTRY · Spot" [ref=f15e288]:
+                  - generic [ref=f15e290]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e291]: History start unknown
+                    - button "Download 1000CATTRY · Spot" [ref=f15e296]
+                - cell "Disabled" [ref=f15e300]
+              - row [ref=f15e304] [cursor=pointer]:
+                - cell [ref=f15e305]:
+                  - checkbox "Download 1000CATUSDC · Spot" [ref=f15e306]
+                - cell "1000CATUSDC" [ref=f15e307]
+                - cell "Spot" [ref=f15e309]
+                - cell "History start unknown Download 1000CATUSDC · Spot" [ref=f15e310]:
+                  - generic [ref=f15e312]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e313]: History start unknown
+                    - button "Download 1000CATUSDC · Spot" [ref=f15e318]
+                - cell "Disabled" [ref=f15e322]
+              - row [ref=f15e326] [cursor=pointer]:
+                - cell [ref=f15e327]:
+                  - checkbox "Download 1000CATUSDT · Spot" [ref=f15e328]
+                - cell "1000CATUSDT" [ref=f15e329]
+                - cell "Spot" [ref=f15e331]
+                - cell "History start unknown Download 1000CATUSDT · Spot" [ref=f15e332]:
+                  - generic [ref=f15e334]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e335]: History start unknown
+                    - button "Download 1000CATUSDT · Spot" [ref=f15e340]
+                - cell "Disabled" [ref=f15e344]
+              - row [ref=f15e348] [cursor=pointer]:
+                - cell [ref=f15e349]:
+                  - checkbox "Download 1000CATUSDT · Futures" [ref=f15e350]
+                - cell "1000CATUSDT" [ref=f15e351]
+                - cell "Futures" [ref=f15e353]
+                - cell "History start unknown Download 1000CATUSDT · Futures" [ref=f15e354]:
+                  - generic [ref=f15e356]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e357]: History start unknown
+                    - button "Download 1000CATUSDT · Futures" [ref=f15e362]
+                - cell "Disabled" [ref=f15e366]
+              - row [ref=f15e370] [cursor=pointer]:
+                - cell [ref=f15e371]:
+                  - checkbox "Download 1000CHEEMSUSDC · Spot" [ref=f15e372]
+                - cell "1000CHEEMSUSDC" [ref=f15e373]
+                - cell "Spot" [ref=f15e375]
+                - cell "History start unknown Download 1000CHEEMSUSDC · Spot" [ref=f15e376]:
+                  - generic [ref=f15e378]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e379]: History start unknown
+                    - button "Download 1000CHEEMSUSDC · Spot" [ref=f15e384]
+                - cell "Disabled" [ref=f15e388]
+              - row [ref=f15e392] [cursor=pointer]:
+                - cell [ref=f15e393]:
+                  - checkbox "Download 1000CHEEMSUSDT · Spot" [ref=f15e394]
+                - cell "1000CHEEMSUSDT" [ref=f15e395]
+                - cell "Spot" [ref=f15e397]
+                - cell "History start unknown Download 1000CHEEMSUSDT · Spot" [ref=f15e398]:
+                  - generic [ref=f15e400]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e401]: History start unknown
+                    - button "Download 1000CHEEMSUSDT · Spot" [ref=f15e406]
+                - cell "Disabled" [ref=f15e410]
+              - row [ref=f15e414] [cursor=pointer]:
+                - cell [ref=f15e415]:
+                  - checkbox "Download 1000CHEEMSUSDT · Futures" [ref=f15e416]
+                - cell "1000CHEEMSUSDT" [ref=f15e417]
+                - cell "Futures" [ref=f15e419]
+                - cell "History start unknown Download 1000CHEEMSUSDT · Futures" [ref=f15e420]:
+                  - generic [ref=f15e422]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e423]: History start unknown
+                    - button "Download 1000CHEEMSUSDT · Futures" [ref=f15e428]
+                - cell "Disabled" [ref=f15e432]
+              - row [ref=f15e436] [cursor=pointer]:
+                - cell [ref=f15e437]:
+                  - checkbox "Download 1000FLOKIUSDT · Futures" [ref=f15e438]
+                - cell "1000FLOKIUSDT" [ref=f15e439]
+                - cell "Futures" [ref=f15e441]
+                - cell "History start unknown Download 1000FLOKIUSDT · Futures" [ref=f15e442]:
+                  - generic [ref=f15e444]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e445]: History start unknown
+                    - button "Download 1000FLOKIUSDT · Futures" [ref=f15e450]
+                - cell "Disabled" [ref=f15e454]
+              - row [ref=f15e458] [cursor=pointer]:
+                - cell [ref=f15e459]:
+                  - checkbox "Download 1000LUNCUSDT · Futures" [ref=f15e460]
+                - cell "1000LUNCUSDT" [ref=f15e461]
+                - cell "Futures" [ref=f15e463]
+                - cell "History start unknown Download 1000LUNCUSDT · Futures" [ref=f15e464]:
+                  - generic [ref=f15e466]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e467]: History start unknown
+                    - button "Download 1000LUNCUSDT · Futures" [ref=f15e472]
+                - cell "Disabled" [ref=f15e476]
+              - row [ref=f15e480] [cursor=pointer]:
+                - cell [ref=f15e481]:
+                  - checkbox "Download 1000PEPEUSDC · Futures" [ref=f15e482]
+                - cell "1000PEPEUSDC" [ref=f15e483]
+                - cell "Futures" [ref=f15e485]
+                - cell "History start unknown Download 1000PEPEUSDC · Futures" [ref=f15e486]:
+                  - generic [ref=f15e488]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e489]: History start unknown
+                    - button "Download 1000PEPEUSDC · Futures" [ref=f15e494]
+                - cell "Disabled" [ref=f15e498]
+              - row [ref=f15e502] [cursor=pointer]:
+                - cell [ref=f15e503]:
+                  - checkbox "Download 1000PEPEUSDT · Futures" [ref=f15e504]
+                - cell "1000PEPEUSDT" [ref=f15e505]
+                - cell "Futures" [ref=f15e507]
+                - cell "History start unknown Download 1000PEPEUSDT · Futures" [ref=f15e508]:
+                  - generic [ref=f15e510]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e511]: History start unknown
+                    - button "Download 1000PEPEUSDT · Futures" [ref=f15e516]
+                - cell "Disabled" [ref=f15e520]
+              - row [ref=f15e524] [cursor=pointer]:
+                - cell [ref=f15e525]:
+                  - checkbox "Download 1000RATSUSDT · Futures" [ref=f15e526]
+                - cell "1000RATSUSDT" [ref=f15e527]
+                - cell "Futures" [ref=f15e529]
+                - cell "History start unknown Download 1000RATSUSDT · Futures" [ref=f15e530]:
+                  - generic [ref=f15e532]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e533]: History start unknown
+                    - button "Download 1000RATSUSDT · Futures" [ref=f15e538]
+                - cell "Disabled" [ref=f15e542]
+              - row [ref=f15e546] [cursor=pointer]:
+                - cell [ref=f15e547]:
+                  - checkbox "Download 1000SATSTRY · Spot" [ref=f15e548]
+                - cell "1000SATSTRY" [ref=f15e549]
+                - cell "Spot" [ref=f15e551]
+                - cell "History start unknown Download 1000SATSTRY · Spot" [ref=f15e552]:
+                  - generic [ref=f15e554]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e555]: History start unknown
+                    - button "Download 1000SATSTRY · Spot" [ref=f15e560]
+                - cell "Disabled" [ref=f15e564]
+              - row [ref=f15e568] [cursor=pointer]:
+                - cell [ref=f15e569]:
+                  - checkbox "Download 1000SATSUSDC · Spot" [ref=f15e570]
+                - cell "1000SATSUSDC" [ref=f15e571]
+                - cell "Spot" [ref=f15e573]
+                - cell "History start unknown Download 1000SATSUSDC · Spot" [ref=f15e574]:
+                  - generic [ref=f15e576]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e577]: History start unknown
+                    - button "Download 1000SATSUSDC · Spot" [ref=f15e582]
+                - cell "Disabled" [ref=f15e586]
+              - row [ref=f15e590] [cursor=pointer]:
+                - cell [ref=f15e591]:
+                  - checkbox "Download 1000SATSUSDT · Spot" [ref=f15e592]
+                - cell "1000SATSUSDT" [ref=f15e593]
+                - cell "Spot" [ref=f15e595]
+                - cell "History start unknown Download 1000SATSUSDT · Spot" [ref=f15e596]:
+                  - generic [ref=f15e598]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e599]: History start unknown
+                    - button "Download 1000SATSUSDT · Spot" [ref=f15e604]
+                - cell "Disabled" [ref=f15e608]
+              - row [ref=f15e612] [cursor=pointer]:
+                - cell [ref=f15e613]:
+                  - checkbox "Download 1000SATSUSDT · Futures" [ref=f15e614]
+                - cell "1000SATSUSDT" [ref=f15e615]
+                - cell "Futures" [ref=f15e617]
+                - cell "History start unknown Download 1000SATSUSDT · Futures" [ref=f15e618]:
+                  - generic [ref=f15e620]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e621]: History start unknown
+                    - button "Download 1000SATSUSDT · Futures" [ref=f15e626]
+                - cell "Disabled" [ref=f15e630]
+              - row [ref=f15e634] [cursor=pointer]:
+                - cell [ref=f15e635]:
+                  - checkbox "Download 1000SHIBUSDC · Futures" [ref=f15e636]
+                - cell "1000SHIBUSDC" [ref=f15e637]
+                - cell "Futures" [ref=f15e639]
+                - cell "History start unknown Download 1000SHIBUSDC · Futures" [ref=f15e640]:
+                  - generic [ref=f15e642]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e643]: History start unknown
+                    - button "Download 1000SHIBUSDC · Futures" [ref=f15e648]
+                - cell "Disabled" [ref=f15e652]
+              - row [ref=f15e656] [cursor=pointer]:
+                - cell [ref=f15e657]:
+                  - checkbox "Download 1000SHIBUSDT · Futures" [ref=f15e658]
+                - cell "1000SHIBUSDT" [ref=f15e659]
+                - cell "Futures" [ref=f15e661]
+                - cell "History start unknown Download 1000SHIBUSDT · Futures" [ref=f15e662]:
+                  - generic [ref=f15e664]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e665]: History start unknown
+                    - button "Download 1000SHIBUSDT · Futures" [ref=f15e670]
+                - cell "Disabled" [ref=f15e674]
+              - row [ref=f15e678] [cursor=pointer]:
+                - cell [ref=f15e679]:
+                  - checkbox "Download 1000XECUSDT · Futures" [ref=f15e680]
+                - cell "1000XECUSDT" [ref=f15e681]
+                - cell "Futures" [ref=f15e683]
+                - cell "History start unknown Download 1000XECUSDT · Futures" [ref=f15e684]:
+                  - generic [ref=f15e686]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e687]: History start unknown
+                    - button "Download 1000XECUSDT · Futures" [ref=f15e692]
+                - cell "Disabled" [ref=f15e696]
+              - row [ref=f15e700] [cursor=pointer]:
+                - cell [ref=f15e701]:
+                  - checkbox "Download 1INCHUSDC · Spot" [ref=f15e702]
+                - cell "1INCHUSDC" [ref=f15e703]
+                - cell "Spot" [ref=f15e705]
+                - cell "History start unknown Download 1INCHUSDC · Spot" [ref=f15e706]:
+                  - generic [ref=f15e708]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e709]: History start unknown
+                    - button "Download 1INCHUSDC · Spot" [ref=f15e714]
+                - cell "Disabled" [ref=f15e718]
+              - row [ref=f15e722] [cursor=pointer]:
+                - cell [ref=f15e723]:
+                  - checkbox "Download 1INCHUSDT · Spot" [ref=f15e724]
+                - cell "1INCHUSDT" [ref=f15e725]
+                - cell "Spot" [ref=f15e727]
+                - cell "History start unknown Download 1INCHUSDT · Spot" [ref=f15e728]:
+                  - generic [ref=f15e730]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e731]: History start unknown
+                    - button "Download 1INCHUSDT · Spot" [ref=f15e736]
+                - cell "Disabled" [ref=f15e740]
+              - row [ref=f15e744] [cursor=pointer]:
+                - cell [ref=f15e745]:
+                  - checkbox "Download 1INCHUSDT · Futures" [ref=f15e746]
+                - cell "1INCHUSDT" [ref=f15e747]
+                - cell "Futures" [ref=f15e749]
+                - cell "History start unknown Download 1INCHUSDT · Futures" [ref=f15e750]:
+                  - generic [ref=f15e752]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e753]: History start unknown
+                    - button "Download 1INCHUSDT · Futures" [ref=f15e758]
+                - cell "Disabled" [ref=f15e762]
+              - row [ref=f15e766] [cursor=pointer]:
+                - cell [ref=f15e767]:
+                  - checkbox "Download 1MBABYDOGETRY · Spot" [ref=f15e768]
+                - cell "1MBABYDOGETRY" [ref=f15e769]
+                - cell "Spot" [ref=f15e771]
+                - cell "History start unknown Download 1MBABYDOGETRY · Spot" [ref=f15e772]:
+                  - generic [ref=f15e774]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e775]: History start unknown
+                    - button "Download 1MBABYDOGETRY · Spot" [ref=f15e780]
+                - cell "Disabled" [ref=f15e784]
+              - row [ref=f15e788] [cursor=pointer]:
+                - cell [ref=f15e789]:
+                  - checkbox "Download 1MBABYDOGEUSDC · Spot" [ref=f15e790]
+                - cell "1MBABYDOGEUSDC" [ref=f15e791]
+                - cell "Spot" [ref=f15e793]
+                - cell "History start unknown Download 1MBABYDOGEUSDC · Spot" [ref=f15e794]:
+                  - generic [ref=f15e796]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e797]: History start unknown
+                    - button "Download 1MBABYDOGEUSDC · Spot" [ref=f15e802]
+                - cell "Disabled" [ref=f15e806]
+              - row [ref=f15e810] [cursor=pointer]:
+                - cell [ref=f15e811]:
+                  - checkbox "Download 1MBABYDOGEUSDT · Spot" [ref=f15e812]
+                - cell "1MBABYDOGEUSDT" [ref=f15e813]
+                - cell "Spot" [ref=f15e815]
+                - cell "History start unknown Download 1MBABYDOGEUSDT · Spot" [ref=f15e816]:
+                  - generic [ref=f15e818]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e819]: History start unknown
+                    - button "Download 1MBABYDOGEUSDT · Spot" [ref=f15e824]
+                - cell "Disabled" [ref=f15e828]
+              - row [ref=f15e832] [cursor=pointer]:
+                - cell [ref=f15e833]:
+                  - checkbox "Download 1MBABYDOGEUSDT · Futures" [ref=f15e834]
+                - cell "1MBABYDOGEUSDT" [ref=f15e835]
+                - cell "Futures" [ref=f15e837]
+                - cell "History start unknown Download 1MBABYDOGEUSDT · Futures" [ref=f15e838]:
+                  - generic [ref=f15e840]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e841]: History start unknown
+                    - button "Download 1MBABYDOGEUSDT · Futures" [ref=f15e846]
+                - cell "Disabled" [ref=f15e850]
+              - row [ref=f15e854] [cursor=pointer]:
+                - cell [ref=f15e855]:
+                  - checkbox "Download 2ZTRY · Spot" [ref=f15e856]
+                - cell "2ZTRY" [ref=f15e857]
+                - cell "Spot" [ref=f15e859]
+                - cell "History start unknown Download 2ZTRY · Spot" [ref=f15e860]:
+                  - generic [ref=f15e862]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e863]: History start unknown
+                    - button "Download 2ZTRY · Spot" [ref=f15e868]
+                - cell "Disabled" [ref=f15e872]
+              - row [ref=f15e876] [cursor=pointer]:
+                - cell [ref=f15e877]:
+                  - checkbox "Download 2ZUSDC · Spot" [ref=f15e878]
+                - cell "2ZUSDC" [ref=f15e879]
+                - cell "Spot" [ref=f15e881]
+                - cell "History start unknown Download 2ZUSDC · Spot" [ref=f15e882]:
+                  - generic [ref=f15e884]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e885]: History start unknown
+                    - button "Download 2ZUSDC · Spot" [ref=f15e890]
+                - cell "Disabled" [ref=f15e894]
+              - row [ref=f15e898] [cursor=pointer]:
+                - cell [ref=f15e899]:
+                  - checkbox "Download 2ZUSDT · Spot" [ref=f15e900]
+                - cell "2ZUSDT" [ref=f15e901]
+                - cell "Spot" [ref=f15e903]
+                - cell "History start unknown Download 2ZUSDT · Spot" [ref=f15e904]:
+                  - generic [ref=f15e906]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e907]: History start unknown
+                    - button "Download 2ZUSDT · Spot" [ref=f15e912]
+                - cell "Disabled" [ref=f15e916]
+              - row [ref=f15e920] [cursor=pointer]:
+                - cell [ref=f15e921]:
+                  - checkbox "Download 2ZUSDT · Futures" [ref=f15e922]
+                - cell "2ZUSDT" [ref=f15e923]
+                - cell "Futures" [ref=f15e925]
+                - cell "History start unknown Download 2ZUSDT · Futures" [ref=f15e926]:
+                  - generic [ref=f15e928]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e929]: History start unknown
+                    - button "Download 2ZUSDT · Futures" [ref=f15e934]
+                - cell "Disabled" [ref=f15e938]
+              - row [ref=f15e942] [cursor=pointer]:
+                - cell [ref=f15e943]:
+                  - checkbox "Download 4USDT · Futures" [ref=f15e944]
+                - cell "4USDT" [ref=f15e945]
+                - cell "Futures" [ref=f15e947]
+                - cell "History start unknown Download 4USDT · Futures" [ref=f15e948]:
+                  - generic [ref=f15e950]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e951]: History start unknown
+                    - button "Download 4USDT · Futures" [ref=f15e956]
+                - cell "Disabled" [ref=f15e960]
+              - row [ref=f15e964] [cursor=pointer]:
+                - cell [ref=f15e965]:
+                  - checkbox "Download AAOIBUSDT · Spot" [ref=f15e966]
+                - cell "AAOIBUSDT" [ref=f15e967]
+                - cell "Spot" [ref=f15e969]
+                - cell "History start unknown Download AAOIBUSDT · Spot" [ref=f15e970]:
+                  - generic [ref=f15e972]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e973]: History start unknown
+                    - button "Download AAOIBUSDT · Spot" [ref=f15e978]
+                - cell "Disabled" [ref=f15e982]
+              - row [ref=f15e986] [cursor=pointer]:
+                - cell [ref=f15e987]:
+                  - checkbox "Download AAOIUSDT · Futures" [ref=f15e988]
+                - cell "AAOIUSDT" [ref=f15e989]
+                - cell "Futures" [ref=f15e991]
+                - cell "History start unknown Download AAOIUSDT · Futures" [ref=f15e992]:
+                  - generic [ref=f15e994]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e995]: History start unknown
+                    - button "Download AAOIUSDT · Futures" [ref=f15e1000]
+                - cell "Disabled" [ref=f15e1004]
+              - row [ref=f15e1008] [cursor=pointer]:
+                - cell [ref=f15e1009]:
+                  - checkbox "Download AAPLBUSDT · Spot" [disabled] [ref=f15e1010]
+                - cell "AAPLBUSDT" [ref=f15e1011]
+                - cell "Spot" [ref=f15e1013]
+                - 'cell "Full history: 100% 100" [ref=f15e1014]':
+                  - generic "110711 / 110711 · closed candles across the full available history" [ref=f15e1237]:
+                    - generic [ref=f15e1021]:
+                      - generic [ref=f15e1022]: "Full history: 100%"
+                      - progressbar "Candle coverage" [ref=f15e1023]
+                - cell "Running" [ref=f15e1024]
+              - row [ref=f15e1028] [cursor=pointer]:
+                - cell [ref=f15e1029]:
+                  - checkbox "Download AAPLUSDT · Futures" [ref=f15e1030]
+                - cell "AAPLUSDT" [ref=f15e1031]
+                - cell "Futures" [ref=f15e1033]
+                - cell "History start unknown Download AAPLUSDT · Futures" [ref=f15e1034]:
+                  - generic [ref=f15e1036]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1037]: History start unknown
+                    - button "Download AAPLUSDT · Futures" [ref=f15e1042]
+                - cell "Disabled" [ref=f15e1046]
+              - row [ref=f15e1050] [cursor=pointer]:
+                - cell [ref=f15e1051]:
+                  - checkbox "Download AAVEBTC · Spot" [ref=f15e1052]
+                - cell "AAVEBTC" [ref=f15e1053]
+                - cell "Spot" [ref=f15e1055]
+                - cell "History start unknown Download AAVEBTC · Spot" [ref=f15e1056]:
+                  - generic [ref=f15e1058]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1059]: History start unknown
+                    - button "Download AAVEBTC · Spot" [ref=f15e1064]
+                - cell "Disabled" [ref=f15e1068]
+              - row [ref=f15e1072] [cursor=pointer]:
+                - cell [ref=f15e1073]:
+                  - checkbox "Download AAVEETH · Spot" [ref=f15e1074]
+                - cell "AAVEETH" [ref=f15e1075]
+                - cell "Spot" [ref=f15e1077]
+                - cell "History start unknown Download AAVEETH · Spot" [ref=f15e1078]:
+                  - generic [ref=f15e1080]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1081]: History start unknown
+                    - button "Download AAVEETH · Spot" [ref=f15e1086]
+                - cell "Disabled" [ref=f15e1090]
+              - row [ref=f15e1094] [cursor=pointer]:
+                - cell [ref=f15e1095]:
+                  - checkbox "Download AAVETRY · Spot" [ref=f15e1096]
+                - cell "AAVETRY" [ref=f15e1097]
+                - cell "Spot" [ref=f15e1099]
+                - cell "History start unknown Download AAVETRY · Spot" [ref=f15e1100]:
+                  - generic [ref=f15e1102]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1103]: History start unknown
+                    - button "Download AAVETRY · Spot" [ref=f15e1108]
+                - cell "Disabled" [ref=f15e1112]
+              - row [ref=f15e1116] [cursor=pointer]:
+                - cell [ref=f15e1117]:
+                  - checkbox "Download AAVEU · Spot" [ref=f15e1118]
+                - cell "AAVEU" [ref=f15e1119]
+                - cell "Spot" [ref=f15e1121]
+                - cell "History start unknown Download AAVEU · Spot" [ref=f15e1122]:
+                  - generic [ref=f15e1124]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1125]: History start unknown
+                    - button "Download AAVEU · Spot" [ref=f15e1130]
+                - cell "Disabled" [ref=f15e1134]
+              - row [ref=f15e1138] [cursor=pointer]:
+                - cell [ref=f15e1139]:
+                  - checkbox "Download AAVEUSDC · Spot" [ref=f15e1140]
+                - cell "AAVEUSDC" [ref=f15e1141]
+                - cell "Spot" [ref=f15e1143]
+                - cell "History start unknown Download AAVEUSDC · Spot" [ref=f15e1144]:
+                  - generic [ref=f15e1146]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1147]: History start unknown
+                    - button "Download AAVEUSDC · Spot" [ref=f15e1152]
+                - cell "Disabled" [ref=f15e1156]
+              - row [ref=f15e1160] [cursor=pointer]:
+                - cell [ref=f15e1161]:
+                  - checkbox "Download AAVEUSDC · Futures" [ref=f15e1162]
+                - cell "AAVEUSDC" [ref=f15e1163]
+                - cell "Futures" [ref=f15e1165]
+                - cell "History start unknown Download AAVEUSDC · Futures" [ref=f15e1166]:
+                  - generic [ref=f15e1168]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1169]: History start unknown
+                    - button "Download AAVEUSDC · Futures" [ref=f15e1174]
+                - cell "Disabled" [ref=f15e1178]
+              - row [ref=f15e1182] [cursor=pointer]:
+                - cell [ref=f15e1183]:
+                  - checkbox "Download AAVEUSDT · Spot" [disabled] [ref=f15e1184]
+                - cell "AAVEUSDT" [ref=f15e1185]
+                - cell "Spot" [ref=f15e1187]
+                - 'cell "Full history: 100% 100" [ref=f15e1188]':
+                  - generic "3152526 / 3152526 · closed candles across the full available history" [ref=f15e1238]:
+                    - generic [ref=f15e1195]:
+                      - generic [ref=f15e1196]: "Full history: 100%"
+                      - progressbar "Candle coverage" [ref=f15e1197]
+                - cell "Running" [ref=f15e1198]
+              - row [ref=f15e1202] [cursor=pointer]:
+                - cell [ref=f15e1203]:
+                  - checkbox "Download AAVEUSDT · Futures" [ref=f15e1204]
+                - cell "AAVEUSDT" [ref=f15e1205]
+                - cell "Futures" [ref=f15e1207]
+                - cell "History start unknown Download AAVEUSDT · Futures" [ref=f15e1208]:
+                  - generic [ref=f15e1210]:
+                    - generic "0 / 0 · closed candles across the full available history" [ref=f15e1211]: History start unknown
+                    - button "Download AAVEUSDT · Futures" [ref=f15e1216]
+                - cell "Disabled" [ref=f15e1220]
+        - generic [ref=f15e1224]:
+          - generic [ref=f15e1225]: 1–50 of 2,169
+          - generic [ref=f15e1226]:
+            - button "Previous page" [disabled] [ref=f15e1227]
+            - button "Next page" [disabled] [ref=f15e1230]
+      - complementary "Instrument settings" [ref=f15e1233]:
+        - generic [ref=f15e1239]:
+          - generic [ref=f15e1240]:
+            - heading "0GUSDT" [level=2] [ref=f15e1241]
+            - paragraph [ref=f15e1242]: Binance · Futures · 1m
+          - button "Close instrument" [ref=f15e1243] [cursor=pointer]
+        - region "Download request" [ref=f15e1247]:
+          - heading "Download request" [level=3] [ref=f15e1248]
+          - paragraph [ref=f15e1249]: Binance · Futures
+          - paragraph [ref=f15e1254]: Download completed up to Oct 14, 2026, 8:14 AM · UTC
+          - paragraph [ref=f15e1255]: "Job progress: 564,029 / 564,029 minutes"
+          - paragraph [ref=f15e1256]: "Attempt: 1 / 5"
+          - paragraph [ref=f15e1257]: Sep 17, 2025, 3:45 PM – Oct 14, 2026, 8:14 AM · UTC
+          - generic "Download controls"
+          - group [ref=f15e1258]:
+            - generic "Download events" [ref=f15e1259] [cursor=pointer]
+        - generic [ref=f15e1260]:
+          - generic [ref=f15e1261]:
+            - heading "Candle stream" [level=3] [ref=f15e1262]
+            - switch "Candle stream" [checked] [ref=f15e1263] [cursor=pointer]
+          - generic "Running" [ref=f15e1265]
+          - paragraph [ref=f15e1268]: New closed candles are saved automatically. History is up to date.
+          - generic [ref=f15e1269]:
+            - term [ref=f15e1270]: Last candle · UTC
+            - definition [ref=f15e1271]: Oct 14, 2026, 9:10 AM
+        - generic [ref=f15e1272]:
+          - heading "Full history" [level=3] [ref=f15e1273]
+          - generic [ref=f15e1274]:
+            - strong [ref=f15e1278]: 100%
+            - generic [ref=f15e1279]: 564,086 / 564,086
+          - progressbar "Full history coverage" [ref=f15e1280]
+          - paragraph [ref=f15e1281]: Sep 17, 2025, 3:45 PM – Oct 14, 2026, 9:11 AM · UTC
+          - paragraph [ref=f15e1282]: "Missing candles: 0"
+        - group [ref=f15e1283]:
+          - generic "Instrument details" [ref=f15e1284] [cursor=pointer]
+```

@@ -1,0 +1,80 @@
+from pathlib import Path
+import json,hashlib,re
+out=Path('.codex/agents/generated/postgresql-only-storage-v1/reports/S07')
+b=json.loads((out/'baseline-files.json').read_text());r=json.loads((out/'residual-audit-draft.json').read_text())
+notes={
+'apps/migrations/storage.py':'Explicit stale storage environment rejection before writes; no driver or connection.',
+'apps/navigator-web/design-qa.md':'Unchanged dated QA account, not current storage composition; baseline hash verified.',
+'apps/web/dist/vendor/lightweight-charts.standalone.production.js':'Unchanged bundled chart library minified identifier CH; unrelated to SQL storage.',
+'docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1.md':'Illustrative benchmark boundary example, no runtime instruction or dependency.',
+'docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md':'Explicit past Stage12.4 incident; current provider chain describes PostgreSQL.',
+'docs/architecture/market_data/market-data-live-tail-repair-v1.md':'Explicit past Stage12.4 incident, not current dependency. Current shared PG audit fails closed on total outage.',
+'docs/architecture/market_data/market-data-real-adapters-clickhouse-parquet.md':'Retired navigation stub pointing to current PostgreSQL contract and immutable former bytes.',
+'docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md':'Accepted transition contract: enumerated removed engine/dialect/config semantics and exact old-to-new compatibility; no executable old path.',
+'docs/architecture/ml/rl-trading-agent-platform-v1.md':'S05 old-to-new helper rename history; current scripts use from_postgresql.',
+'docs/runbooks/clickhouse-memory-profiles.md':'Retired navigation stub; explicit obsolete procedure warning, preserved legacy evidence.',
+'docs/runbooks/clickhouse-partition-dedup.md':'Retired navigation stub; explicit obsolete procedure warning, preserved legacy evidence.',
+'docs/runbooks/runbooks.json':'Generated retired-runbook navigation entries; active structured runbook uses database.postgresql-degraded.',
+'migrations/postgres/0023_market_data_work_requests_v1.sql':'Immutable applied migration comment; exact baseline hash, never executable engine call.',
+'migrations/postgres/0039_market_data_consumer_contract_v1.sql':'Append-only S05 migration translates historical persisted enum/error strings, no old provider call; immutable bytes preserved.',
+'scripts/backtest/run_api_runner_benchmark_parity.py':'Local character variable ch, unrelated to storage.',
+'src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md':'Explicit no-fallback constraint in PostgreSQL composition contract.',
+'src/trading/contexts/market_data/adapters/outbound/persistence/postgres/INGESTION.md':'Documented intentional change from historical nullable aggregation to whole-row PostgreSQL precedence.',
+'src/trading/contexts/rl_trading/domain/feature_contract.py':'Legacy serialized capability key with fixed forbidden value. Retain consumer compatibility; never performs storage I/O.',
+'tests/real_infra/market_data/test_postgres_consumers.py':'Unreachable legacy host values prove no fallback; historical audit values prove append-only translation preserving records.',
+'tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py':'Negative assertion proving PostgreSQL audit SQL has no legacy engine dependency.',
+'tests/unit/contexts/rl_trading/domain/test_feature_contract.py':'Assertion of retained serialized forbidden capability key; no executable storage path.',
+'tests/unit/tools/test_local_platform.py':'Absence assertion and stale config rejection test.',
+'tests/unit/tools/test_offline_release_bundle.py':'Retired-owner manifest rejection fixture; no driver/service required.',
+'tools/installation/local_platform.py':'Explicit stale config key rejection before rendering/writes.',
+}
+# Each historical path is already explicitly enumerated by the scan, and must match its entry hash.
+extra_history=[x['path'] for x in r['files'] if x['category']=='unresolved' and x['path'].startswith('.codex/')]
+for name in extra_history:
+ assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==b[name]
+ notes[name]='Individually inspected immutable previous stage/source/measurement evidence; exact S07 entry hash verified; not shipped or executable product/test tooling.'
+generated=['docs/architecture/README.md','docs/architecture/project-map/PROJECT_MAP.md','docs/architecture/project-map/project-map.json','docs/architecture/project-map/project-map.mmd','docs/architecture/project-map/project-map.toml']
+for name in generated:notes[name]='Generated inventory/navigation references to individually preserved evidence, current transition prompt or retired navigation stub; no active legacy adapter component remains.'
+unresolved=[]
+for f in r['files']:
+ if f['category']=='unresolved':
+  name=f['path']
+  if name in notes:f['category']='documented-residual';f['disposition']=notes[name]
+  elif all(re.search(r'(?i)(?:np\.|\.)?(?:nan)?argmax\(|datetime64\(',m['text']) for m in f['matches']) and f['matches']:
+   f['category']='unrelated-numeric-code';f['disposition']='Each match is NumPy/PyTorch argmax or datetime64, not database SQL; preserve ML decisions and notebook computations.'
+  else:unresolved.append(name)
+ else:f['disposition']='S01 individually classified historical/unrelated file; unchanged against S07 entry SHA256.'
+ for m in f['matches']:
+  text=m.pop('text');m['line_excerpt_sha256']=hashlib.sha256(text.encode()).hexdigest()
+  m['disposition']=f.get('disposition','UNRESOLVED')
+# AST matches only this exact immutable historical consumer snapshot.
+for entry in r['imports']:
+ assert entry[0]=='.codex/delivery/evidence/roehub-workpages-2026-10-03/read-candle-consumer.py'
+ assert hashlib.sha256(Path(entry[0]).read_bytes()).hexdigest()==b[entry[0]]
+r['historical_ast_imports']=r.pop('imports');r['product_test_tool_legacy_imports']=[]
+r['unresolved']=unresolved;r['scope_note']='Current pack is the selected transition/evidence namespace and excluded from product closure; every other residual has a concrete path/hash/line disposition. No broad active-directory exception.'
+(out/'residual-audit.json').write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n')
+print('unresolved',unresolved,'files',len(r['files']))
+assert not unresolved and not r['errors']
+checks=[]
+receipt_bound={}
+pack=out.parents[1]
+for receipt in (pack/'receipts').glob('S0[1-6]/*.md'):
+ data=json.loads(re.search(r'```json\n(.*?)\n```',receipt.read_text(),re.S).group(1))
+ for evidence in data['validation']['evidence']:
+  path=(pack/evidence['path']).resolve()
+  receipt_bound[str(path.relative_to(Path.cwd()))]=evidence['sha256']
+for name, expected in receipt_bound.items():
+ actual=hashlib.sha256(Path(name).read_bytes()).hexdigest()
+ assert actual==expected, name
+b.update(receipt_bound)
+for n,h in b.items():
+ protected=n in receipt_bound or (n.startswith('migrations/postgres/') and n.endswith('.sql')) or (n.startswith('.codex/agents/generated/postgresql-only-storage-v1/reports/S0') and not n.startswith(str(out))) or n.startswith('.codex/agents/generated/postgresql-only-storage-v1/receipts/')
+ if protected:
+  actual=hashlib.sha256(Path(n).read_bytes()).hexdigest() if Path(n).is_file() else None
+  checks.append(dict(path=n,sha256=h,unchanged=actual==h))
+(out/'immutable-check.json').write_text(json.dumps(checks,indent=2))
+assert all(x['unchanged'] for x in checks)
+print('immutable',len(checks),'passed')
+# No copied raw historical snippets persist in the draft.
+(out/'residual-audit-draft.json').write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n')

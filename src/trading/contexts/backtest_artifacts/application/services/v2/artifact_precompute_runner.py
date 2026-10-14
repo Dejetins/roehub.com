@@ -9005,7 +9005,7 @@ def _epoch_millis_to_utc_timestamp_v2(value: int) -> UtcTimestamp:
     Returns:
         UtcTimestamp: Shared-kernel UTC timestamp.
     Assumptions:
-        Millisecond timestamps already follow canonical `DateTime64(3, 'UTC')` precision.
+        Millisecond timestamps already follow canonical `UTC millisecond timestamp` precision.
     Raises:
         None.
     Side Effects:

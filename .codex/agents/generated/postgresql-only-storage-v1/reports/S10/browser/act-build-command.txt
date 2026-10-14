@@ -1,0 +1,6 @@
+### Result
+{"status":202,"data":{"command_id":"8b50cfca-a7d5-490c-aaf3-9ebad96be00b","items":[{"coordinate":{"exchange":"binance","market_type":"spot","symbol":"ACTUSDT"},"request_id":"ec8287b0-7320-48c3-9566-138f30f030bd","state":"queued","outcome":"submitted","control_version":1}]}}
+### Ran Playwright code
+```js
+await (async page => { const r=await page.request.post("http://127.0.0.1:20120/api/backtest-artifacts/build-requests",{headers:{Origin:"http://127.0.0.1:20120","Idempotency-Key":"s10-20261014-act-proof"},data:{items:[{coordinate:{exchange:"binance",market_type:"spot",symbol:"ACTUSDT"},expected_version:0}]}}); return {status:r.status(),data:await r.json()}; })(page);
+```

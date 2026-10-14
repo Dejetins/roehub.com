@@ -1,0 +1,66 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_runbooks",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "OK: runbooks up-to-date (8 Russian docs + JSON index)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.artifacts.generate_schemas",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.backup.generate_schemas",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "backup schemas passed: mode=check\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "tools/release/generate_runtime_topology.py",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "runtime topology generation passed: mode=check, profiles=base,trading,ml\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "tools/release/runtime_input_inventory.py",
+      "--check"
+    ],
+    "code": 0,
+    "stdout": "runtime input inventory passed: mode=check, total=121\n",
+    "stderr": ""
+  }
+]

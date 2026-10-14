@@ -23,10 +23,6 @@ scrape_configs:
   static_configs:
   - targets:
     - alertmanager:9093
-- job_name: loki
-  static_configs:
-  - targets:
-    - loki:3100
 - job_name: blackbox-http
   metrics_path: /probe
   params:
@@ -57,16 +53,6 @@ scrape_configs:
       service: backtest-job-runner
     targets:
     - http://backtest-job-runner:9204/metrics
-  - labels:
-      capability: storage.clickhouse
-      service: clickhouse
-    targets:
-    - http://clickhouse:8123/ping
-  - labels:
-      capability: runtime.service
-      service: clickhouse-exporter
-    targets:
-    - http://clickhouse-exporter:9116/metrics
   - labels:
       capability: trading.execution
       service: exchange-control
@@ -103,11 +89,6 @@ scrape_configs:
     targets:
     - http://openbao:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200
   - labels:
-      capability: extensions.plugins
-      service: plugin-gateway
-    targets:
-    - http://plugin-gateway:9209/health/ready
-  - labels:
       capability: trading.strategy
       service: strategy-live-runner
     targets:
@@ -137,11 +118,6 @@ scrape_configs:
   - replacement: blackbox:9115
     target_label: __address__
   static_configs:
-  - labels:
-      capability: storage.postgresql
-      service: postgresql
-    targets:
-    - postgresql:5432
   - labels:
       capability: transport.redis
       service: redis

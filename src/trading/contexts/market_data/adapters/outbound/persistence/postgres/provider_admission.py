@@ -14,10 +14,11 @@ import psycopg
 
 from trading.contexts.market_data.application.ports.provider_admission import ProviderRequest
 from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 def _connect(dsn: str):
-    connection = psycopg.connect(
+    connection = budget_connect(
         dsn,
         autocommit=True,
         connect_timeout=2,
@@ -73,9 +74,9 @@ class PostgresProviderAdmission:
                         "(provider,scope,dimension,seconds,bucket,spent) VALUES (%s,%s,%s,%s,%s,0) "
                         "ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET "
                         "spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket "
-                        'THEN market_data_provider_windows.spent ELSE 0 '
-                        'END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.'
-                        'bucket)',
+                        "THEN market_data_provider_windows.spent ELSE 0 "
+                        "END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED."
+                        "bucket)",
                         (request.provider, request.scope, window.dimension, window.seconds, bucket),
                     )
                     spent = connection.execute(

@@ -1,0 +1,12 @@
+{
+  "action": "stop",
+  "services": [
+    "market-data-ws",
+    "market-data-scheduler",
+    "backtest-artifact-publisher"
+  ],
+  "operation_id": "4a5797f5-50d9-4652-b92e-ca30ecda617a",
+  "returncode": 0,
+  "stdout": "{\"action\": \"stop\", \"active_services\": [\"api\", \"clickhouse\", \"operational-health\", \"postgresql\", \"web\"], \"detail_code\": \"topology.stopped\", \"journal_sequence\": 333, \"operation_id\": \"4a5797f5-50d9-4652-b92e-ca30ecda617a\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

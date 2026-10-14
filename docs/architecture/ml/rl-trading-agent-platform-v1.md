@@ -1,5 +1,22 @@
 # RL Trading Agent Platform v1
 
+## Consumer wiring — S05, 2026-10-14
+
+Прямые SQL callers stage04b/05/06/08j переведены на PostgreSQL; dataset transport использует bounded cursor и read-only memmap. Имена внутренних `from_clickhouse` helpers заменены на `from_postgresql` в согласованной версии. Статические datasets, обучение и historical evidence не переписываются.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Потребители сохраняют domain/array/API и security границы. S05 переносит wiring и прямые SQL/script callers; S08 доказывает numerical/runtime parity. Упоминание прежнего engine ниже не задаёт целевую зависимость.
+
+
 Статус: architecture plan для staged внедрения платформенного RL/ML trading agent на базе концепции D3QN/PER из `YuriyKolesnikov/rl-trading-binance`, но с посадкой в текущую архитектуру Roehub. Документ не является реализацией и не открывает mainnet execution сам по себе.
 
 ## Цель
@@ -129,13 +146,13 @@ Backtest/live distinction:
 
 ## Latency Budget
 
-Safety boundary не должен добавлять заметную задержку в live execution path. Целевой runtime path держит модель загруженной в памяти, live feature window обновляет на закрытых 1m candles, а `source_event` и optional `intent` записывает коротким durable write path без тяжелой ML/ClickHouse работы в момент исполнения.
+Safety boundary не должен добавлять заметную задержку в live execution path. Целевой runtime path держит модель загруженной в памяти, live feature window обновляет на закрытых 1m candles, а `source_event` и optional `intent` записывает коротким durable write path без тяжелой ML/PostgreSQL работы в момент исполнения.
 
 Начальные target budgets являются рабочими ориентирами до Stage `13`/`17` measurements:
 
 | Segment | Target before evidence | Rule |
 |---|---:|---|
-| Candle close -> feature window ready | p95 <= 250 ms | No full ClickHouse scan on hot path; repair only on gap/degraded state. |
+| Candle close -> feature window ready | p95 <= 250 ms | No full PostgreSQL scan on hot path; repair only on gap/degraded state. |
 | Feature window -> model decision | p95 <= 100 ms | Model preloaded; no checkpoint load per decision. |
 | Decision -> `source_event` persisted | p95 <= 50 ms | Durable audit insert must stay lightweight. |
 | `source_event` -> accepted/rejected `intent` | p95 <= 100 ms | Risk/sizing/quota checks must be local and bounded. |
@@ -199,8 +216,8 @@ flowchart LR
 
 | Слой | Может зависеть от | Не должен зависеть от |
 |---|---|---|
-| `rl_trading` domain/application | model policy, feature contract, calibration, dataset/model metadata, ports | FastAPI, ClickHouse driver, Redis client, exchange SDK, API secrets |
-| Dataset builder adapters | ClickHouse canonical reader, artifact array loader, HF importer | execution intents/orders |
+| `rl_trading` domain/application | model policy, feature contract, calibration, dataset/model metadata, ports | FastAPI, PostgreSQL driver, Redis client, exchange SDK, API secrets |
+| Dataset builder adapters | PostgreSQL canonical reader, artifact array loader, HF importer | execution intents/orders |
 | Trainer app | PyTorch, NumPy, dataset artifacts, model registry writer | web UI, exchange SDK, secrets |
 | Inference producer | model registry reader, Redis/canonical market feed, entitlement/risk config, `live_execution` ACL | raw exchange credentials, direct order adapters |
 | `live_execution` | `ml_agent_decision` source event, risk context, order model | ML internal tensors/checkpoints |
@@ -253,7 +270,7 @@ flowchart LR
 
 1. HF dataset используется только как external reproducibility baseline.
 2. Acceptance model quality строится на Roehub-native `binance:futures` dataset over the full current Binance USD-M Futures `USDT` perpetual trading universe, not only over symbols that appeared in the external HF train split.
-3. Existing `.npy` artifact arrays можно использовать как fast OHLCV source, но v1 RL feature dataset обязан augment-ить `vwap` и `num_trades` из Binance Futures ClickHouse canonical/raw rows или materialize separate RL feature artifacts.
+3. Existing `.npy` artifact arrays можно использовать как fast OHLCV source, но v1 RL feature dataset обязан augment-ить `vwap` и `num_trades` из Binance Futures PostgreSQL canonical/raw rows или materialize separate RL feature artifacts.
 4. Binance spot, Bybit spot, and Bybit futures are not training sources in v1. Stage `02B` records them as `blocked_not_training_source_v1`; it does not spend the current cycle on Bybit `trades_count` enrichment or feature-mask training branches.
 5. Binance Futures evaluation cannot be treated as production-realistic until Stage `02B`/`05`/`08` define funding/fee/slippage/contract-spec coverage or explicitly record a research-only approximation.
 6. Splits строятся по времени и instrument lifecycle, а не только по активным сегодня symbols; delisted/inactive intervals должны попадать в inventory как known missing/known unavailable, если исторические данные недоступны.
@@ -278,10 +295,10 @@ Feature generation должен быть общим контрактом, а н�
 | Rule | Requirement |
 |---|---|
 | Shared builder | Dataset builder и live inference producer используют один feature-contract модуль или один набор pure functions для channel order, normalization, action-history extras и metadata. |
-| Golden windows | Stage `05`/`13` создают golden fixtures: один и тот же candle window из ClickHouse/artifact должен давать одинаковый feature vector в offline dataset и live inference path. |
+| Golden windows | Stage `05`/`13` создают golden fixtures: один и тот же candle window из PostgreSQL/artifact должен давать одинаковый feature vector в offline dataset и live inference path. |
 | Tolerance | Для `float32` normalized features acceptance через `np.testing.assert_allclose(..., rtol=1e-6, atol=1e-6)`; если MPS/NumPy path требует иной tolerance, Stage report обязан доказать причину и зафиксировать ее в feature contract. |
 | Source ordering | Channel order фиксируется как `open, high, vwap, low, close, volume, num_trades` для article-compatible `binance:futures` mode. No feature-mask training branch exists in v1; any future alternative model would require a separate accepted plan and a separate `feature_contract_hash`. |
-| Live gaps | Live inference читает Redis closed candles для hot path и допускает read-only ClickHouse canonical repair при gaps по паттерну strategy live-runner; full ClickHouse scan на hot path запрещен. |
+| Live gaps | Live inference читает Redis closed candles для hot path и допускает read-only PostgreSQL canonical repair при gaps по паттерну strategy live-runner; full PostgreSQL scan на hot path запрещен. |
 | Drift guard | Feature stats в live сравниваются с promotion baseline; drift создает retraining candidate task/alert, но не меняет active model автоматически. |
 
 Live feed feature gate:
@@ -290,7 +307,7 @@ Live feed feature gate:
 |---|---|
 | Preferred | Stage `02B`/`05` расширяет live feature window так, чтобы `trades_count` был доступен на hot path вместе с `open/high/low/close/volume_base/volume_quote`; `vwap` считается из `volume_quote / volume_base` только при валидном `volume_base > 0`. |
 | Fallback | For v1 training there is no fallback training branch without `num_trades`: non-`binance:futures` branches are `blocked_not_training_source_v1`. A future accepted plan may introduce a separate feature-mask model, but that is outside this cycle. |
-| Block | Market branch блокируется как `blocked`, если нельзя доказать train/live feature parity без тяжелого ClickHouse repair на обычном hot path. |
+| Block | Market branch блокируется как `blocked`, если нельзя доказать train/live feature parity без тяжелого PostgreSQL repair на обычном hot path. |
 | Stage `13` acceptance | `monitor_only` inference не accepted, пока Redis/live feature window и offline dataset fixture не дают идентичный feature vector для одного candle window в пределах tolerance. |
 
 ### Session Extraction Policy
@@ -334,7 +351,7 @@ V1 target training universe policy:
 | Ref/enrichment | After whitelist update, sync to `market_data.ref_instruments` and enrich from exchange metadata so filters/steps/min-notional are current before backfill. |
 | Source lower bound | For each symbol use `max(required_source_window_start, exchange onboard/listing/history start)`. Never request candles before exchange-confirmed availability. |
 | Backfill source | Use existing market-data REST/scheduler/fill path if it supports explicit historical ranges safely; if the current CLI only supports parquet or seeded catch-up, Stage `04B` must implement the narrowest operator-safe range runner around existing `RestCandleIngestSource`/`RestFillRange1mUseCase` or block. Existing 215-symbol Stage `04B` progress is treated as a reusable partial backfill, not as the final universe. |
-| Long-running backfill behavior | Stage `04B` must not keep an agent session open waiting for the entire history to load. It starts a managed resumable/background backfill, verifies within a bounded observation window that rows/high-watermarks started moving in ClickHouse, records job/log/resume evidence, and stops. Full Stage `04B` acceptance still requires a later completed-coverage check; start-only proof leaves the stage `in_progress` and does not unlock Stage `04C`. |
+| Long-running backfill behavior | Stage `04B` must not keep an agent session open waiting for the entire history to load. It starts a managed resumable/background backfill, verifies within a bounded observation window that rows/high-watermarks started moving in PostgreSQL, records job/log/resume evidence, and stops. Full Stage `04B` acceptance still requires a later completed-coverage check; start-only proof leaves the stage `in_progress` and does not unlock Stage `04C`. |
 | Coverage acceptance | Backfill is accepted only with per-symbol first/last, missing minutes, duplicates, `volume_quote`, `trades_count`, and `vwap` computability report for the required source windows. |
 | Dataset versions | Produce at least two refresh manifests when coverage permits: `hf_period_rebuild_current_trading` for HF-compatible time windows over the full current USDT perpetual universe, and `post_hf_extension_current_trading` for data after `2025-06-01`. Do not overwrite the external HF baseline. |
 
@@ -510,7 +527,7 @@ Stage `09` final result on 2026-07-02: accepted locally. The stage added additiv
 
 Минимальный v1 lifecycle:
 
-1. `dataset_version` создается из ClickHouse/artifacts с deterministic manifest, hashes, split policy и feature availability mask.
+1. `dataset_version` создается из PostgreSQL/artifacts с deterministic manifest, hashes, split policy и feature availability mask.
 2. Stage `07A` создает trainer/runtime capability smoke. После Stage `08` rejection этот stage остается техническим smoke, но не считается достаточным переносом upstream methodology.
 3. Stage `07B` historical run остается accepted как завершенный runtime experiment, но его candidate rejected/superseded after Stage `08`; он не может питать Stage `09`.
 4. Stage `08A` фиксирует upstream methodology parity matrix: source file/function map, gap list, tests to add, accepted deviations and license/attribution notes.
@@ -710,11 +727,11 @@ Backend-only v1 без billing:
 |---|---|---|---|---|---|
 | UI | `apps/api` | HTTP | RL tab config, model registry summaries, active ticker CRUD, mode changes | Existing frontend timeout; no hidden retry for mode/live activation | Show stable blocked reason |
 | API | RL application use cases | In-process | Validate ticker slots, policy config, model availability | DB transaction timeout; idempotency for activate/deactivate | Return typed error, no partial activation |
-| Dataset builder | ClickHouse canonical | Read-only SQL | Feature extraction from `market_data.canonical_candles_1m` | Bounded chunking; no concurrent-session misuse | Stage blocked if coverage or feature availability missing |
+| Dataset builder | PostgreSQL canonical | Read-only SQL | Feature extraction from `market_data.canonical_candles_1m` | Bounded chunking; no concurrent-session misuse | Stage blocked if coverage or feature availability missing |
 | Dataset builder | Artifact arrays | Filesystem mmap | Fast OHLCV source from pinned manifests | Fail-fast hash/manifest validation | No fallback to unpinned arrays |
 | Universe resolver | Binance Futures REST metadata | Public REST read | `exchangeInfo` current `TRADING` USDT perpetual universe and onboard/listing metadata | Bounded retries with rate-limit awareness; no secret-bearing endpoints | Excluded symbols are recorded and never backfilled if not currently tradable USDT perpetual |
-| Market-data onboarding | Whitelist/ref/enrichment use cases | Config + ClickHouse metadata write | Add accepted `binance:futures` symbols to whitelist, sync `ref_instruments`, enrich filters/steps/min-notional | Idempotent sync/enrich; no blind duplicate rows outside existing writer semantics | Stage blocks if whitelist/ref/enrichment evidence is missing |
-| Historical backfill runner | Binance Futures REST + ClickHouse raw writer | Public REST read + market-data raw write | Fill accepted symbol/source windows into raw/canonical 1m pipeline | Chunked ranges, resume manifest, rate-limit delays, dedup/read-back coverage check | Gaps remain explicit; no synthetic candles and no retry storm |
+| Market-data onboarding | Whitelist/ref/enrichment use cases | Config + PostgreSQL metadata write | Add accepted `binance:futures` symbols to whitelist, sync `ref_instruments`, enrich filters/steps/min-notional | Idempotent sync/enrich; no blind duplicate rows outside existing writer semantics | Stage blocks if whitelist/ref/enrichment evidence is missing |
+| Historical backfill runner | Binance Futures REST + PostgreSQL raw writer | Public REST read + market-data raw write | Fill accepted symbol/source windows into raw/canonical 1m pipeline | Chunked ranges, resume manifest, rate-limit delays, dedup/read-back coverage check | Gaps remain explicit; no synthetic candles and no retry storm |
 | Trainer | Model registry | Filesystem + Postgres metadata | Write dataset/run/model artifacts and hashes | Atomic write temp->rename; metadata after file hash | Failed run stays rejected/incomplete |
 | Host-local operator command / authorized UI | Model registry and promotion use cases | CLI first; guarded HTTP later | Retrain, promote, rollback candidate/champion state | Idempotent by run/model/calibration hash and confirmation id | No activation if operator authority is missing or ambiguous |
 | Inference producer | Redis/canonical market feed | Async/read | Closed 1m candles and gap repair | Backoff; no busy loop | Signal generation pauses with observable degraded reason |
@@ -783,9 +800,9 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 
 | Stage | Name | Purpose | Dependency | Acceptance evidence |
 |---|---|---|---|---|
-| `01` | Baseline and plan freeze | Freeze current ML/execution/data/user constraints, create ledger. | none | plan + ledger, ClickHouse feature snapshot, dirty-worktree note, docs index. |
-| `02A` | Data source inventory | Inventory HF tickers, Roehub ClickHouse coverage, artifact arrays, exchange/market coverage, instrument lifecycle, raw gaps and current classic producer blocker state. | `01` | SQL coverage, HF ticker manifest, artifact manifests, lifecycle/gap report, classic Stage `05` blocker recorded, no feature contract decisions hidden. |
-| `02B` | Feature and live-feed contract | Freeze `binance:futures` article-compatible training feature contract, channel order, missing fields, futures metadata gate and Redis/live feature hot-path decision; record non-training market branches as blocked for v1 training. | `02A` | feature contract hash, training-source matrix with `binance:futures=trainable|research_only_approximation|blocked` and Binance spot/Bybit spot/Bybit futures as `blocked_not_training_source_v1`, live `trades_count`/block decision, no hot-path full ClickHouse scan. |
+| `01` | Baseline and plan freeze | Freeze current ML/execution/data/user constraints, create ledger. | none | plan + ledger, PostgreSQL feature snapshot, dirty-worktree note, docs index. |
+| `02A` | Data source inventory | Inventory HF tickers, Roehub PostgreSQL coverage, artifact arrays, exchange/market coverage, instrument lifecycle, raw gaps and current classic producer blocker state. | `01` | SQL coverage, HF ticker manifest, artifact manifests, lifecycle/gap report, classic Stage `05` blocker recorded, no feature contract decisions hidden. |
+| `02B` | Feature and live-feed contract | Freeze `binance:futures` article-compatible training feature contract, channel order, missing fields, futures metadata gate and Redis/live feature hot-path decision; record non-training market branches as blocked for v1 training. | `02A` | feature contract hash, training-source matrix with `binance:futures=trainable|research_only_approximation|blocked` and Binance spot/Bybit spot/Bybit futures as `blocked_not_training_source_v1`, live `trades_count`/block decision, no hot-path full PostgreSQL scan. |
 | `02C` | Action/state/reward contract | Freeze RL environment semantics, action/state/reward mapping, position ownership, close scope and external-repo-compatible fixtures. | `02B` | action/reward/state contract tests planned, no-pyramiding/no-cross-strategy-close fixtures, reward compatibility notes. |
 | `03` | Mac Studio ML environment | Create isolated `uv` ML env with PyTorch, CPU/MPS smoke, resource isolation policy and no API runtime dependency. | `02C` | `torch.backends.mps.is_available`, CPU/MPS microbenchmark, RSS/thread report, accepted device/fallback policy. |
 | `04` | External repo/HF reproducibility | Import external repo concept safely and reproduce a small HF train/eval/backtest baseline. | `03` | dataset hash, run config hash, metrics, no vendored code without attribution/license note. |
@@ -821,7 +838,7 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | accepted `09B`, accepted `10`, and accepted research candidate from `08M` or later | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
 | `11` | RL tab UI skeleton | Add `/strategies` RL/ML tab for model status, ticker slots, modes, risk config and authorized operator controls for retraining/rollback actions; extend the reusable strategy signal/outcome read model instead of creating an RL-only signal panel. | `09B`,`10A` | browser QA, API read models, authorized rollback UI control test, delivery-neutral signal/outcome read model, no live side effects. |
 | `12` | Backend entitlements | Enforce active live ticker quotas from current `paid_level` (`base/free/pro/ultra`) plus optional RL override for Enterprise/custom. | `11` | transactional quota tests, UI blocked reason, audit rows, unknown/ambiguous level fail-closed tests. |
-| `13` | Monitor-only inference producer | Supervised inference producer emits `ml_agent_decision` source events with `no_intent` and proves train/live feature parity. | `10`,`10A`,`11`,`12` | Monit/Prometheus, Redis/canonical feed with ClickHouse repair only on gaps, DB source events, Redis/live vs offline golden feature parity, common UI signal/outcome journal for `source_type=ml_agent_decision`. |
+| `13` | Monitor-only inference producer | Supervised inference producer emits `ml_agent_decision` source events with `no_intent` and proves train/live feature parity. | `10`,`10A`,`11`,`12` | Monit/Prometheus, Redis/canonical feed with PostgreSQL repair only on gaps, DB source events, Redis/live vs offline golden feature parity, common UI signal/outcome journal for `source_type=ml_agent_decision`. |
 | `14` | User risk/sizing policy | Add configurable risk/sizing profiles for RL ticker activation, including synthetic platform-side exits. | `13` | API/UI tests, invalid policy blocks, TP/SL/trailing as synthetic exits only, no exchange-native advanced order fields, no exchange submit. |
 | `15` | Paper RL integration | Convert accepted decisions to paper intents/orders through existing execution path and reconcile simulator vs paper accounting. | classic producer Stage `07` accepted; RL `14` | paper ledger proof, PnL accounting, simulator/accounting/paper parity within tolerance, duplicate/idempotency evidence. |
 | `16` | Testnet RL integration | Run Binance/Bybit spot/futures testnet with safe guards and no mainnet. | classic producer Stage `09` accepted; RL `15` | real testnet orders/fills/reconciliation, unsupported branch blocks. |
@@ -838,7 +855,7 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | Stage | Primary planned artifacts |
 |---|---|
 | `01` | This plan, stage ledger, Stage `01` report, docs index. |
-| `02A` | Data inventory report, ClickHouse/HF/artifact coverage report, exchange/market/instrument lifecycle/gap report, classic producer blocker note. |
+| `02A` | Data inventory report, PostgreSQL/HF/artifact coverage report, exchange/market/instrument lifecycle/gap report, classic producer blocker note. |
 | `02B` | `src/trading/contexts/rl_trading/...feature_contract...`, feature contract note/tests plan, Binance Futures metadata gate report, live-feed `trades_count|blocked` decision, training-source matrix. |
 | `02C` | Action/reward/state contract note, external-repo-compatible fixtures plan, no-pyramiding and strategy-owned close tests plan. |
 | `03` | ML dependency group/config, Mac Studio env runbook, benchmark/resource isolation report. |

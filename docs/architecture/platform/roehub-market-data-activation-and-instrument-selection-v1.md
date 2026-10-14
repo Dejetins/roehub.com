@@ -1,5 +1,12 @@
 # Roehub — активация рыночных данных и выбор инструментов v1
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Selections/settings сохраняются. Coverage/frontier/jobs/cache и artifact inputs, зависящие от старой истории, получают новое generation/invalidation; reset ограничен derived market state.
+
+
 **Уточнение целевой архитектуры от 2026-07-16:** реализованные egress,
 organizational selection, coverage и ingestion evidence сохраняются. Будущий
 пользовательский каталог, snapshot/cursor API, экран выбора и resource review
@@ -33,7 +40,7 @@ organizational selection, coverage и ingestion evidence сохраняются.
 Активная стратегия ──pin──> EffectiveSelection ├──> scheduler / WS / REST
 Каталог биржи ────────────────────────────────┘          │
                                                          v
-                                              ClickHouse canonical candles
+                                              PostgreSQL canonical candles
                                                          │
                                                          v
                                        coverage + artifact inventory ──> API/Web
@@ -50,7 +57,7 @@ organizational selection, coverage и ingestion evidence сохраняются.
 | Поверхность | Изменение | Класс | Совместимость и откат |
 |---|---|---|---|
 | API / DTO | Добавляются каталог, selections, effective state, coverage и artifact inventory | `compatible-change` | Новые versioned endpoints/поля; старый readiness остаётся до migration docs |
-| Хранение | PostgreSQL selections и migrations; ClickHouse read-model для coverage | `breaking-change` | Только greenfield/новая migration; downgrade сохраняет rows, но не использует их |
+| Хранение | PostgreSQL selections и migrations; PostgreSQL read-model для coverage | `breaking-change` | Только greenfield/новая migration; downgrade сохраняет rows, но не использует их |
 | Конфигурация | whitelist перестаёт быть источником runtime policy; появляется bootstrap default `BTCUSDT` | `breaking-change` | Явная migration/versioned generated config; без silent fallback к CSV |
 | Вызовы сервисов | worker читают effective selections, scheduler/WS получают egress | `breaking-change` | fail-closed при пустом/устаревшем каталоге; retries bounded, error metrics |
 | Браузер | onboarding и settings показывают выбор/покрытие/размер/pin | `compatible-change` | Empty/loading/error states и accessibility coverage обязательны |
@@ -63,7 +70,7 @@ organizational selection, coverage и ingestion evidence сохраняются.
 | `00` | Зафиксированы контракты, migration path и baseline | `N/A` | статический audit + focused tests |
 | `01` | Egress только для двух workers, динамические subscriptions и readiness | `00` | Docker runtime с публичным `BTCUSDT` |
 | `02` | Организационный выбор, каталог, coverage и UI onboarding/settings | `01` | PostgreSQL/API/Browser |
-| `03` | Один ручной publish, согласованная память и controlled expansion policy | `02` | Docker/ClickHouse/artifact runtime |
+| `03` | Один ручной publish, согласованная память и controlled expansion policy | `02` | Docker/PostgreSQL/artifact runtime |
 | `04` | Owner-operated OpenBao init flow, network/credential hardening и custody handoff | `03` | disposable runtime; production-like durable custody остаётся owner action |
 | `05` | Новый локальный release candidate, lifecycle и original-plan handoff | `04` | Docker Desktop/browser; `linux/amd64` остаётся отдельным blocker |
 
@@ -83,23 +90,16 @@ organizational selection, coverage и ingestion evidence сохраняются.
 Этапы `00`–`05` приняты или содержат явный owner-custody handoff для OpenBao; локальный Docker Desktop демонстрирует рабочий `BTCUSDT` path и UI. Финальный production OpenBao bootstrap и native `linux/amd64` остаются отдельными строго контролируемыми действиями.
 
 
-## Локальные ClickHouse workload identities (S02, 2026-10-10)
+## PostgreSQL workloads
 
-Текущий managed local renderer владеет четырьмя классами `stream`, `interactive`,
-`backfill`, `artifacts`; назначение находится в composition roots, включая
-дочерние процессы collector. Все процессы класса используют одну серверную
-identity, поэтому per-user memory/concurrency caps действуют совместно на одном
-ClickHouse server. Смена профиля и снятие caps обычным клиентом запрещены.
-
-Жизненный цикл `legacy` → `provisioned` → `active` отделяет подготовку серверных
-профилей/секретов от переключения клиентов. Private credentials сохраняются при
-повторной генерации, отдельный workload получает только свой password file.
-Rollback после drain возвращает клиентов в `provisioned`, сохраняя additive
-identities и данные. Existing credentials не ротируются и не удаляются. Точные
-лимиты, grants/MV, административные исключения и команды приведены в разделе
-S02 `docs/runbooks/navigator-local-market-data-recovery.md`; состояние фактической
-активации фиксирует отчёт S02. Выбор инструментов и полномочия организаций не
-изменены. Generic offline topology не включается этим локальным переключателем.
+`interactive`, `ingestion`, `bulk` выбирает trusted composition. Все используют
+явный `STRATEGY_PG_DSN` и общий installation registry с budget 16/24/8 до handshake.
+База объединяет market storage и control-plane fencing. Это connection admission,
+а не отдельные серверные memory identities. Ограниченные transactions и deadlines
+описаны в PostgreSQL storage contract и local Market Data recovery runbook.
+Выбор инструментов, организационные права и provider admission сохраняются.
+Installed cutover выполняется отдельно по S10; source configuration не доказывает
+активацию конкретной установки.
 
 ## Общий REST egress scope (S03, 2026-10-10)
 

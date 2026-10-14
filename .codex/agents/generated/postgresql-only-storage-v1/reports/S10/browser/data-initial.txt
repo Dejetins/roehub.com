@@ -1,0 +1,88 @@
+### Page
+- Page URL: http://127.0.0.1:20120/data
+- Page Title: Data · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f2e8]:
+  - link "Skip to content" [ref=f2e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - complementary [ref=f2e10]:
+    - generic "RoeHub" [ref=f2e11]: R
+    - navigation "Navigation" [ref=f2e12]:
+      - link "Overview" [ref=f2e13] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f2e20] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f2e24] [cursor=pointer]:
+        - /url: /strategies
+      - link "Data" [ref=f2e28] [cursor=pointer]:
+        - /url: /data
+      - link "Connections" [ref=f2e34] [cursor=pointer]:
+        - /url: /connections
+      - link "Monitoring" [ref=f2e38] [cursor=pointer]:
+        - /url: /monitoring
+      - link "Settings" [ref=f2e42] [cursor=pointer]:
+        - /url: /settings/profile
+    - group [ref=f2e47]:
+      - 'generic "Language: EN" [ref=f2e48] [cursor=pointer]': EN
+    - link "Sign out" [ref=f2e51] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f2e56]:
+    - generic [ref=f2e57]:
+      - text: Data
+      - generic [ref=f2e58]: Navigator
+    - generic [ref=f2e59]:
+      - complementary [ref=f2e60]:
+        - heading "Exchanges" [level=2] [ref=f2e63]
+        - navigation "Exchanges" [ref=f2e65]:
+          - link "Binance" [ref=f2e66] [cursor=pointer]:
+            - /url: /data?exchange=binance&market=1
+          - link "Bybit" [ref=f2e70] [cursor=pointer]:
+            - /url: /data?exchange=bybit&market=3
+      - heading "Data" [active] [level=1] [ref=f2e74]
+      - region "Instrument catalog" [ref=f2e75]:
+        - navigation "Data view" [ref=f2e76]:
+          - link "Candles" [ref=f2e77] [cursor=pointer]:
+            - /url: /data
+          - link "Artifacts" [ref=f2e78] [cursor=pointer]:
+            - /url: /data?view=artifacts
+        - generic [ref=f2e79]:
+          - generic [ref=f2e80]:
+            - generic [ref=f2e81]: Search instruments
+            - searchbox "Search instruments" [ref=f2e82]
+          - button "Market" [ref=f2e84] [cursor=pointer]: All markets
+          - button "History" [ref=f2e88] [cursor=pointer]: "History: all"
+          - button "Stream" [ref=f2e92] [cursor=pointer]: "Stream: all"
+        - generic [ref=f2e95]:
+          - generic [ref=f2e96]: All available history · 1m · through the latest closed minute
+          - generic [ref=f2e97]:
+            - button "Show log" [ref=f2e98] [cursor=pointer]
+            - button "Refresh" [ref=f2e99] [cursor=pointer]
+        - generic [ref=f2e106]:
+          - generic [ref=f2e107]: Some markets have no catalog snapshot.
+          - button "Load catalog · Spot" [ref=f2e108] [cursor=pointer]
+          - button "Load catalog · Futures" [ref=f2e109] [cursor=pointer]
+        - generic "Catalog rows" [ref=f2e110]:
+          - table [ref=f2e111]:
+            - rowgroup [ref=f2e112]:
+              - row [ref=f2e113]:
+                - columnheader [ref=f2e114]:
+                  - checkbox "Select this page for download" [disabled] [ref=f2e115]
+                - columnheader [ref=f2e116]:
+                  - button "Instrument" [ref=f2e117] [cursor=pointer]
+                - columnheader [ref=f2e120]:
+                  - button "Market" [ref=f2e121] [cursor=pointer]
+                - columnheader [ref=f2e125]:
+                  - button "History / download" [ref=f2e126] [cursor=pointer]
+                - columnheader [ref=f2e130]:
+                  - button "Stream" [ref=f2e131] [cursor=pointer]
+            - rowgroup
+          - paragraph [ref=f2e135]: No matching instruments
+        - generic [ref=f2e136]:
+          - generic [ref=f2e137]: 0–0 of 0
+          - generic [ref=f2e138]:
+            - button "Previous page" [disabled] [ref=f2e139]
+            - button "Next page" [disabled] [ref=f2e142]
+      - complementary "Instrument settings" [ref=f2e145]:
+        - paragraph [ref=f2e146]: Select an instrument to manage its data.
+```

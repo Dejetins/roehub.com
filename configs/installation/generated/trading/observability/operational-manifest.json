@@ -33,26 +33,6 @@
       "timeout_seconds": 1.0
     },
     {
-      "action_ref": "diagnostics",
-      "capability": "storage.clickhouse",
-      "kind": "http_reachability",
-      "required": false,
-      "runbook_id": "database.clickhouse-degraded",
-      "service_id": "clickhouse",
-      "target": "http://clickhouse:8123/ping",
-      "timeout_seconds": 1.0
-    },
-    {
-      "action_ref": "diagnostics",
-      "capability": "runtime.service",
-      "kind": "http_reachability",
-      "required": false,
-      "runbook_id": "runtime.service-degraded",
-      "service_id": "clickhouse-exporter",
-      "target": "http://clickhouse-exporter:9116/metrics",
-      "timeout_seconds": 1.0
-    },
-    {
       "action_ref": "restart_service",
       "capability": "trading.execution",
       "kind": "http_json",
@@ -123,19 +103,9 @@
       "timeout_seconds": 1.0
     },
     {
-      "action_ref": "restart_service",
-      "capability": "extensions.plugins",
-      "kind": "http_json",
-      "required": true,
-      "runbook_id": "runtime.service-degraded",
-      "service_id": "plugin-gateway",
-      "target": "http://plugin-gateway:9209/health/ready",
-      "timeout_seconds": 1.0
-    },
-    {
       "action_ref": "diagnostics",
       "capability": "storage.postgresql",
-      "kind": "tcp_reachability",
+      "kind": "postgresql",
       "required": false,
       "runbook_id": "runtime.service-degraded",
       "service_id": "postgresql",

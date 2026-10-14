@@ -1,0 +1,93 @@
+[
+  {
+    "slot": "admin-0.json",
+    "state": "connected",
+    "pid": 154,
+    "start": "2026-10-14 08:38:29.431902+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "admin-1.json",
+    "state": "connected",
+    "pid": 157,
+    "start": "2026-10-14 08:38:30.302773+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "admin-2.json",
+    "state": "connected",
+    "pid": 6034,
+    "start": "2026-10-14 08:53:46.543938+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "admin-3.json",
+    "state": "connected",
+    "pid": 6130,
+    "start": "2026-10-14 08:54:08.802411+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "admin-4.json",
+    "state": "connected",
+    "pid": 6132,
+    "start": "2026-10-14 08:54:09.619177+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "control-2.json",
+    "state": "connected",
+    "pid": 148,
+    "start": "2026-10-14 08:38:29.178062+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "market-0.json",
+    "state": "connected",
+    "pid": 158,
+    "start": "2026-10-14 08:38:30.461561+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "market-1.json",
+    "state": "connected",
+    "pid": 6133,
+    "start": "2026-10-14 08:54:09.701119+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "market-3.json",
+    "state": "connected",
+    "pid": 1495,
+    "start": "2026-10-14 08:41:53.535238+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "market-4.json",
+    "state": "connected",
+    "pid": 4993,
+    "start": "2026-10-14 08:50:56.274535+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "market-5.json",
+    "state": "connected",
+    "pid": 6361,
+    "start": "2026-10-14 08:54:37.201394+00",
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "recovery-authority.json",
+    "state": null,
+    "pid": null,
+    "start": null,
+    "epoch": "2026-10-14 08:38:06.561818+00"
+  },
+  {
+    "slot": "retired-authority-adb01950343be8a4877295926126d8350d161f59b30a042af97555e8703abafe.json",
+    "state": null,
+    "pid": null,
+    "start": null,
+    "epoch": "2026-10-14 07:05:52.426179+00"
+  }
+]

@@ -1,5 +1,4 @@
 from .backtest import build_backtests_router
-from .extensions import build_extensions_api_module
 from .identity import build_identity_api_module, build_identity_router
 from .indicators import (
     bind_indicators_runtime_dependencies,
@@ -25,7 +24,6 @@ from .ui_strategies_dashboard import (
 
 __all__ = [
     "build_backtests_router",
-    "build_extensions_api_module",
     "build_account_settings_use_case",
     "build_dashboard_summary_service",
     "build_strategy_dashboard_service",

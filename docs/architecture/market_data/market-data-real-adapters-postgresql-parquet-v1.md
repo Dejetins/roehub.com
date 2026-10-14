@@ -1,0 +1,433 @@
+# Market Data — PostgreSQL adapters and storage transition v1
+
+Status: accepted PG-only target, documentation contract established by S01 on
+2026-10-13; **not an implemented or activated runtime**. The live source baseline
+still contains ClickHouse adapters. This document supersedes the engine-specific
+target of the former ClickHouse adapter document (removed after cutover).
+Its prior implementation account remains valid historical/current-baseline evidence.
+No migration, reset, benchmark or deployment is performed by this amendment.
+
+The selected [implementation plan](../../../.codex/agents/generated/postgresql-only-storage-v1/implementation-plan.md)
+records authority and stage obligations; its [journal](../../../.codex/agents/generated/postgresql-only-storage-v1/iteration-ledger.md)
+records execution state. The following D1–D7 preserve the selected decisions;
+concrete S01 refinements below bind implementation and proof, not runtime claims.
+
+### D1 — one durable SQL engine, existing capability boundaries
+
+PostgreSQL 16.x, already an installation dependency, becomes the durable source of truth
+for market reference data, candle observations, canonical candles, funding and coverage,
+in addition to existing accounts/jobs/recovery. Redis remains bounded hot cache/transport;
+NPY/mmap/CAS artifacts remain the backtest compute path. Domain/application code depends
+on its ports; PostgreSQL adapters and composition roots own SQL/drivers. No TimescaleDB,
+new queue, broker or second database engine. Keep current approach is no longer selected:
+the owner chose removal, and the measured small-operation/storage tradeoff is accepted.
+
+Prefer tables in a dedicated `market_data` schema of the existing PostgreSQL database;
+existing public control tables need not move. Separate migration and application privileges;
+never require the app to be superuser. Qualify identifiers and parameterize values.
+Embedded and external PostgreSQL profiles must both provision/check the same capabilities.
+
+### D2 — physical schema and preservation of semantics
+
+Planned names are target contracts, not files/tables claimed to exist today.
+
+| Current capability | PostgreSQL target | Required constraints and proof |
+|---|---|---|
+| `ref_market`, `ref_instruments` | Same purpose under `market_data` | Stable market IDs 1–4, enabled/tradable semantics, PK market and market/symbol, version-aware upsert; search/paging |
+| `raw_binance_klines_1m`, `raw_bybit_klines_1m` | Provider-specific typed observation tables, monthly range partitions | Preserve every currently persisted provider field/nullability and provenance; no unbounded JSON duplication |
+| `canonical_candles_1m` | Monthly RANGE(ts_open), PK(market_id,symbol,ts_open) | Exactly one closed minute, all 17 canonical fields, UTC half-open ranges, float64/null behavior unchanged |
+| aggregate bitmap stats | `candle_coverage_days` + compact `candle_coverage_summary` | PK market/symbol/day; actual `bit(1440)`, source-absent `bit(1440)`, counts and actual bounds, durable content revision; rebuildable and generation-bound |
+| `source_absent_candles_1m` | Auditable accepted-absence observations + daily mask | Proven fully consumed successful provider response only, actual candle takes precedence |
+| history start metadata | Existing `market_data_history_bounds` | Keep exchange availability discovery separate from observed and verified storage coverage |
+| verified historical prefix | `candle_history_verification` | Origin, exclusive verified_until, data generation and verification policy version; explicit invalidation |
+| funding universe/raw/canonical | PostgreSQL equivalents for ALL funding tables | Version-aware records, nullable Binance mark price and non-null Bybit category, interval/source semantics, exact funding timestamps; canonical PK includes funding_time |
+| artifact source coordinate index | PG observation port extended with durable generation + content revision | Keyset page ≤50, exact actual bounds before exclusive cutoff; never include source absences; unchanged bounds must not hide corrected values |
+
+Monthly raw/canonical/funding partitions are pre-created for requested import ranges and
+current/next month by a bounded maintenance/migration capability, with serialized DDL.
+No per-candle DDL and no silent default-partition accumulation. Rollover and old-history
+imports work across month/year boundaries. Use BIGINT where unsigned CH values require
+it and range checks for positive IDs/counts; preserve Float64 as double precision rather
+than silently changing financial arithmetic to numeric. Avoid redundant covering indexes
+until EXPLAIN proves their benefit. Partition pruning requires direct UTC timestamp bounds.
+
+### D3 — atomic write receipt, batching and deterministic replay
+
+One bounded adapter transaction: stage with COPY, persist typed raw observations,
+deduplicate incoming canonical keys, UPSERT canonical, update affected coverage days and
+summary/dirty state, commit. Success returns only after durable commit; no successful
+recovery cursor or Redis publication before the durable receipt. Keep existing buffered
+writer limits, flush cadence/backpressure and asynchronous recovery batching semantics.
+Do not open a new DB connection or transaction for every candle.
+
+Canonical version precedence: newer ingested_at wins; normalize to the established
+millisecond precision. Equal version + equal contents is a no-op. Equal version + different
+contents uses a documented stable tie-break derived from normalized persisted contents
+(not process arrival order, random ingest UUID or source priority). Persist the tie-break
+only if needed to make retries/order permutations stable; test it. This tightens previously
+ambiguous equal-version behavior and must be explicit in the contract. Deduplicate multiple
+same-key rows inside one staging batch before ON CONFLICT; PostgreSQL cannot update a target
+row twice in one such statement. Raw observations can contain retries as today; do not let
+those inflate canonical counts, summary counts, artifact revisions or verified coverage.
+Retries of unknown commit outcomes must converge to the same canonical/coverage state.
+
+Acquire row/day locks in stable market/symbol/day order. Compute actual count deltas under
+those locks (bitset cardinality before/after), not from attempted row count. Summary updates
+must not lose concurrent increments. Publish artifact invalidation/version hints for value
+corrections even when minute membership/count is unchanged. Make this recoverability concrete: persist a monotonic content revision per instrument
+(or per instrument/day aggregated into its summary) in the same transaction as a change
+to materialization-relevant canonical values or actual-minute membership. Identical replay
+and ingestion-metadata-only changes do not increment it. Bind revision to source generation.
+Extend StoredSourceObservation, persisted source targets and reconciliation comparison to
+carry that durable revision; current first/last + content_unverified is insufficient.
+The bounded sweep must detect a corrected old OHLCV value even if first/last/count stay
+unchanged and the process dies before publishing its hint. Conservative invalidation for
+an unaffected cutoff is acceptable when documented; missed relevant changes are not.
+Update content-derived cache/recipe invalidation without embedding the storage engine in
+public artifact identity. Hints remain optional accelerators, not the durability mechanism;
+no silent failure of already committed writes.
+
+A DB failure may simultaneously affect candles and recovery/audit metadata now that they
+share a server: propagate failed receipt, preserve existing durable cursors, bound buffers,
+mark degraded, and reconcile on recovery. Never call an unpersisted repair 'completed'.
+Classify SQLSTATE retries (serialization/deadlock/transient disconnect) with bounded backoff
+and idempotent transaction replay. Permission/schema errors fail visibly; never swallow all
+exceptions or replay external order submissions. Keep DSNs, credentials and provider
+payloads out of logs/evidence.
+
+### D4 — exact coverage, verified frontier and bounded backfill
+
+Three distinct facts: (1) actual stored minutes, (2) source-confirmed absent minutes,
+(3) unverified/missing minutes. A source absence is not a candle, latest candle, artifact
+coordinate or actual-count increment. An arrived late candle clears/overrides its absence
+in the same transaction and updates summaries. Failed HTTP, 451/429/timeouts, partial or
+unconsumed pages, stale lease and storage failure never produce accepted absence.
+
+Verified frontier means every minute in [origin, verified_until) is either durable actual
+or currently valid accepted source absence for that generation/policy. It is not max(ts),
+last seen WS time, provider first-open time or a claim that the exchange cannot revise data.
+Advance only across contiguous proven ranges, in a transaction protected by current lease
+and generation checks. Noncontiguous completed jobs must not leap over a gap.
+
+Normal gap search consults the compact summary/frontier then range-bounded daily masks;
+it never scans all canonical history or expands one SQL/Python row per historical minute.
+Missing days are gaps, no mask row does not mean complete. Locate the first incomplete day,
+then its first missing minute; retain the current bounded per-verification range (≤7 days).
+A frontier skips verified old prefixes; corrections, deletion, restore, reset or index rebuild
+invalidate affected frontier/generation before claiming completeness. An administrative
+historical delete must clear/rebuild actual masks and exact bounds, not keep OR-only truth.
+
+Negative availability has a policy version and observation provenance. Keep old confirmed
+absence valid under that policy, but invalidate on provider-history refresh/policy change
+or explicit repair. Recent tail retry does not permanently suppress transient provider lag.
+Do not introduce periodic full-history rescans to 'keep the watermark fresh'. Bounded
+repair/rebuild is explicit, resumable and visible in health/events.
+
+### D5 — SQL query catalogue and bounded resource use
+
+Every replacement query gets an input/cardinality/plan record in the S04 report (updated by
+S09): port/caller, SQL identifier, predicate/order, expected rows, indexes/partitions touched,
+statement/lock timeout, concurrency class, EXPLAIN ANALYZE BUFFERS evidence and result parity.
+Do not mechanically translate FINAL, argMax, bitmap states or MergeTree syntax.
+
+| Query family | Required access path | Forbidden regression |
+|---|---|---|
+| Latest N / live-tail | PK range + ordered LIMIT; bound timestamps where known, summary to locate latest occupied range | Whole-table ORDER BY/MAX scan each poll |
+| Candle range / arrays | Half-open UTC range, pruning, ordered server-side cursor/COPY or bounded binary batches | fetchall of multi-year history followed by duplicate tuple/array copies |
+| Distinct timestamps / daily counts / before bounds | Actual daily masks and summary; exact partial first/last day | Counting attempted writes or source absences; per-instrument full scan |
+| Catalog / instrument coverage | Batched keys, compact summary, keyset/search indexes | N+1 history queries, offset over huge histories, global repeated COUNT(DISTINCT) |
+| Gap / source absence counts | Range-bounded day masks + frontier, actual precedence | Minute-level generate_series over multi-year history |
+| Source reconciliation | Bounded coordinate page and clipped masks, exact `before` | Full canonical scan fallback when index is unavailable |
+| Funding reads | market/symbol/funding_time ranges, canonical PK; interval metadata | Assuming fixed eight-hour funding or ignoring nullable provider fields |
+| Verification/rebuild | Explicit bounded range and generation/lease checks | Hidden unbounded repair on UI or periodic scheduler hot path |
+
+Do not promise index-only scans in every case or reject a justified sequential scan of a
+small summary. Prove rows/buffers/partition scaling, not just plan node names. Full-range
+artifact reads inherently scale with returned data; stream directly toward artifact output
+where contracts allow. Account for client RSS as well as PostgreSQL memory.
+
+Use the installed psycopg3 integration; add a bounded supported pool only after checking
+existing gateway lifecycle and dependency policy. Set total installation connection budgets
+across processes/classes, leaving capacity for identity/jobs/admin/recovery and migrations.
+Per-process limits are not a global budget. Admission must bound concurrent artifact builds
+and history imports; queues expose wait/backlog. Session settings must reset on pool return.
+Choose shared_buffers/work_mem/maintenance/autovacuum and statement/lock timeouts from a
+measured envelope, not by granting every request the whole container. Start evaluation with
+the measured 2 CPU / 4 GiB envelope; optional larger ceilings are owner-authorized but rerun
+comparable evidence and retain failures. No unlimited max_connections or disabled durability.
+
+### D6 — complete product removal and compatibility
+
+No final feature flag, old driver import, CH service/image/exporter, CH DSN/secret slot,
+clickhouse workload profile, executable migration, SQL adapter, fallback query or runnable
+maintenance script remains in shipped/runtime/test tooling. Delete or port stale notebooks
+and RL scripts too. Retire optimize-partition operations; do not create meaningless PG
+OPTIMIZE analogues. Preserve historical evidence without executable imports in product paths.
+
+| Surface / consumers | Before → target | Classification and transition |
+|---|---|---|
+| Candle public DTOs, identities, UTC/NaN/order contracts | Same data semantics behind PG adapter | Target `none`; must prove consumer parity in S05/S08; not yet verified |
+| write receipt and equal-version precedence | MV/eventual dedup → transactional canonical/index, stable tie | `compatible-change` for successful-write consumers; explicit internal behavior strengthening, tests required |
+| persisted market schemas and restart state | CH tables/index + PG metadata → PG-only market schema | `breaking-change`; development reset permitted, no old binary against new state |
+| internal source observation and target revision | first/last only → generation + durable content revision | `breaking-change` for the internal port/persisted comparison shape; update all callers and invalidate stale source targets in the same rollout |
+| repair source enum, circuit/timeout names, metrics/UI/errors | clickhouse → canonical_store or postgresql as appropriate | `breaking-change`; all producers/validators/UI/alerts together; migrate affected persisted source values with append-only migration |
+| installation config, status and service identity | CH required in trading/ml → PostgreSQL-only | `breaking-change`; explicit schema/version transition; reject stale keys clearly, never silently ignore |
+| encrypted backup/capture owners and manifests | CH owner required → no CH owner | `breaking-change`; version manifest/policy/capture schemas consistently; reject old format before writes, no silent skip of backup integrity |
+| artifact cache/source state and pending work | old history bounds/generation → reset source generation | `breaking-change` for reuse of stale coverage/inputs; reconcile/invalidate, never report stale artifacts as fresh |
+| unknown external scripts/config clients | No supported inventory yet | `unknown`; S01/S05 enumerate repository callers and document supported version boundary |
+
+Single-version local maintenance cutover is selected, not rolling old/new workers or
+permanent dual write. New installers never contact CH. A minimal explicit old-config
+rejection/migration diagnostic may mention its former name but must not connect to it.
+Old backup restore is not promised; recovery uses matching old tooling in isolation or
+new-format PG backup, not a partial mixed-version restore. Do not repurpose unchanged
+schema identifiers to encode incompatible owner sets.
+
+### D7 — logging, monitoring and user-visible events
+
+Preserve recent connection transition/event journal improvements. Structured events for
+DB unavailable/recovered, pool exhaustion/admission wait, retry exhausted, backfill
+started/progress-summary/completed/failed, verified-prefix invalidation/rebuild and
+partition maintenance. Correlation/job/instrument IDs and sanitized SQLSTATE, no raw SQL
+parameters/DSNs. Coalesce/rate-limit progress; no per-candle or per-query informational log.
+Connect recovery events to the existing user event journal and bounded pagination.
+
+Replace CH health/exporter/action/runbook identities with meaningful PG metrics: active
+connections by class, pool wait, transaction/statement failures, lock wait, long transactions,
+WAL/checkpoint/autovacuum state, partition readiness, ingestion lag, coverage/recovery backlog
+and artifact build queue. Do not reintroduce retired observability services; use current
+operational topology and optional supported integrations only. Apply language/localization
+and data-loading contracts on affected UI; no redesign.
+
+## S01 source audit and exact field preservation
+
+The report directory contains [inventory](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/inventory.json),
+[caller edges](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/caller-edges.json),
+[baseline signatures](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/baseline-signatures.json)
+and [all persisted fields](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/persisted-fields.json).
+Each inventory row has exact source hash, match lines, disposition and owning stage.
+These hashes identify code/DDL, not successful query results. External private
+scripts are outside the repository audit: compatibility remains `unknown` for them.
+S07 must refresh the inventory against its then-current tree, rather than treating
+this snapshot as an evergreen allowlist. Tests mentioning the old engine are
+semantic fixtures to port, not automatically permitted rejection diagnostics.
+
+All 11 current tables are covered: two reference tables, two raw candle tables,
+canonical candles, aggregate stats, funding universe, two raw funding tables,
+canonical funding, and source absence. Three materialized views become transaction
+steps; stats become exact daily masks/summary. The DDL field inventory is the
+column-by-column S02 checklist. No unbounded provider JSON archive is added.
+
+Observed details that a normalized prototype cannot prove:
+
+- Binance raw preserves open/close times, OHLC/base volume, quote volume,
+  number_of_trades, both taker buy volumes, instrument key, source, ingestion time
+  and nullable UUID. The current writer normalizes absent quote/trade/taker values
+  to zero before persistence; preserve that existing behavior in parity fixtures.
+- Bybit raw preserves interval_min=1, start_time_ms, start_time_utc, OHLC/base volume,
+  turnover, instrument key and ingestion metadata. Missing turnover currently becomes
+  zero; canonical trades/taker fields remain NULL. Keep the current Bybit close-time
+  mapping (open + 1 minute), and Binance's supplied close time; do not normalize away
+  a difference that changes the existing 17-field canonical result.
+- Funding universe preserves nullable assets, interval minutes/source, cap and floor.
+  Binance raw funding preserves nullable mark_price. Bybit category is persisted as
+  non-null text, defaulting to `linear` in the adapter when DTO category is absent.
+  Do not infer nullable SQL category merely from optional input. Canonical funding
+  has no mark_price/category column today; its artifact reader deliberately emits
+  NULL mark_price and data_quality=1. Preserve that output unless a separately
+  versioned feature changes it. Funding intervals are data, not a fixed 8-hour rule.
+- UInt16 IDs/intervals need positive/range checks; UInt32 trade counts need BIGINT
+  with 0..4294967295 validation; Bybit millisecond timestamps use BIGINT with supported
+  UTC range validation. Store timestamps as timestamptz at millisecond precision.
+  Keep binary float64 and null/NaN conversion at the existing consumer boundary.
+- Applied PG 0023 and later public control tables remain in place. Existing
+  stream events, async recovery admission, provider quota, selection and organization
+  contracts are preserved. Applied migration text is immutable even where comments
+  mention the old engine. The next free migration ID must be resolved in S02.
+
+## S01 reversible implementation decisions
+
+Canonical precedence is `(ingested_at_ms, normalized_payload_order)`. Define the
+second component as lexicographic unsigned bytes of a versioned, length-prefixed
+encoding of persisted fields in DDL order, excluding ingested_at and random ingest_id.
+Strings use UTF-8; null has a distinct tag; integers use fixed big-endian encoding;
+float64 uses IEEE-754 bytes with canonical NaN and signed-zero normalization; timestamps
+use UTC epoch milliseconds. Choose the lexicographically greater payload on equal
+version. A hash may accelerate comparison but cannot replace the payload tie-break
+on collision. An equal normalized payload retains existing ingest_id and is a no-op.
+S03 fixes test vectors and permutes batches/retries; arrival order and source priority
+must not determine the winner. In funding-universe reads the current separate
+`argMax(nullable_field, updated_at)` expressions may keep an older non-null value
+while an unmerged newer row contains NULL; merges can change that outcome. The target
+whole-row version rule intentionally makes an explicit newer NULL authoritative
+(clear the old value). Classify this nullable-universe interaction as
+`breaking-change` for consumers relying on stale non-null carry-forward, not generic
+parity. S03/S05 freeze cases old non-null -> newer NULL, all NULL, same-version null
+versus value, and repeat before/after CH merge only where a baseline fixture is
+available. Expected PG outputs are deterministic from the version rule, not whatever
+a current merge happens to return. Apply the same explicit-null rule to reference
+columns present in an update; omitted enrichment fields remain unchanged. Candle and
+canonical-funding artifact output semantics are still required to retain parity. Use the same rule for versioned funding records and
+reference updates, substituting updated_at where applicable.
+
+Materialization revision compares only fields consumed by artifact/array generation,
+not ingest_id/ingested_at. Increment once per affected instrument transaction when
+actual minute membership or consumed values change. Bind it to a non-reusable source
+generation. Funding changes also invalidate funding-dependent inputs through a durable
+funding revision; they cannot rely solely on a candle-coordinate hint. S03/S05 may
+use a separate funding revision or conservatively bump the shared instrument revision,
+but must test corrected funding with unchanged candle bounds. Identical replay does
+not increment either revision. A newer metadata-only row may update provenance without
+invalidating identical compute inputs.
+
+Summary revision is conservative across cutoffs: a correction after the observed
+cutoff may cause an extra rebuild; missing a correction before the cutoff is forbidden.
+The reader takes one consistent observation of generation, revision, clipped actual
+bounds and count. Empty/future-only keys still advance the page. Use fixed cutoff and
+keyset limit <=50; no fallback full-canonical scan when coverage is unavailable.
+Restore/reset allocates a fresh generation before claims can become ready. Restart
+without reset retains generation and resumes verification. A missing summary is
+`unknown` with bounded repair, never an empty-but-complete history.
+
+## S01 query catalogue and baseline signatures
+
+[Query catalogue](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/query-catalogue.md)
+maps every public storage adapter operation to source signature, caller family,
+PG access path, cardinality, concurrency class, timeouts and fixed parity cases.
+S04 replaces proposed query IDs by actual SQL/source locations and records
+`EXPLAIN (ANALYZE, BUFFERS)` with fixture hashes, row counts, partitions, timings,
+result hashes and client RSS; S09 repeats under the fixed production mix. No plans
+or result hashes were measured in S01. Gateway operations are transport, not an
+additional query family; all their concrete callers remain in the source inventory.
+
+## S01 resource and performance contract
+
+These are engineering guardrails selected for evaluation, not a product SLA or
+production-capacity claim. Keep the plan thresholds unchanged: p95 latest/catalog/gap
+and stream writes <=100 ms; p95 1,000-row backfill <=250 ms; one-year input median
+<=2 s; full-instrument large read p95 <=10 s. Evaluate each normal/stress regime
+separately, excluding warmup from percentile samples and retaining all failures.
+Adapter elapsed time includes pool/admission wait, read materialization or committed
+write receipt. Also record scheduled latency/backlog and HTTP latency separately.
+
+Baseline is the retained 2 CPU / 4 GiB DB prototype, >=15,130,115 canonical rows,
+102 instruments, 89 months, 17 fields, 7,625 absences, exclusive cutoff 2026-10-12.
+Its three 60-second runs per regime/engine support threshold selection only. They
+lack production adapters, complete raw/funding semantics, shared application-control
+load and long soak. The prototype's normal PG artifact median is ~679 ms; stress
+full-history median ~4,253 ms is a different query size, not a regression of the
+one-year query. Its stress client RSS peaks at ~5,040 MiB across processes, outside
+the 4 GiB DB container: this is a reason to stream, not evidence of a 4 GiB total
+installation. [Sanitized baseline binding](../../../.codex/agents/generated/postgresql-only-storage-v1/reports/S01/performance-baseline.json)
+retains exact evidence hashes and measurement limitations.
+
+Initial evaluation envelope, adjustable only with recorded comparable reruns:
+
+| Resource | Initial bounded choice | Proof owner |
+|---|---|---|
+| DB | 2 CPU / 4 GiB, shared_buffers=256 MiB, work_mem=4 MiB, maintenance_work_mem=64 MiB; durability and autovacuum on | S03/S09 |
+| Connections | Installation cap 48: market data 16, other app/control 24, maintenance/admin reserve 8; process allocations must sum within class, including async lease sessions | S03/S06/S09 |
+| Market slots | ingestion 4, interactive reads 6, artifact bulk 2, reconcile/verification 2, reference/funding 2; no independent uncounted worker pools | S03/S05 |
+| Bulk/read memory | 8,192-row or 8 MiB batches, whichever first; no unbounded fetchall; <=128 MiB incremental reader RSS per active reader, excluding explicitly measured output mmap pages | S04/S09 |
+| Admission | Two concurrent artifact source reads, four ingestion transactions globally; finite queues use existing row/byte admission and fail/backpressure visibly | S03/S05 |
+| Timeouts | Interactive statement 1 s; ingestion 5 s; bulk 30 s; verification 10 s; maintenance 60 s. Lock timeout 250 ms except explicit maintenance 2 s. Pool wait max 1 s and within caller deadline | S03/S04 |
+| Recovery | Existing async metadata session deadline 3 s, no network I/O within SQL transaction, bounded retry up to 3 transient attempts inside total deadline; unknown commit reconciles idempotently | S03/S08 |
+
+Do not override a stricter existing caller deadline. Reset session settings at return;
+a lease-owning session is budgeted even while idle. S06 must sum actual processes and
+replicas before activating these choices; external PG reports reserved capacity and
+rejects insufficient budget rather than assuming it owns the whole server.
+
+S09 runs three >=5-minute normal and three >=5-minute stress trials, then >=60-minute
+mixed soak crossing checkpoints with observed autovacuum. Normal: 5 stream rows/s,
+1,000 backfill rows/2 s, latest and hot-latest 1/s each, catalog/gap every 2 s,
+one-year artifact every 10 s. Stress: 100 stream rows/s plus latest 2/s and two
+full-instrument reads/10 s. Keep a one-year lane in stress too so its threshold
+remains evaluated; retain >=30 large-read samples per regime. Add actual identity/API
+reads and job/recovery writes: initially 10 identity/session reads/s, two job
+lease renewals/s and two recovery metadata batches/s, with fixed seeds and row counts.
+S09 records/control-checks the exact offered mix before timing, including any documented
+adjustment to realistic configured cadence. Control work must complete without lost
+leases or unbounded wait. No errors, OOM, dropped receipts or divergent hashes are
+acceptable. Report per-process/aggregate RSS, cgroup anon/file, DB CPU, client CPU,
+WAL/checkpoints/autovacuum, disk relation/index/WAL bytes and queue slopes separately.
+No silent retention deletion, disabled durability, global unlimited connections or
+benchmark threshold relaxation is allowed.
+
+## Versioned compatibility and coordinated cutover
+
+S01 runtime compatibility is `none`: only docs/evidence change. Planned changes below
+are `breaking-change` unless stated otherwise. Supported rollout is one stopped
+local version -> one new version; concurrent old/new workers are unsupported.
+
+| Boundary | Baseline -> target | Migration owner and test |
+|---|---|---|
+| Config | `io.roehub.installation/v1alpha1` -> `v1alpha2`, remove CH store/workload/secret keys | S06 schema, generator, CLI, release bundle; stale keys/version reject before writes |
+| Storage status | `io.roehub.storage-status/v1alpha1` -> `v1alpha2`, PG/Redis capabilities and schema versions only | S06 bootstrap/readiness/status consumers; embedded + external |
+| Backup/capture/policy | `io.roehub.installation-backup/v1alpha1`, `installation-capture/v1alpha1`, `installation-backup-policy/v1alpha1` -> corresponding `v1alpha2` | S06 version owner models, generated schemas, host capture/control/restore together; old format fails before write |
+| Backup owner set | Eight owners including clickhouse -> seven, removing only clickhouse | Preserve release_config, postgresql, redis_checkpoint, openbao, artifacts, plugin_operation_audit, observability; existing unrelated retirement work is not authority to drop another owner here |
+| Release transition policy/signature | Current v1alpha1 signed bytes/transition model | Shape unchanged unless S06 proves owner-dependent incompatibility; digest binds the new exact bytes, never silently re-signs old manifest as new |
+| Repair source | `clickhouse` -> `canonical_store`; timeout/circuit/metrics use canonical_store | S05 strict DTO, policy/config, stored repair attempts, events, UI/alerts in same rollout; additive data migration for stored enum, not deletion of user/audit history |
+| Source observation/target | bounds + content_unverified -> generation + durable candle/funding revision | S02 additive state, S03 transactional revision, S04 snapshot observation, S05 serializers/reconciler/build identity; old source targets invalid until rebuilt |
+| Candle/array/funding output | Same existing ordering, UTC, float64/NaN/null and numerical semantics | Target `none`, still unproven until S05/S08 fixed-input parity |
+| Successful write | Eventual canonical dedup -> commit covers raw/canonical/index/revision | `compatible-change` for receipt consumers; failed or unknown writes must never advance durable cursors |
+
+Any persisted old enum, pending work or config must have a declared migration or
+explicit fail-before-side-effect path. Public artifact identity remains independent
+of storage engine; generation/revision invalidates stale recipe inputs without adding
+`postgresql` to user-facing artifact IDs. Existing authorization, organization scoping,
+read-only mounts, path/digest validation, secret redaction and quiesce checks remain.
+
+## Scoped reset/invalidation manifest (S10 fills actual identities)
+
+Manifest version: `market-data-reset/v1`. This is a shape, **not an executable reset
+request**. No actual installation/database/volume identity is selected in S01.
+S10 resolves the current target through the then-current runbook and records:
+
+- installation fingerprint, local target identity, exact compose/service and volume
+  identifiers, source revision/config hashes and PG migration checksums;
+- private backup reference/digest plus preserved-state verification (no secrets or
+  raw payloads), owner authority reference and reset boundary;
+- previous/new generation, selected market/symbol keys, explicit tables/rows/Redis
+  namespaces/artifact source-target IDs, action per item and owning capability;
+- quiesced processes and old-worker restart fence, pending-work disposition,
+  expected before counts, after invariants, completed steps and retry cursor;
+- validation evidence and recovery mode, including point of irreversibility.
+
+| State | Action and owner |
+|---|---|
+| Raw/canonical/funding/absence + coverage/verification | Market Data: reset only selected derived market scope; new generation, empty truthful masks/frontier; rebuild via admitted providers |
+| market_data_history_bounds | Market Data: exchange-origin facts remain separate; invalidate claims/jobs tied to old storage generation; do not mark stored history complete |
+| market_data_catalog_snapshots/work_requests | Market Data scheduler: retire stale coverage snapshots; terminalize/requeue impacted history work; preserve org/audit history and selections |
+| stream recovery journal/leases, live hot-cache/streams | Collector: drain or leave durable pending; exact namespace/generation invalidation; no FLUSHALL, no generic token replacement |
+| artifact_source_state, requests/build inputs/recipes | Artifact owner: invalidate old source target and stale reuse, fence in-flight builders; preserve policies/profiles/settings, user results and unrelated CAS pins/blobs; GC only separately identified unreferenced objects |
+| identity/accounts/organizations/settings/secrets/strategy definitions | Preserve byte/logical state; protected backup and post-reset verification; no blanket SQL/TRUNCATE/database/volume deletion |
+| Old CH volumes and benchmark files | Retain inert by default; optional exact volume deletion is separate from successful runtime dependency removal; benchmark evidence retained |
+
+The destructive boundary is the first scoped market reset without a retained copy.
+Before it, restore matching old config/binaries if needed. Afterwards use forward
+repair/refill, or explicitly restore matching old state; never claim automatic
+lossless rollback. Generation guards prevent old receipts/frontiers/builds from
+committing ready state into the new generation. S08 proves this on disposable state
+before S10 can use the manifest on the real local installation.
+
+## Stage proof and fixed-case map
+
+All rows below are future obligations, not S01 pass claims. Reuse semantic tests and
+record replacement coverage where engine-specific assertions are retired.
+
+| Stage | Required fixed cases and evidence |
+|---|---|
+| S01 | Every Appendix/search/caller row classified; 11-table field parity checklist; normative supersession; query catalogue, resource/compatibility/reset contracts; docs and structural gates; source-level review |
+| S02 | PG16 clean/bootstrap twice, interrupted/resume, checksum drift rejection, embedded/external, non-superuser app, month/year rollover and historical partitions; manifest/DDL checksums |
+| S03 | Both providers × spot/futures, nullable UUID/float/time, duplicate-in-batch, old/equal versions and permutations, WS/REST concurrency, rollback/unknown commit, bounded admission and exact raw/canonical/mask/revision receipts |
+| S04 | Every catalogue operation parity and EXPLAIN, empty/epoch-zero/in-minute cutoff, partial boundary days, missing day and disjoint gaps, actual overriding absence, no full-scan fallback, streaming memory, generation/lease races |
+| S05 | API/CLI/WS/scheduler/backtest/strategy/indicators/RL/notebook callers, persisted repair enum and source-target version rollout; unchanged fixed-input NPY/backtest hashes; supported platform-web journeys and candidate compatibility without baseline promotion |
+| S06 | All base/trading/ml × embedded/external configs and boot; new backup full restore/quiesce/digests/owner set; old format rejection before writes; meaningful PG health/runbooks/metrics, no CH requirement |
+| S07 | Re-run inventory/dependency/SQL audit; every residual is narrowly historical or explicit rejection fixture; imports/build/config generated consistency and no executable old maintenance/driver |
+| S08 | Real PG restart/disconnect/saturated pool/locks/constrained disk/interrupted maintenance; no false success; lost post-commit hint on old-minute correction with unchanged bounds/count is caught by bounded sweep; funding correction, reset/delete/restore and fixed-input/browser parity; independent review |
+| S09 | Full-size production query/mixed-control workload, 3×5-minute normal/stress and >=60-minute soak; >=30 large-read samples/regime; all thresholds, hashes, plans, CPU/memory/WAL/disk/errors and retained failures |
+| S10 | Exact target/reset manifest, preserved protected state, admitted real history refill and consecutive closed candles through disconnect/reconnect, independent SQL/API/events/browser evidence; no CH service/socket/health/backup requirement; final independent audit |
+
+Local source/docs checks establish no provider uptime, browser behavior, SQL performance,
+backup restore safety or installation delivery. Required later proof remains mandatory.

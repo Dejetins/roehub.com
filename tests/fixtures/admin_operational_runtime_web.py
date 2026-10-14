@@ -21,7 +21,7 @@ app.state.current_user_api_client = type(
     {
         "fetch_current_user": lambda self, *, cookie_header: CurrentUserApiResult(
             status_code=200,
-            user=WebCurrentUser(user_id="stage20-browser-user", paid_level="free"),
+            user=WebCurrentUser(user_id="stage20-browser-user"),
             error_message=None,
         )
     },

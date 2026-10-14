@@ -1,0 +1,9 @@
+{
+  "rows": 15130115,
+  "nonrepresentable_ms": {
+    "ts_open": 0,
+    "ts_close": 0,
+    "ingested_at": 0
+  },
+  "direct_database_check": true
+}

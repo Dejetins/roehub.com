@@ -298,9 +298,9 @@ def test_ui_account_profile_limits_integrations_and_notifications_contracts() ->
     assert profile.json()["email"] is None
     assert profile.json()["telegram_discord"] is None
     assert profile.json()["locale"] == "en"
-    assert profile.json()["subscription_status"] == "free"
+    assert "subscription_status" not in profile.json()
     assert limits.status_code == 200
-    assert limits.json()["plan"] == "free"
+    assert "plan" not in limits.json()
     assert limits.json()["exchange_connections_used"] == 0
     assert limits.json()["api_keys_used"] == 0
     assert limits.json()["exchange_connections_limit"] == 10
@@ -1578,13 +1578,13 @@ def _build_test_client(
     session_repository = InMemoryIdentitySessionRepository()
     account_repository = InMemoryAccountSettingsRepository()
 
-    first_user = user_repository.upsert_keycloak_login(
-        keycloak_subject="ui-account-user-1",
-        login_at=now,
+    first_user = user_repository.create_local_user(
+        user_id=UserId(UUID(int=1)),
+        created_at=now,
     )
-    second_user = user_repository.upsert_keycloak_login(
-        keycloak_subject="ui-account-user-2",
-        login_at=now,
+    second_user = user_repository.create_local_user(
+        user_id=UserId(UUID(int=2)),
+        created_at=now,
     )
     first_session = session_repository.create_session(
         user_id=first_user.user_id,

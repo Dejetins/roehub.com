@@ -1,0 +1,169 @@
+{
+  "mode": "embedded",
+  "profile": "trading",
+  "status": "passed",
+  "runtime_services": {
+    "operational-health": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "api": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 805306368,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    },
+    "web": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 402653184,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "notification-dispatcher": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 402653184,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "notification-report-scheduler": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 250000000,
+      "health": "healthy"
+    },
+    "telegram-bot-worker": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 250000000,
+      "health": "healthy"
+    },
+    "market-data-ws": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 805306368,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    },
+    "market-data-scheduler": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 536870912,
+      "nano_cpus": 750000000,
+      "health": "healthy"
+    },
+    "backtest-artifact-publisher": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 1073741824,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    },
+    "backtest-job-runner": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 2147483648,
+      "nano_cpus": 2000000000,
+      "health": "healthy"
+    },
+    "exchange-control": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 536870912,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "exchange-execution": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 805306368,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    },
+    "strategy-live-runner": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 805306368,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    }
+  },
+  "application_readiness": {
+    "operational-health": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "api": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "web": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "notification-dispatcher": {
+      "proof": "initialized_operational_metric",
+      "marker": "notification_dispatcher_deliveries_claimed_total",
+      "ready": true
+    },
+    "notification-report-scheduler": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": "disabled"
+    },
+    "telegram-bot-worker": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": "disabled"
+    },
+    "market-data-ws": {
+      "proof": "initialized_operational_metric",
+      "marker": "ws_connected",
+      "ready": true
+    },
+    "market-data-scheduler": {
+      "proof": "initialized_operational_metric",
+      "marker": "scheduler_job_runs_total",
+      "ready": true
+    },
+    "backtest-artifact-publisher": {
+      "proof": "initialized_operational_metric",
+      "marker": "backtest_artifact_publish_runs_total",
+      "ready": true
+    },
+    "backtest-job-runner": {
+      "proof": "initialized_operational_metric",
+      "marker": "backtest_runner_active",
+      "ready": true
+    },
+    "exchange-control": {
+      "proof": "application_health_endpoint",
+      "ready": false,
+      "mode": "safe-degraded",
+      "reason": "openbao_transit_unavailable"
+    },
+    "exchange-execution": {
+      "proof": "application_health_endpoint",
+      "ready": false,
+      "mode": "safe-degraded",
+      "reason": "pitr_restore_not_verified"
+    },
+    "strategy-live-runner": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    }
+  },
+  "storage_ready": true,
+  "scope": "actual source services; disposable stores; upstream same-version OpenBao; no provider delivery or release image claim"
+}

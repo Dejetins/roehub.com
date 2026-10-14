@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
@@ -79,6 +79,9 @@ def demand(p, sha="a" * 64, *, minutes=7200, request_id=None):
         request_id=request_id or str(uuid4()),
         coordinate=Coordinate(exchange="binance", market_type="spot", symbol="BTCUSDT"),
         source=SourceTarget(
+            source_generation=UUID("00000000-0000-0000-0000-000000000001"),
+            content_revision=1,
+            funding_revision=0,
             history=History(
                 kind="range", start_utc=START, end_utc=START + timedelta(minutes=minutes)
             ),
@@ -619,11 +622,15 @@ def test_frozen_subset_catalog_preserves_legacy_demand_without_mutable_defaults(
     from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
         BacktestSignalRulesEngineV2,
     )
+
     selected = profile(catalog, names=("ma.ema",))
-    subset = selected.model_copy(update={
-        "catalog_indicators": tuple(x for x in selected.catalog_indicators
-                                    if x.indicator_id == "ma.ema"),
-    })
+    subset = selected.model_copy(
+        update={
+            "catalog_indicators": tuple(
+                x for x in selected.catalog_indicators if x.indicator_id == "ma.ema"
+            ),
+        }
+    )
     plan = plan_derivatives((demand(subset),), grid_builder=n._signal_grid_builder_v2())
     assert {name for _, name, _ in plan.selected_rows} == {"ma.ema"}
     defaults = FrozenProfileDefaults(subset.model_dump_json())

@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
-from uuid import UUID
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -240,17 +239,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.state.runbooks_path = Path(
         effective_environ.get("ROEHUB_RUNBOOKS_PATH", str(_DEFAULT_RUNBOOKS_PATH))
     )
-    app.state.plugin_panel_lab_enabled = (
-        effective_environ.get("ROEHUB_PLUGIN_PANEL_LAB", "false").lower() == "true"
-    )
-    lab_instance_id = effective_environ.get(
-        "ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID",
-        "00000000-0000-0000-0000-000000000000",
-    )
-    try:
-        app.state.plugin_panel_lab_instance_id = str(UUID(lab_instance_id))
-    except ValueError as error:
-        raise ValueError("ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID must be a UUID") from error
     _register_routes(app=app, templates=templates, runtime_settings=runtime_settings)
     return app
 
@@ -370,7 +358,7 @@ def _register_routes(
             error_message=None,
             auth_next_path=safe_next_path,
         )
-        context["register_entrypoint_url"] = _build_oidc_login_url(next_path=safe_next_path)
+        context["register_entrypoint_url"] = "/login"
         return templates.TemplateResponse(request, "pages/register.html", context=context)
 
     @app.api_route(
@@ -430,26 +418,6 @@ def _register_routes(
             template_name="pages/dashboard.html",
         )
 
-    @app.get("/__qa/plugin-panels", response_class=HTMLResponse, include_in_schema=False)
-    def get_plugin_panel_lab_page(request: Request) -> Response:
-        if not bool(getattr(request.app.state, "plugin_panel_lab_enabled", False)):
-            raise HTTPException(status_code=404)
-        instance_id = str(request.app.state.plugin_panel_lab_instance_id)
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/__qa/plugin-panels",
-            active_path="/dashboard",
-            page_title_key="plugin_panel_lab.page_title",
-            page_description_key="plugin_panel_lab.page_description",
-            template_name="pages/plugin_panel_lab.html",
-            template_context={
-                "plugin_panel_instance_id": instance_id,
-                "plugin_panel_query_endpoint": (
-                    f"/api/v1/plugins/data-sources/{instance_id}:query"
-                ),
-            },
-        )
 
     @app.get("/settings", response_class=HTMLResponse)
     def get_settings_page(request: Request) -> Response:
@@ -825,7 +793,6 @@ def _build_template_context(
         ),
         "open_login_modal": False,
         "auth_next_path": safe_auth_next_path,
-        "oidc_login_url": _build_oidc_login_url(next_path=safe_auth_next_path),
     }
 
 
@@ -887,8 +854,3 @@ def _build_language_options(
         }
         for option in SUPPORTED_LOCALES
     ]
-
-
-def _build_oidc_login_url(*, next_path: str) -> str:
-    safe_next_path = sanitize_next_path(raw_next=next_path)
-    return f"/api/auth/oidc/login?{urlencode({'next': safe_next_path})}"

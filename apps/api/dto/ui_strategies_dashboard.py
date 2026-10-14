@@ -499,7 +499,6 @@ class StrategyRlMlTickerSlotsResponse(BaseModel):
 
     source: str
     state: PanelState
-    paid_level: str
     product_label: str
     entitlement_source: str
     live_slots_allowed: int

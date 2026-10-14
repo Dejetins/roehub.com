@@ -283,7 +283,7 @@ def _recent_auth_required() -> HTTPException:
         status_code=403,
         detail={
             "error": "recent_auth_required",
-            "message": "Recent Keycloak authentication is required.",
+            "message": "Recent authentication is required.",
         },
     )
 

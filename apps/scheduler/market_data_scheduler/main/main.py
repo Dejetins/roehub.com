@@ -65,8 +65,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=9202,
         help="Prometheus metrics HTTP port",
     )
-    parser.add_argument("--requests-only", action="store_true",
-                        help="Consume explicit user requests without automatic backfill jobs")
+    parser.add_argument(
+        "--requests-only",
+        action="store_true",
+        help="Consume explicit user requests without automatic backfill jobs",
+    )
     return parser
 
 
@@ -113,7 +116,7 @@ async def _run_async(config_path: str, metrics_port: int, requests_only: bool = 
     - Process exit code.
 
     Assumptions/Invariants:
-    - ClickHouse settings are supplied through environment variables.
+    - PostgreSQL settings are supplied through environment variables.
 
     Errors/Exceptions:
     - Propagates wiring/runtime exceptions to caller.

@@ -1,6 +1,6 @@
 """Disposable local Backtests proof stack, never imported by a production entrypoint.
 
-Uses production auth, PostgreSQL, ClickHouse readers, filesystem artifacts and idle
+Uses production auth, PostgreSQL readers, filesystem artifacts and idle
 job runner. Synthetic input data is explicit; no job is submitted by this tool.
 Run from the repository root: .venv/bin/python -m tools.qa.backtests_client_fixture
 Ctrl-C removes this run's containers, processes and private temporary state.
@@ -31,10 +31,6 @@ ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / os.environ.get("ROEHUB_PROOF_STATE", ".local_artifacts/backtests-client")
 PORT = int(os.environ.get("ROEHUB_PROOF_PORT", "18480"))
 PG_IMAGE = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685"
-CH_IMAGE = (
-    "clickhouse/clickhouse-server@sha256:"
-    "87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146"
-)
 PREVIEW_SESSION_TTL_SECONDS = 365 * 24 * 60 * 60
 
 
@@ -58,13 +54,13 @@ def create_api() -> FastAPI:
     from apps.api.routes.monitoring import build_monitoring_router
     from apps.api.wiring.modules.backtest import build_backtests_router
     from apps.api.wiring.modules.backtest_artifacts import build_artifact_http_router
-    from apps.api.wiring.modules.extensions import build_extensions_api_module
     from apps.api.wiring.modules.identity import build_identity_api_module
     from apps.api.wiring.modules.market_data_reference import build_market_data_reference_router
     from apps.api.wiring.modules.research_tenancy import build_research_organization_scope_resolver
     from apps.api.wiring.modules.strategy import build_strategy_router
     from apps.api.wiring.modules.ui_account import build_ui_account_router
     from apps.api.wiring.modules.ui_backtests import build_ui_backtests_router
+    from apps.api.wiring.modules.ui_dashboard import build_ui_dashboard_router
     from apps.api.wiring.modules.ui_strategies_dashboard import (
         build_ui_strategies_dashboard_router,
     )
@@ -85,19 +81,8 @@ def create_api() -> FastAPI:
     # checks without exposing unrelated installation/plugin mutations in preview.
     from fastapi.routing import APIRoute
 
-    extensions = build_extensions_api_module(
-        environ={
-            **os.environ,
-            "EXTENSIONS_PG_DSN": (
-                os.environ.get("EXTENSIONS_PG_DSN") or os.environ["IDENTITY_PG_DSN"]
-            ),
-        },
-        current_user_dependency=identity.current_user_dependency,
-        organization_repository=identity.organization_repository,
-    )
     admin = build_admin_router(
         organization_service=identity.organization_access_service,
-        plugin_service=extensions.service,
         current_user_dependency=identity.current_user_dependency,
         clock=identity.clock,
         control_agent_client=control if managed else None,
@@ -136,6 +121,9 @@ def create_api() -> FastAPI:
             organization_service=identity.organization_access_service,
             health=operational,
         ))
+    app.include_router(build_ui_dashboard_router(
+        environ=os.environ, current_user_dependency=identity.current_user_dependency
+    ))
     app.include_router(build_ui_account_router(
         environ=os.environ, current_user_dependency=identity.current_user_dependency
     ))
@@ -409,7 +397,9 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
 
 def run_stack():
     """Start only new, named loopback containers; refuse to overwrite another run."""
-    count = 6 if os.environ.get("ROEHUB_PROOF_STRATEGIES") == "true" else 4
+    count = 7 if os.environ.get("ROEHUB_PROOF_MARKET_DATA") == "true" else (
+        6 if os.environ.get("ROEHUB_PROOF_STRATEGIES") == "true" else 4
+    )
     for port in range(PORT, PORT + count):
         with socket.socket() as probe:
             try:
@@ -421,7 +411,7 @@ def run_stack():
     STATE.mkdir(parents=True, exist_ok=False)
     STATE.chmod(0o700)
     suffix = secrets.token_hex(4)
-    pg, ch = f"roehub-client-pg-{suffix}", f"roehub-client-ch-{suffix}"
+    pg = f"roehub-client-pg-{suffix}"
     containers: list[str] = []
     processes: list[subprocess.Popen] = []
     logs = []
@@ -441,6 +431,8 @@ def run_stack():
             "ROEHUB_NUMBA_NUM_THREADS": "1",
         }
     )
+    if os.environ.get("ROEHUB_PROOF_MARKET_DATA") == "true":
+        env["ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED"] = "1"
     password = secrets.token_urlsafe(30)
 
     def stop(_signum, _frame):
@@ -469,7 +461,9 @@ def run_stack():
         containers.append(pg)
         port = _docker("port", pg, "5432/tcp").rsplit(":", 1)[1]
         dsn = f"postgresql://proof:{password}@127.0.0.1:{port}/proof"
-        _wait(lambda: _docker("exec", pg, "pg_isready", "-U", "proof", "-d", "proof"))
+        _wait(lambda: _docker(
+            "exec", pg, "pg_isready", "-h", "127.0.0.1", "-U", "proof", "-d", "proof"
+        ))
         env.update({"POSTGRES_DSN": dsn, "STRATEGY_PG_DSN": dsn, "IDENTITY_PG_DSN": dsn})
         from apps.migrations.bootstrap import run_dev_db_bootstrap
 
@@ -487,54 +481,17 @@ def run_stack():
                         )
         print("PostgreSQL migrations: passed", flush=True)
         subject = _seed_postgres(dsn, password)
-        _docker(
-            "run",
-            "-d",
-            "--rm",
-            "--name",
-            ch,
-            "-p",
-            "127.0.0.1::8123",
-            "-e",
-            "CLICKHOUSE_USER=proof",
-            "-e",
-            "CLICKHOUSE_PASSWORD",
-            "-e",
-            "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-            CH_IMAGE,
-            environ={**env, "CLICKHOUSE_PASSWORD": password},
-        )
-        containers.append(ch)
-        ch_port = _docker("port", ch, "8123/tcp").rsplit(":", 1)[1]
-        env.update(
-            {
-                "CH_HOST": "127.0.0.1",
-                "CH_PORT": ch_port,
-                "CH_USER": "proof",
-                "CH_PASSWORD": password,
-                "CH_DATABASE": "market_data",
-            }
-        )
-        ch_url = f"http://127.0.0.1:{ch_port}"
-        _wait(lambda: httpx.get(ch_url + "/ping").status_code == 200)
-        _docker(
-            "exec",
-            "-i",
-            ch,
-            "clickhouse-client",
-            "--multiquery",
-            input=(ROOT / "migrations/clickhouse/market_data_ddl.sql").read_text(),
-        )
-        with httpx.Client(auth=("proof", password)) as client:
-            for sql in (
-                "INSERT INTO market_data.ref_market (market_id, exchange_name, market_type, "
-                "market_code, is_enabled, count_symbols) "
-                "VALUES (1,'binance','spot','binance:spot',1,1)",
-                "INSERT INTO market_data.ref_instruments (market_id, symbol, status, is_tradable) "
-                "VALUES (1,'BTCUSDT','ENABLED',1)",
-            ):
-                client.post(ch_url, content=sql).raise_for_status()
-        print("ClickHouse schema and synthetic catalog: passed", flush=True)
+        with psycopg.connect(dsn) as connection:
+            connection.execute(
+                "INSERT INTO market_data.ref_market (market_id,exchange_name,market_type,"
+                "market_code,is_enabled,count_symbols) "
+                "VALUES (1,'binance','spot','binance:spot',1,1) ON CONFLICT DO NOTHING"
+            )
+            connection.execute(
+                "INSERT INTO market_data.ref_instruments (market_id,symbol,status,is_tradable) "
+                "VALUES (1,'BTCUSDT','ENABLED',1) ON CONFLICT DO NOTHING"
+            )
+        print("PostgreSQL schema and synthetic catalog: passed", flush=True)
         env["ROEHUB_INDICATORS_CONFIG"] = str(ROOT / "configs/test/indicators.yaml")
         config = _artifacts(env, dsn)
         env.update(
@@ -593,6 +550,9 @@ def run_stack():
                 {"WEB_BACKTESTS_CLIENT_ENABLED": "false", "WEB_STRATEGIES_CLIENT_ENABLED": "false"},
             ),
         ]
+        if os.environ.get("ROEHUB_PROOF_MARKET_DATA") == "true":
+            servers.append(("navigator", "tools.qa.navigator_preview:create_app", str(PORT + 6),
+                            {"WEB_BACKTESTS_CLIENT_ENABLED": "true"}))
         if os.environ.get("ROEHUB_PROOF_STRATEGIES") == "true":
             servers.extend(
                 [

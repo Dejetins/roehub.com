@@ -50,7 +50,7 @@ class _FakeInstrumentReader:
         Returns:
             tuple[InstrumentId, ...]: Deterministic instrument tuple for the scenario.
         Assumptions:
-            Metric tests do not need ClickHouse and therefore use a fixed in-memory snapshot.
+            Metric tests do not need PostgreSQL and therefore use a fixed in-memory snapshot.
         Raises:
             None.
         Side Effects:

@@ -22,10 +22,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: E402
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway  # noqa: E402
 from trading.contexts.market_data.adapters.outbound.clients.common_http import (  # noqa: E402
     RequestsHttpClient,
 )
@@ -35,16 +32,14 @@ from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_s
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (  # noqa: E402
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E402,E501
-    ClickHouseCanonicalCandleIndexReader,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E402, E501
+    PostgresCanonicalCandleIndexReader,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (  # noqa: E402,E501
-    ClickHouseConnectGateway,
-    ClickHouseGateway,
-    ThreadLocalClickHouseConnectGateway,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (  # noqa: E402
+    IngestionGateway,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (  # noqa: E402,E501
-    ClickHouseRawKlineWriter,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E402
+    PostgresRawKlineWriter,
 )
 from trading.contexts.market_data.application.dto import RestFillTask  # noqa: E402
 from trading.contexts.market_data.application.use_cases import RestFillRange1mUseCase  # noqa: E402
@@ -274,9 +269,7 @@ def build_plan_manifest(
             reused_completed_chunks=reused_completed_chunks,
         ),
         "execution": {
-            "status": "planned_with_reused_progress"
-            if reused_completed_chunks
-            else "planned",
+            "status": "planned_with_reused_progress" if reused_completed_chunks else "planned",
             "started_at_utc": None,
             "updated_at_utc": _format_utc(generated_at_utc),
             "finished_at_utc": None,
@@ -292,7 +285,7 @@ def build_plan_manifest(
 def build_coverage_report(
     *,
     plan_manifest: Mapping[str, Any],
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     collected_at_utc: datetime,
 ) -> dict[str, Any]:
@@ -337,9 +330,7 @@ def build_coverage_report(
         "stage": "04B",
         "market": BINANCE_FUTURES_MARKET_CODE,
         "collected_at_utc": _format_utc(collected_at_utc),
-        "latest_binance_futures_candle_utc": plan_manifest.get(
-            "latest_binance_futures_candle_utc"
-        ),
+        "latest_binance_futures_candle_utc": plan_manifest.get("latest_binance_futures_candle_utc"),
         "coverage_status": "accepted_coverage" if not blocked_entries else "residual_gaps",
         "summary": {
             "windows_total": len(entries),
@@ -415,14 +406,7 @@ def execute_manifest(
 
     manifest = _read_json(manifest_path)
     cfg = load_market_data_runtime_config(market_config_path)
-    settings = ClickHouseSettingsLoader(os.environ).load()
-    gateway: ClickHouseGateway
-    if workers == 1:
-        gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-    else:
-        gateway = ThreadLocalClickHouseConnectGateway(
-            client_factory=lambda: _clickhouse_client(settings),
-        )
+    gateway = market_gateway(os.environ, workload="ingestion")
     ingest_id = uuid4()
     thread_state = threading.local()
 
@@ -432,7 +416,7 @@ def execute_manifest(
             use_case = _make_rest_fill_use_case(
                 cfg=cfg,
                 gateway=gateway,
-                database=settings.database,
+                database="market_data",
                 batch_size=batch_size,
                 ingest_id=ingest_id,
             )
@@ -488,7 +472,7 @@ def execute_manifest(
                         covered_chunk = _chunk_has_accepted_canonical_coverage(
                             chunk=chunk,
                             gateway=gateway,
-                            database=settings.database,
+                            database="market_data",
                         )
                     except Exception as exc:  # noqa: BLE001
                         skip_check_failed = True
@@ -521,9 +505,7 @@ def execute_manifest(
                     chunk["rows_written"] = 0
                     chunk["batches_written"] = 0
                     chunk["skip_reason"] = "accepted_canonical_coverage_exists"
-                    execution["chunks_completed"] = (
-                        int(execution.get("chunks_completed") or 0) + 1
-                    )
+                    execution["chunks_completed"] = int(execution.get("chunks_completed") or 0) + 1
                     execution["chunks_skipped_covered"] = (
                         int(execution.get("chunks_skipped_covered") or 0) + 1
                     )
@@ -772,9 +754,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
                 "active_stage04a_symbol_count": manifest["current_metadata"][
                     "active_stage04a_symbol_count"
                 ],
-                "supplement_symbol_count": manifest["current_metadata"][
-                    "supplement_symbol_count"
-                ],
+                "supplement_symbol_count": manifest["current_metadata"]["supplement_symbol_count"],
                 "chunks_reused_completed_from_previous_manifest": manifest["summary"][
                     "chunks_reused_completed_from_previous_manifest"
                 ],
@@ -808,12 +788,12 @@ def _cmd_execute(args: argparse.Namespace) -> int:
 
 
 def _cmd_coverage(args: argparse.Namespace) -> int:
-    settings = ClickHouseSettingsLoader(os.environ).load()
-    gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
+    settings = market_gateway(os.environ, workload="reference")
+    gateway = settings
     report = build_coverage_report(
         plan_manifest=_read_json(args.manifest),
         gateway=gateway,
-        database=settings.database,
+        database="market_data",
         collected_at_utc=_now_utc(),
     )
     _atomic_write_json(args.output_json, report)
@@ -1026,11 +1006,7 @@ def _previous_manifest_reuse_summary(
     previous_chunks = previous_manifest.get("chunks")
     chunks_total = len(previous_chunks) if isinstance(previous_chunks, Sequence) else 0
     execution = previous_manifest.get("execution")
-    execution_status = (
-        execution.get("status")
-        if isinstance(execution, Mapping)
-        else None
-    )
+    execution_status = execution.get("status") if isinstance(execution, Mapping) else None
     return {
         "enabled": True,
         "source_stage": previous_manifest.get("stage"),
@@ -1116,7 +1092,7 @@ def _task_from_chunk(chunk: Mapping[str, Any]) -> RestFillTask:
 def _make_rest_fill_use_case(
     *,
     cfg: Any,
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     batch_size: int,
     ingest_id: Any,
@@ -1130,13 +1106,12 @@ def _make_rest_fill_use_case(
     )
     return RestFillRange1mUseCase(
         source=source,
-        writer=ClickHouseRawKlineWriter(gateway=gateway, database=database),
+        writer=PostgresRawKlineWriter(gateway=gateway),
         clock=clock,
         max_days_per_insert=cfg.backfill.max_days_per_insert,
         batch_size=batch_size,
-        index_reader=ClickHouseCanonicalCandleIndexReader(
+        index_reader=PostgresCanonicalCandleIndexReader(
             gateway=gateway,
-            database=database,
         ),
     )
 
@@ -1162,7 +1137,7 @@ def _run_chunk(
 def _chunk_has_accepted_canonical_coverage(
     *,
     chunk: Mapping[str, Any],
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
 ) -> bool:
     start = _parse_utc(str(chunk["start_utc"]))
@@ -1186,8 +1161,7 @@ def _chunk_has_accepted_canonical_coverage(
         and entry["duplicate_rows"] == 0
         and entry["volume_quote_rows"] == entry["physical_rows"]
         and entry["trades_count_rows"] == entry["physical_rows"]
-        and entry["vwap_computable_rows"] + entry["zero_volume_rows"]
-        == entry["physical_rows"]
+        and entry["vwap_computable_rows"] + entry["zero_volume_rows"] == entry["physical_rows"]
     )
 
 
@@ -1255,8 +1229,7 @@ def _overlaps_active_range(
         return False
     start, end = _chunk_time_range(chunk)
     return any(
-        start < active_end and end > active_start
-        for active_start, active_end in active_ranges
+        start < active_end and end > active_start for active_start, active_end in active_ranges
     )
 
 
@@ -1315,17 +1288,16 @@ def _runtime_limit_reached(
 
 
 def _query_latest_candle_utc(*, market_id: int) -> datetime:
-    settings = ClickHouseSettingsLoader(os.environ).load()
-    gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-    query = f"""
-    SELECT max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
-    FROM {settings.database}.canonical_candles_1m
-    WHERE market_id = %(market_id)s
-    """
-    rows = gateway.select(query, {"market_id": market_id})
-    if not rows or rows[0].get("last_minute_key") is None:
+    settings = market_gateway(os.environ, workload="reference")
+    gateway = settings
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.research_export import (  # noqa: E501
+        latest_minute,
+    )
+
+    value = latest_minute(gateway, market_id)
+    if value is None:
         raise RuntimeError(f"No canonical candles found for market_id={market_id}")
-    return _minute_key_to_dt(rows[0]["last_minute_key"])
+    return _minute_key_to_dt(value)
 
 
 def _safe_error_summary(exc: Exception) -> str:
@@ -1345,40 +1317,18 @@ def _safe_error_summary(exc: Exception) -> str:
 
 def _query_coverage_row(
     *,
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     market_id: int,
     symbol: str,
     start: datetime,
     end: datetime,
 ) -> Mapping[str, Any]:
-    query = f"""
-    SELECT
-        min(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
-        max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key,
-        count() AS physical_rows,
-        uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS distinct_minutes,
-        countIf(volume_quote IS NOT NULL) AS volume_quote_rows,
-        countIf(trades_count IS NOT NULL) AS trades_count_rows,
-        countIf(volume_base = 0) AS zero_volume_rows,
-        countIf(volume_base > 0 AND volume_quote IS NOT NULL) AS vwap_computable_rows
-    FROM {database}.canonical_candles_1m
-    WHERE market_id = %(market_id)s
-      AND symbol = %(symbol)s
-      AND ts_open >= fromUnixTimestamp64Milli(%(start_ms)s, 'UTC')
-      AND ts_open < fromUnixTimestamp64Milli(%(end_ms)s, 'UTC')
-    SETTINGS max_threads = 1
-    """
-    rows = gateway.select(
-        query,
-        {
-            "market_id": market_id,
-            "symbol": symbol,
-            "start_ms": _dt_to_epoch_ms(start),
-            "end_ms": _dt_to_epoch_ms(end),
-        },
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.research_export import (  # noqa: E501
+        coverage_row,
     )
-    return rows[0] if rows else {}
+
+    return coverage_row(gateway, market_id=market_id, symbol=symbol, start=start, end=end)
 
 
 def _load_exchange_info(*, base_url: str, timeout_s: float) -> Mapping[str, Any]:
@@ -1507,9 +1457,14 @@ def _parse_utc(value: str) -> datetime:
 
 
 def _format_utc(value: datetime) -> str:
-    return value.astimezone(UTC).replace(second=value.second, microsecond=0).isoformat().replace(
-        "+00:00",
-        "Z",
+    return (
+        value.astimezone(UTC)
+        .replace(second=value.second, microsecond=0)
+        .isoformat()
+        .replace(
+            "+00:00",
+            "Z",
+        )
     )
 
 

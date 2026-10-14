@@ -1,0 +1,3309 @@
+{
+  "scope": "isolated paired writer component; not an S09 mixed soak or installed SLA",
+  "server": "disposable PG16 2CPU 4GiB",
+  "client": "same host venv sequential alternating order",
+  "warmup_batches": 5,
+  "repetitions": 3,
+  "samples_per_repetition": 30,
+  "baseline_sha256": "8b4a97d2e8f439ad44da0e5f44e21038805ae2f43edea4c535749edc539ca328",
+  "candidate_sha256": "bc4e358c7fd49c5e2f026d4236ad5894c848e0919e96e8b86ca9949062fbf7a4",
+  "summaries": [
+    {
+      "rows": 5,
+      "variant": "baseline",
+      "n": 90,
+      "median_ms": 10.155312484130263,
+      "p95_ms": 17.220583045855165,
+      "min_ms": 8.754458976909518,
+      "max_ms": 60.33549993298948
+    },
+    {
+      "rows": 5,
+      "variant": "candidate",
+      "n": 90,
+      "median_ms": 12.057020969223231,
+      "p95_ms": 23.533125058747828,
+      "min_ms": 9.378000046126544,
+      "max_ms": 31.29662503488362
+    },
+    {
+      "rows": 100,
+      "variant": "baseline",
+      "n": 90,
+      "median_ms": 14.560749987140298,
+      "p95_ms": 19.426458049565554,
+      "min_ms": 11.954042012803257,
+      "max_ms": 26.58233291003853
+    },
+    {
+      "rows": 100,
+      "variant": "candidate",
+      "n": 90,
+      "median_ms": 12.910291436128318,
+      "p95_ms": 15.997417038306594,
+      "min_ms": 11.383709032088518,
+      "max_ms": 19.921791972592473
+    },
+    {
+      "rows": 1000,
+      "variant": "baseline",
+      "n": 90,
+      "median_ms": 44.66447903541848,
+      "p95_ms": 60.1984589593485,
+      "min_ms": 38.33424998447299,
+      "max_ms": 68.59074998646975
+    },
+    {
+      "rows": 1000,
+      "variant": "candidate",
+      "n": 90,
+      "median_ms": 46.1045210249722,
+      "p95_ms": 62.95991700608283,
+      "min_ms": 39.45095802191645,
+      "max_ms": 89.36170896049589
+    }
+  ],
+  "observations": [
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 18.997833016328514
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 10.89000003412366
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.245291960425675
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 11.835374985821545
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.954374986700714
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 60.33549993298948
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.743083966895938
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.827250032685697
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 17.418499919585884
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 19.333000062033534
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.963791959919035
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.287958033382893
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.246582980267704
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.379582945257425
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 8.824625052511692
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 8.785416022874415
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 10.390041978098452
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 8.926582988351583
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.302792022936046
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.649457992054522
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 8.754458976909518
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.466874995268881
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 11.457082931883633
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.845750057138503
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.637458043172956
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.09245901554823
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 29.86983396112919
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.137125060893595
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 10.75554103590548
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 9.121290990151465
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 16.643375041894615
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 11.499041924253106
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 10.746416985057294
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.188167061656713
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 11.515624937601388
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 11.388208949938416
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.38437497522682
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.279499999247491
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.176292064599693
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.08629203028977
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.993207999505103
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.707125046290457
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 23.361167055554688
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.48233297560364
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 17.872957978397608
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.694874994456768
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.79150006081909
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 16.164875007234514
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.824499962851405
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 19.660874968394637
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 23.533125058747828
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 15.338500030338764
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 17.813250073231757
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 20.22241591475904
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 31.29662503488362
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 16.01795805618167
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.381957960315049
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.318250024691224
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.186042080633342
+    },
+    {
+      "rows": 5,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 23.61845795530826
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 27.557124965824187
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 16.352291917428374
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 26.98824997060001
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.822624968364835
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 16.104916925542057
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 17.921791062690318
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.389374991878867
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.027749908156693
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 10.137250064872205
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 10.578708024695516
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.720417088828981
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.52487497124821
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.896417010575533
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.23875000141561
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 10.844041942618787
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.745624964125454
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.681958006694913
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.378000046126544
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.755374984815717
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.68716698884964
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.059166027233005
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.071541907265782
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 10.464708902873099
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 24.78004095610231
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.853874988853931
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.239000040106475
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.12412491440773
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 9.515375015325844
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.025167001411319
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.681292020715773
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.6032499615103
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.670375031419098
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.237291058525443
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.352957993745804
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.795957943424582
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.820584022440016
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.695749962702394
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.875542018562555
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.152957936748862
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.037709096446633
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.028082993812859
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.069541982375085
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.370834032073617
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.957166970707476
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.179375017993152
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.181083063594997
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.093541069887578
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.11291700322181
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.935749927535653
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.916792041622102
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.390374925918877
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.595084004104137
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.203833062201738
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.125708020292222
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 8.757125004194677
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.550208971835673
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 10.042499983683228
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.376666974276304
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.108124999329448
+    },
+    {
+      "rows": 5,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 9.058125084266067
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.01754205673933
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 9.447459015063941
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 9.402833064086735
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 11.308916029520333
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.908958036452532
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.729582980275154
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.382457985542715
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 9.871499962173402
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.454125003889203
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 12.697875034064054
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 12.967500020749867
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.026459026150405
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.706875007599592
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.601292015053332
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 11.87487505376339
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 11.274209013208747
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 12.316165957599878
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.216207968071103
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.204792027361691
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 9.376791073009372
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 8.91287496779114
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 8.994500036351383
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 12.917416985146701
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 12.972833006642759
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 17.220583045855165
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.782249996438622
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 11.850374983623624
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.286334087140858
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 9.840624989010394
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 10.241082985885441
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 17.45408307760954
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.265542008914053
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.536332990042865
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.052666909061372
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.097666108980775
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.963958015665412
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.995791992172599
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.786458034999669
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.159041965380311
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.57462499011308
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 9.44391603115946
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.94345806632191
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.380291030742228
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.30304201412946
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.277458000928164
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.626874980516732
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.3407499846071
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 9.578124969266355
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 9.851749986410141
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.234792018309236
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.116292047314346
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.10079204570502
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.953749995678663
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.174624971114099
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 9.70825005788356
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.676375008188188
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.848000063560903
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.17849997151643
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 10.422916966490448
+    },
+    {
+      "rows": 5,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.254042037762702
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 20.195916993543506
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.08366609737277
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.826582977548242
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.913540984503925
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.438416994176805
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.220749911852181
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.623209088109434
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.078917050734162
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 16.129667055793107
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.5186249865219
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.805583071894944
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.660500011406839
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.209833017550409
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 12.641999986954033
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.752375030890107
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.782375073991716
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.495417078956962
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.174832962453365
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.802708010189235
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.735665939748287
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 16.98204199783504
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.52791697718203
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.616958050988615
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 14.992958051152527
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.042832957580686
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 15.17695898655802
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.573125004768372
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.60912504605949
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 13.248000061139464
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 19.015332916751504
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 17.611333052627742
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.15874997433275
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.441584025509655
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.71391601767391
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.320749927312136
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.656458002515137
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.044833020307124
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.108625007793307
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 16.350166988559067
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 15.469082980416715
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.622540980577469
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.037500019185245
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 14.270790969021618
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.72029208485037
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.975749956443906
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.936832965351641
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.928833999671042
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.69612496253103
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.762792106717825
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.174792005680501
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 11.971583007834852
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 11.9041659636423
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.694666045717895
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.1453339708969
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.207957963459194
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.971125077456236
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.734625022858381
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 12.311124941334128
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 15.397333074361086
+    },
+    {
+      "rows": 100,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 13.447082950733602
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 18.66712491028011
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.85075000487268
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.638292021118104
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.274708948098123
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.8486670544371
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.329000048339367
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.601374997757375
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.96516607888043
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.230917043983936
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.620125082321465
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.337750035338104
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.937541003338993
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.294583001174033
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 15.997417038306594
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.859749935567379
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.522042009048164
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.187499997206032
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.67129199206829
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.913958915509284
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 14.626333024352789
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.90362498164177
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.733416933566332
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 12.748792069032788
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.676833012141287
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.90508296713233
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.663874960504472
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.383709032088518
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 11.964416014961898
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 13.170165941119194
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 19.921791972592473
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 19.426458049565554
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.372167013585567
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.27933301217854
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 17.117667011916637
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.37362504657358
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 16.940540983341634
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 15.516082989051938
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.943540980108082
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.03183299023658
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.302499941550195
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 11.954042012803257
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 20.044917007908225
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 12.086624978110194
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 15.021124971099198
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 17.427042010240257
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 17.76658301241696
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.790000113658607
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 12.64924998395145
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 12.120832921937108
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.055749983526766
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.59416700527072
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 18.2740839663893
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 13.235999969765544
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.584125019609928
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.33887507300824
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 15.549040981568396
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 16.044583986513317
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 14.478166936896741
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 15.332333976402879
+    },
+    {
+      "rows": 100,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 16.93616691045463
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 20.20908403210342
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 16.112167038954794
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.234207967296243
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.091166947968304
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.175750082358718
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.863749966025352
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.884291052818298
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.908249955624342
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.05383406765759
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 16.323332907631993
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.439499984495342
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.052917016670108
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 18.252083915285766
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.178625027649105
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 13.705125078558922
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.537374954670668
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.68012498319149
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.87204192765057
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.239166979677975
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 14.468249981291592
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.963957994244993
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 26.58233291003853
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 20.499916980043054
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 16.88462495803833
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.833500074222684
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.726041980087757
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.198749955743551
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 15.956750023178756
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 18.62954196985811
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 16.063582967035472
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 18.357124994508922
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.275416986085474
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.57504103705287
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.276459019631147
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.245791964232922
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.000624905340374
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.3346250038594
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.50287494622171
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.936291004531085
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.444875086657703
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.820416992530227
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.451249989680946
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.21654103230685
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.269332888536155
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.018166948109865
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.883416096679866
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.953291948884726
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.507999966852367
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 11.905416962690651
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.747125049121678
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 14.470333000645041
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.860916020348668
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.980207964777946
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.950458029285073
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 14.371915953233838
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 14.396082959137857
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.397332931868732
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.23433401901275
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 12.883749906904995
+    },
+    {
+      "rows": 100,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 13.370833010412753
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 44.20095798559487
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 38.3727919543162
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 53.878124919719994
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 41.40216705854982
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 38.70699997060001
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 46.46766697987914
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 47.413542051799595
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 48.25420898851007
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 40.526665979996324
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 58.20241698529571
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 50.509167020209134
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 41.51054110843688
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 43.10916701797396
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 40.88500002399087
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 40.365542052313685
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 43.440583045594394
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 60.1984589593485
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 65.39187498856336
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 44.12425006739795
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 43.51391608361155
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 52.24312504287809
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 54.52958308160305
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 42.034209007397294
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 43.003124999813735
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 58.88129095546901
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 43.44158305320889
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 68.30870790872723
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 58.08245891239494
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 55.0496659707278
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "baseline",
+      "ms": 51.03708396200091
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 53.650874993763864
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 62.95991700608283
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 51.142332958988845
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 53.480374976061285
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 44.8679169639945
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 49.895667005330324
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 47.762875095941126
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 42.73841599933803
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 42.17699996661395
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 58.21041599847376
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 57.91537510231137
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 45.74125004000962
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 44.164667022414505
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 45.24400003720075
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 43.10087498743087
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 45.603750040754676
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 70.10691601317376
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 52.79545800294727
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 63.66620899643749
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 47.41766594815999
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 44.96737499721348
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 42.42620896548033
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 45.690709026530385
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 52.60795901995152
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 70.28195797465742
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 44.38245797064155
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 46.72520898748189
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 41.69787489809096
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 44.92704197764397
+    },
+    {
+      "rows": 1000,
+      "repetition": 0,
+      "variant": "candidate",
+      "ms": 46.29508301150054
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 58.83800005540252
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 56.09125003684312
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 48.45254204701632
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 43.56712498702109
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 43.89691702090204
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 45.800500083714724
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 48.076917068101466
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 44.05933292582631
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 46.264750068075955
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 42.080707964487374
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 40.9961249679327
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 46.72341700643301
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 41.81620804592967
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 47.44187497999519
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 48.50587504915893
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 51.19591695256531
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 52.843417041003704
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 43.43279206659645
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 49.09129207953811
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 45.88504193816334
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 58.44074999913573
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 39.518916979432106
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 39.45095802191645
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 47.235250007361174
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 46.9625840196386
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 50.47108302824199
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 47.38283297047019
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 47.666584025137126
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 48.171125003136694
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "candidate",
+      "ms": 48.66954102180898
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 58.31508303526789
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 50.04837503656745
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 63.40412492863834
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 57.15720891021192
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 54.90683391690254
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 50.36912497598678
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 49.950749962590635
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 44.86516700126231
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 47.29154193773866
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 42.35166707076132
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 43.87991700787097
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 40.271291974931955
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 40.92691605910659
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 42.58816596120596
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 41.565375053323805
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 42.02237504068762
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 47.95779101550579
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 46.849625068716705
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 45.56995793245733
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 46.66729096788913
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 48.675292055122554
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 47.888249973766506
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 40.00358306802809
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 43.98441698867828
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 40.4859590344131
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 42.493916931562126
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 42.845499934628606
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 40.558749926276505
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 53.43054106924683
+    },
+    {
+      "rows": 1000,
+      "repetition": 1,
+      "variant": "baseline",
+      "ms": 46.25224997289479
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 51.35470803361386
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 44.463791069574654
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 49.52016694005579
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 48.72379102744162
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 42.74883295875043
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 53.29666705802083
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 46.41170799732208
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 46.48866690695286
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 40.94983299728483
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 44.26379199139774
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 44.11662509664893
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 44.16237503755838
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 45.96691601909697
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 43.87116595171392
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 39.57212495151907
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 44.02033309452236
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 48.42875001486391
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 39.24366703722626
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 41.400916990824044
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 42.09258302580565
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 40.25779198855162
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 38.33424998447299
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 42.335416888818145
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 45.25312501937151
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 61.60504091531038
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 49.35204202774912
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 46.35187494568527
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 40.12658295687288
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 68.59074998646975
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "baseline",
+      "ms": 41.80795804131776
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 51.412667031399906
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 46.409582952037454
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 43.450083932839334
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 71.74645899794996
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 44.782625045627356
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 47.044500010088086
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 46.50241695344448
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 44.14604196790606
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 46.00187495816499
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 55.10070896707475
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 43.65400003734976
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 60.482459026388824
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 42.86087502259761
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 45.7460000179708
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 42.26554196793586
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 41.068792110309005
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 41.06862493790686
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 41.90995800308883
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 42.91258298326284
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 40.58799997437745
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 40.60891596600413
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 40.49662500619888
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 41.13170807249844
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 46.20716709177941
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 42.21866698935628
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 89.36170896049589
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 39.78258301503956
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 43.23712503537536
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 46.58016702160239
+    },
+    {
+      "rows": 1000,
+      "repetition": 2,
+      "variant": "candidate",
+      "ms": 41.95108299609274
+    }
+  ],
+  "interference": "Concurrent disposable regression tests and image build; retained diagnostic run, not final comparison"
+}

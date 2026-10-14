@@ -73,7 +73,7 @@ class _FixtureStateCoordinator:
     ) -> dict[str, object]:
         assert policy.profile == "base"
         assert manifest is not None
-        assert len(list(restored_root.glob("*.snapshot"))) == 8
+        assert len(list(restored_root.glob("*.snapshot"))) == 7
         return {"status": "ready", "state_owner_count": 8}
 
     def update(
@@ -138,7 +138,6 @@ def _policy(tmp_path: Path) -> Path:
     modes = {
         BackupStateOwner.RELEASE_CONFIG: "application_quiesced",
         BackupStateOwner.POSTGRESQL: "database_snapshot",
-        BackupStateOwner.CLICKHOUSE: "database_snapshot",
         BackupStateOwner.REDIS_CHECKPOINT: "durable_checkpoint",
         BackupStateOwner.OPENBAO: "encrypted_raft_snapshot",
         BackupStateOwner.ARTIFACTS: "content_addressed_snapshot",
@@ -299,7 +298,7 @@ def test_backup_backend_executes_and_reconciles_backup_and_fresh_restore(
     assert backend.reconcile(backup).state is OperationState.SUCCEEDED
     assert backend.execute(restore).detail_code == "restore.completed"
     assert backend.reconcile(restore).state is OperationState.SUCCEEDED
-    assert len(list((tmp_path / "restores" / "backup-001").glob("*.snapshot"))) == 8
+    assert len(list((tmp_path / "restores" / "backup-001").glob("*.snapshot"))) == 7
 
 
 def test_recovery_backend_requires_verified_preupgrade_backup(tmp_path: Path) -> None:
@@ -371,9 +370,7 @@ def test_backup_policy_schema_rejects_duplicate_owner_semantics(tmp_path: Path) 
     policy_payload = json.loads(_policy(tmp_path).read_text(encoding="utf-8"))
     policy_payload["sources"][-1]["owner"] = policy_payload["sources"][0]["owner"]
     schema = json.loads(
-        (Path("schemas/backup/installation-backup-policy.schema.json")).read_text(
-            encoding="utf-8"
-        )
+        (Path("schemas/backup/installation-backup-policy.schema.json")).read_text(encoding="utf-8")
     )
 
     assert list(Draft202012Validator(schema).iter_errors(policy_payload))

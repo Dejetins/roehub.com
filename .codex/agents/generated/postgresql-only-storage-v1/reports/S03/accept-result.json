@@ -1,0 +1,1 @@
+{"status": "ok", "action": "accept", "stage": "S03", "stage_status": "accepted", "ledger_status": "active", "executor": "s03-20261013-01a13706-ingestion", "receipt": "receipts/S03/receipt-7c6b7401707e4f629df7b763be16f0b4.md", "next_allowed": ["S04"]}

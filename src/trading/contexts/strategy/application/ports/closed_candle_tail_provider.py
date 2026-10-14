@@ -11,7 +11,7 @@ class ClosedCandleTailProvider(Protocol):
     Strategy-side port for requesting a continuous closed 1m candle tail.
 
     The implementation belongs to Market Data adapters/use cases. Strategy must not call
-    exchange REST providers or ClickHouse directly through this contract.
+    exchange REST providers or PostgreSQL directly through this contract.
     """
 
     def get_closed_1m_tail(

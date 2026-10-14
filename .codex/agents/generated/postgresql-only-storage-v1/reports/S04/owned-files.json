@@ -1,0 +1,132 @@
+[
+  {
+    "path": "apps/migrations/market_data.py",
+    "status": "modified",
+    "sha256": "fd13fad0271bb00b8d8fa83c33b6e22ab8aa052b4bc11d13f2cb5db3efb892b9"
+  },
+  {
+    "path": "apps/migrations/storage.py",
+    "status": "modified",
+    "sha256": "676edeccc53bb5b2698f1e4cd77854aaf92fffc95f8f058dac6ac1c1e22ba2d3"
+  },
+  {
+    "path": "docs/architecture/project-map/PROJECT_MAP.md",
+    "status": "modified",
+    "sha256": "6b3f02e15bb60f2266148010587c1707d88170d35e3459e792103b25a1e397cf"
+  },
+  {
+    "path": "docs/architecture/project-map/project-map.json",
+    "status": "modified",
+    "sha256": "d2e3bffb6a451d06e4656df2420fe36f0bbddd6f5363df265a777b2c2aa90c02"
+  },
+  {
+    "path": "migrations/postgres/0038_market_data_verification_fences_v1.sql",
+    "status": "created",
+    "sha256": "8af6d62c18daacc9c7db317ea98b65afa37a807aeee195c74fd6f1c170d02011"
+  },
+  {
+    "path": "migrations/postgres/manifest.json",
+    "status": "modified",
+    "sha256": "f12c645cf3e9b772375ddeb4fbb208c3e114308d7e016dfdccaf00b41f50ace6"
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+    "status": "modified",
+    "sha256": "0f5ac780974e1372f5268d7446f0580ea997851b94a24231920d69e9fb3258ea"
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/stored_coordinates.py",
+    "status": "created",
+    "sha256": "162d7c87199eddeff47ee75b95f084f493158a7e84340b0b9f9ce9347a5b9a8c"
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "status": "modified",
+    "sha256": "3a15bf15b74fc93df7bcfd114cc3edd5e3c21d49d61bf6725e60776a8ed0f52a"
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "status": "modified",
+    "sha256": "7eebe9c08a89661a437f23c4b5abfd2595f1478ac7f4f456ec7510fbf40c96ed"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/READERS.md",
+    "status": "created",
+    "sha256": "70340a126cacdaf98720a08b8d998a2a538c7e83d4c8eb3bbfff621ac77a4357"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_index_reader.py",
+    "status": "created",
+    "sha256": "82ecb75c0c805e7078482e6dc847f75c2d8774f29ba7edf9473ed021e0f245e8"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py",
+    "status": "created",
+    "sha256": "e0e7023548252fce9b2372bbd79831cfd0a80bfbaa9d5102bd850420048e0e6b"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/catalog_coverage_reader.py",
+    "status": "created",
+    "sha256": "f0f552e9b43db7ce7d4312ac5463b296ef7dfa7cabe43b22f76e0b5dd22a3f43"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/coverage_maintenance.py",
+    "status": "created",
+    "sha256": "a8e133b2b31f44eb8bb2e085545e339b03a481adb688b4487982ade42b4ae4b9"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/funding_rate_store.py",
+    "status": "created",
+    "sha256": "5a927d325308200d9491b63a4429b1045379980a0699284228ff410d66946e10"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_coverage_reader.py",
+    "status": "created",
+    "sha256": "570f375e9b68b4f4042afcdf1b5ef8efed6ee6511da9eb5d51db881f8003e216"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_range_verifier.py",
+    "status": "created",
+    "sha256": "5c0d72a780bf25fb74ed513554a21f371f78693dd03793c6daebbfb761fa3664"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py",
+    "status": "modified",
+    "sha256": "7f0c74c6e76796ac8c880d57334ac4e2c9d1f14abf67938d50f4b38a654ce2e4"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_coverage_reader.py",
+    "status": "created",
+    "sha256": "b038445a0cc7148874c91325b6df468be8414af6c3e8b32fb5661f03fe5a499d"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/query_support.py",
+    "status": "created",
+    "sha256": "38cc3fb1c9f36cac78fbf3a1596f6ab0ce0c31bb8d29f54b3265fe1c89903c05"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/reference_readers.py",
+    "status": "created",
+    "sha256": "1d18327b09b871f4549b179cc2348f5547a84116c143ae415d4fdb6ba926178d"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/reference_writers.py",
+    "status": "modified",
+    "sha256": "a4b523fdb3c972489d88d01f2aaeab27bad806da548313598670344f355d81af"
+  },
+  {
+    "path": "tests/real_infra/market_data/test_postgres_readers_frontier.py",
+    "status": "created",
+    "sha256": "65df8767831c5ad1de7ebafc87e8f3ef4dd55310b20f6b71031ee15a6a9dd29f"
+  },
+  {
+    "path": "tests/real_infra/market_data/test_storage_schema_postgres.py",
+    "status": "modified",
+    "sha256": "b3710b7a971554ab8e78758b5efc53650b99e5ad332dacd568dd34960962dfcd"
+  },
+  {
+    "path": "tests/unit/apps/migrations/test_storage_lifecycle.py",
+    "status": "modified",
+    "sha256": "f50d346959d09399d9154982dd43fb2330666da455c63dda4f8559dc90ab399c"
+  }
+]

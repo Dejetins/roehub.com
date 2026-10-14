@@ -1,5 +1,9 @@
 # Roehub Plugin API v1alpha1
 
+> Статус: historical / retired, 2026-10-13. Функция удалена из текущей self-host
+> платформы по решению владельца. Ниже сохранён прежний контракт для истории.
+> Текущий состав: `docs/runbooks/offline-release-installation.md`.
+
 ## Статус и граница
 
 `Plugin API v1alpha1` — публичная экспериментальная граница Stage `12` для

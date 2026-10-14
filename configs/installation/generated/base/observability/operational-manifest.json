@@ -43,19 +43,9 @@
       "timeout_seconds": 1.0
     },
     {
-      "action_ref": "restart_service",
-      "capability": "extensions.plugins",
-      "kind": "http_json",
-      "required": true,
-      "runbook_id": "runtime.service-degraded",
-      "service_id": "plugin-gateway",
-      "target": "http://plugin-gateway:9209/health/ready",
-      "timeout_seconds": 1.0
-    },
-    {
       "action_ref": "diagnostics",
       "capability": "storage.postgresql",
-      "kind": "tcp_reachability",
+      "kind": "postgresql",
       "required": false,
       "runbook_id": "runtime.service-degraded",
       "service_id": "postgresql",

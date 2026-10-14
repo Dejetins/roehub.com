@@ -1,0 +1,13 @@
+{
+  "revision": 3,
+  "phase_prefix": "final-",
+  "verdict": "FAILED",
+  "failed_criterion": "unexplained monotonic server anonymous memory growth; confirmed ~8 KiB catalog allocation per write without plateau at 8000 operations",
+  "latency_and_parity_pass": true,
+  "memory_pass": false,
+  "superseding_attempt": "revision4 r4-* pending",
+  "diagnostics": [
+    "memory-context-diagnostic-long.json",
+    "memory-context-diagnostic-reused.json"
+  ]
+}

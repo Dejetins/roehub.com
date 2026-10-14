@@ -33,10 +33,6 @@ PINNED_INFRASTRUCTURE_IMAGES = {
     "postgresql": (
         "postgres:16@sha256:" "be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
     ),
-    "clickhouse": (
-        "clickhouse/clickhouse-server:24.8@sha256:"
-        "1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
-    ),
     "redis": (
         "redis:7.2-bookworm@sha256:"
         "e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
@@ -117,7 +113,6 @@ def validate_runtime_service_manifest(
         for dependency in role["depends_on"]:
             if dependency not in names and dependency not in {
                 "postgresql",
-                "clickhouse",
                 "redis",
                 "openbao",
             }:
@@ -172,10 +167,6 @@ def render_runtime_profile(
     roles = [
         copy.deepcopy(role) for role in service_manifest["roles"] if profile in role["profiles"]
     ]
-    if profile != "base":
-        storage_migrations = next(role for role in roles if role["name"] == "storage-migrations")
-        if "clickhouse" not in storage_migrations["depends_on"]:
-            storage_migrations["depends_on"].append("clickhouse")
     topology = {
         "schema": RUNTIME_TOPOLOGY_SCHEMA,
         "profile": profile,
@@ -190,7 +181,6 @@ def render_runtime_profile(
             "postgresql",
             "redis",
             "openbao",
-            *(["clickhouse"] if profile != "base" else []),
         ],
         "roles": roles,
         "observability": [
@@ -198,8 +188,6 @@ def render_runtime_profile(
             "prometheus",
             "alertmanager",
             "blackbox",
-            "grafana",
-            "loki",
         ],
     }
     compose = _render_compose(
@@ -220,7 +208,6 @@ def render_runtime_profile(
         "control-policy.json": json_bytes(control_policy),
         "runtime-topology.json": json_bytes(topology),
         "service-config.json": installation_outputs["service-config.json"],
-        "oidc.json": installation_outputs["oidc.json"],
         "openbao.json": installation_outputs["openbao.json"],
         "prometheus.yml": observability_outputs.pop("prometheus.yml"),
         "effective-config.redacted.json": installation_outputs["effective-config.redacted.json"],
@@ -343,9 +330,6 @@ def _render_service_configs(
         "rl-runtime.yaml": yaml_bytes(rl_runtime),
         "backtest-artifacts.yaml": yaml_bytes(backtest_artifacts),
         "indicators.yaml": yaml_bytes(indicators),
-        "plugin-publisher-keys.json": json_bytes(
-            {"contract": "PluginPublisherKeys/v1alpha1", "keys": {}}
-        ),
     }
 
 
@@ -362,8 +346,8 @@ def _render_compose(
         "redis": _redis_service(),
         "openbao": _openbao_service(),
     }
-    if profile != "base":
-        services["clickhouse"] = _clickhouse_service()
+    if config["stores"]["postgresql"]["mode"] == "external":
+        services.pop("postgresql")
     for role in roles:
         if role["lifecycle"] in {"host-service", "host-tool"}:
             continue
@@ -374,18 +358,23 @@ def _render_compose(
             config=config,
         )
     services.update(observability_compose_services())
+    if config["stores"]["postgresql"]["mode"] == "external":
+        for service in services.values():
+            service.get("depends_on", {}).pop("postgresql", None)
     volumes = {
+        "pg-budget": {},
+        "pg-trust": {},
+        "pg-init": {},
+        "pg-admin-secrets": {},
+        "pg-monitor-secrets": {},
+        "pg-maintenance-secrets": {},
         "postgres-data": {"labels": {"io.roehub.state-owner": "postgresql"}},
         "redis-data": {"labels": {"io.roehub.state-owner": "redis"}},
         "openbao-data": {"labels": {"io.roehub.state-owner": "openbao"}},
         "openbao-audit": {"labels": {"io.roehub.state-owner": "openbao-audit"}},
         "runtime-secrets": {"labels": {"io.roehub.state-owner": "installation"}},
-        "grafana-secrets": {"labels": {"io.roehub.state-owner": "grafana-auth"}},
         "artifacts": {"labels": {"io.roehub.state-owner": "artifact-store"}},
     }
-    if profile != "base":
-        volumes["clickhouse-data"] = {"labels": {"io.roehub.state-owner": "clickhouse"}}
-        volumes["clickhouse-logs"] = {"labels": {"io.roehub.state-owner": "clickhouse-logs"}}
     if profile == "ml":
         volumes["ml-state"] = {"labels": {"io.roehub.state-owner": "ml-runtime"}}
     volumes.update(observability_volumes())
@@ -482,9 +471,7 @@ def _render_control_policy(
             "environment_names": sorted((service.get("environment") or {}).keys()),
             "resources": service.get("deploy", {}).get("resources", {}).get("limits", {}),
             "command_sha256": sha256_bytes(
-                json.dumps(
-                    service.get("command", []), separators=(",", ":")
-                ).encode("utf-8")
+                json.dumps(service.get("command", []), separators=(",", ":")).encode("utf-8")
             ),
             "release_reference": release_reference,
             "restart_allowed": str(service_name) in SAFE_RESTART_SERVICES,
@@ -503,22 +490,23 @@ def _render_control_policy(
 
 def _secret_init_service() -> dict[str, Any]:
     script = (
-        "umask 077; "
-        "if [ ! -s /run/roehub-secrets/postgresql-password ]; then "
-        "head -c 48 /dev/urandom | base64 > /run/roehub-secrets/postgresql-password; "
-        "chmod 0400 /run/roehub-secrets/postgresql-password; fi; "
-        "if [ ! -s /run/roehub-secrets/clickhouse-password ]; then "
-        "head -c 48 /dev/urandom | base64 > /run/roehub-secrets/clickhouse-password; "
-        "chmod 0400 /run/roehub-secrets/clickhouse-password; "
-        "chown 65532:65532 /run/roehub-secrets/clickhouse-password; fi; "
+        "umask 077; cp /input/roles.sh /run/roehub-pg-init/10-roles.sh; "
+        "chmod 0444 /run/roehub-pg-init/10-roles.sh; "
+        "for f in /run/roehub-pg-admin/* /run/roehub-pg-monitor/* /run/roehub-pg-maintenance/* "
+        "/run/roehub-secrets/postgresql-app-password /run/roehub-secrets/pgpass; "
+        "do if [ -e $$f ]; then chown 0:0 $$f; chmod 0600 $$f; fi; done; "
+        "if [ ! -s /run/roehub-pg-admin/postgresql-password ]; then "
+        "head -c 48 /dev/urandom | base64 > /run/roehub-pg-admin/postgresql-password; "
+        "chmod 0400 /run/roehub-pg-admin/postgresql-password; fi; "
         "if [ ! -s /run/roehub-secrets/redis-password ]; then "
         "head -c 48 /dev/urandom | base64 > /run/roehub-secrets/redis-password; "
         "chmod 0400 /run/roehub-secrets/redis-password; fi; "
         "chown 0:0 /run/roehub-secrets/redis-password; "
         "if [ -e /run/roehub-secrets/redis-password-server ]; then "
-        "chown 0:0 /run/roehub-secrets/redis-password-server; fi; "
+        "chown 0:0 /run/roehub-secrets/redis-password-server; "
+        "chmod 0600 /run/roehub-secrets/redis-password-server; fi; "
         "if [ -e /run/roehub-secrets/redis.conf ]; then "
-        "chown 0:0 /run/roehub-secrets/redis.conf; fi; "
+        "chown 0:0 /run/roehub-secrets/redis.conf; chmod 0600 /run/roehub-secrets/redis.conf; fi; "
         "cp /run/roehub-secrets/redis-password "
         "/run/roehub-secrets/redis-password-server; "
         "chmod 0400 /run/roehub-secrets/redis-password-server; "
@@ -534,11 +522,35 @@ def _secret_init_service() -> dict[str, Any]:
         "head -c 32 /dev/urandom | base64 > /run/roehub-secrets/identity-exchange-kek; "
         "chmod 0400 /run/roehub-secrets/identity-exchange-kek; "
         "chown 65532:65532 /run/roehub-secrets/identity-exchange-kek; fi; "
-        "if [ ! -s /run/roehub-secrets/pgpass ]; then "
-        "printf 'postgresql:5432:roehub:roehub:' > /run/roehub-secrets/pgpass; "
-        "cat /run/roehub-secrets/postgresql-password >> /run/roehub-secrets/pgpass; "
+        "if [ ! -s /run/roehub-secrets/postgresql-app-password ]; then "
+        "head -c 48 /dev/urandom | base64 > /run/roehub-secrets/postgresql-app-password; fi; "
+        "if [ ! -s /run/roehub-pg-monitor/monitor-password ]; then "
+        "head -c 48 /dev/urandom | base64 > /run/roehub-pg-monitor/monitor-password; fi; "
+        "if [ ! -s /run/roehub-pg-maintenance/password ]; then "
+        "head -c 48 /dev/urandom | base64 > /run/roehub-pg-maintenance/password; fi; "
+        "printf '*:*:*:roehub:' > /run/roehub-pg-admin/pgpass; "
+        "cat /run/roehub-pg-admin/postgresql-password >> /run/roehub-pg-admin/pgpass; "
+        "printf '*:*:*:roehub_monitor:' > /run/roehub-pg-monitor/monitor-pgpass; "
+        "cat /run/roehub-pg-monitor/monitor-password >> /run/roehub-pg-monitor/monitor-pgpass; "
+        "printf '*:*:*:roehub_maintenance:' > /run/roehub-pg-maintenance/pgpass; "
+        "cat /run/roehub-pg-maintenance/password >> /run/roehub-pg-maintenance/pgpass; "
+        "chmod 0400 /run/roehub-pg-admin/* /run/roehub-pg-maintenance/* /run/roehub-pg-monitor/*; "
+        "chown 65532:65532 /run/roehub-pg-admin/pgpass "
+        "/run/roehub-pg-monitor/monitor-pgpass /run/roehub-pg-maintenance/pgpass; "
+        "chown 0:0 /run/roehub-pg-budget; chmod 0755 /run/roehub-pg-budget; "
+        "f=/run/roehub-pg-budget/authority.json; test -e $$f || touch $$f; "
+        "chown 0:0 $$f; chmod 0600 $$f; chown 65532:65532 $$f; "
+        "for class in market control admin; do "
+        "case $$class in market) n=16;; control) n=24;; admin) n=8;; esac; "
+        "i=0; while [ $$i -lt $$n ]; do f=/run/roehub-pg-budget/$$class-$$i.json; "
+        "test -e $$f || touch $$f; chown 0:0 $$f; chmod 0600 $$f; chown 65532:65532 $$f; "
+        "i=$$((i+1)); done; done; "
+        "printf '*:*:*:roehub_app:' > /run/roehub-secrets/pgpass; "
+        "cat /run/roehub-secrets/postgresql-app-password >> /run/roehub-secrets/pgpass; "
         "chmod 0400 /run/roehub-secrets/pgpass; "
-        "chown 65532:65532 /run/roehub-secrets/pgpass; fi; "
+        "chown 65532:65532 /run/roehub-secrets/pgpass; "
+        "chown 999:999 /run/roehub-secrets/postgresql-app-password "
+        "/run/roehub-pg-monitor/monitor-password /run/roehub-pg-maintenance/password; "
         "if [ ! -s /run/roehub-secrets/exchange-control-internal-api-token ]; then "
         "head -c 48 /dev/urandom | base64 > "
         "/run/roehub-secrets/exchange-control-internal-api-token; "
@@ -550,11 +562,6 @@ def _secret_init_service() -> dict[str, Any]:
         "/run/roehub-secrets/exchange-control-transit-token; "
         "chmod 0400 /run/roehub-secrets/exchange-control-transit-token; "
         "chown 65532:65532 /run/roehub-secrets/exchange-control-transit-token; fi; "
-        "if [ ! -s /run/grafana-secrets/admin-password ]; then "
-        "head -c 48 /dev/urandom | base64 > "
-        "/run/grafana-secrets/admin-password; "
-        "chmod 0400 /run/grafana-secrets/admin-password; "
-        "chown 472:472 /run/grafana-secrets/admin-password; fi"
     )
     return {
         "image": PINNED_INFRASTRUCTURE_IMAGES["secret_init"],
@@ -567,7 +574,12 @@ def _secret_init_service() -> dict[str, Any]:
         "tmpfs": ["/tmp:rw,noexec,nosuid,size=8m"],
         "volumes": [
             "runtime-secrets:/run/roehub-secrets",
-            "grafana-secrets:/run/grafana-secrets",
+            "pg-admin-secrets:/run/roehub-pg-admin",
+            "pg-monitor-secrets:/run/roehub-pg-monitor",
+            "pg-maintenance-secrets:/run/roehub-pg-maintenance",
+            "pg-budget:/run/roehub-pg-budget",
+            "pg-init:/run/roehub-pg-init",
+            "../../../../infra/docker/postgres-init-roles.sh:/input/roles.sh:ro",
         ],
         "labels": {
             "io.roehub.root-justification": (
@@ -582,14 +594,34 @@ def _secret_init_service() -> dict[str, Any]:
 def _postgres_service() -> dict[str, Any]:
     return {
         "image": PINNED_INFRASTRUCTURE_IMAGES["postgresql"],
+        "command": [
+            "postgres",
+            "-c",
+            "max_connections=48",
+            "-c",
+            "reserved_connections=0",
+            "-c",
+            "superuser_reserved_connections=0",
+            "-c",
+            "shared_buffers=256MB",
+            "-c",
+            "work_mem=4MB",
+            "-c",
+            "maintenance_work_mem=64MB",
+        ],
         "environment": {
             "POSTGRES_DB": "roehub",
             "POSTGRES_USER": "roehub",
-            "POSTGRES_PASSWORD_FILE": "/run/roehub-secrets/postgresql-password",
+            "POSTGRES_PASSWORD_FILE": "/run/roehub-pg-admin/postgresql-password",
         },
         "depends_on": {"secret-init": {"condition": "service_completed_successfully"}},
         "healthcheck": {
-            "test": ["CMD-SHELL", "pg_isready -U roehub -d roehub"],
+            "test": [
+                "CMD-SHELL",
+                "test -s /var/lib/postgresql/data/postmaster.pid && "
+                "test \"$$(sed -n '8p' /var/lib/postgresql/data/postmaster.pid "
+                    "| tr -d ' ')\" = 'ready'",
+            ],
             "interval": "2s",
             "timeout": "2s",
             "retries": 30,
@@ -604,6 +636,10 @@ def _postgres_service() -> dict[str, Any]:
         "networks": ["roehub"],
         "volumes": [
             "postgres-data:/var/lib/postgresql/data",
+            "pg-admin-secrets:/run/roehub-pg-admin:ro",
+            "pg-monitor-secrets:/run/roehub-pg-monitor:ro",
+            "pg-maintenance-secrets:/run/roehub-pg-maintenance:ro",
+            "pg-init:/docker-entrypoint-initdb.d:ro",
             "runtime-secrets:/run/roehub-secrets:ro",
         ],
     }
@@ -634,42 +670,6 @@ def _redis_service() -> dict[str, Any]:
         "networks": ["roehub"],
         "volumes": [
             "redis-data:/data",
-            "runtime-secrets:/run/roehub-secrets:ro",
-        ],
-    }
-
-
-def _clickhouse_service() -> dict[str, Any]:
-    return {
-        "image": PINNED_INFRASTRUCTURE_IMAGES["clickhouse"],
-        "environment": {
-            "CLICKHOUSE_DB": "roehub",
-            "CLICKHOUSE_USER": "default",
-            "CLICKHOUSE_PASSWORD_FILE": "/run/roehub-secrets/clickhouse-password",
-        },
-        "depends_on": {"secret-init": {"condition": "service_completed_successfully"}},
-        "healthcheck": {
-            "test": [
-                "CMD-SHELL",
-                "clickhouse-client --user default --password "
-                "$$(cat /run/roehub-secrets/clickhouse-password) --query 'SELECT 1'",
-            ],
-            "interval": "3s",
-            "timeout": "3s",
-            "retries": 40,
-        },
-        "restart": "unless-stopped",
-        "deploy": {"resources": {"limits": {"cpus": "2.0", "memory": "2048M"}}},
-        "labels": {
-            "io.roehub.root-justification": (
-                "official init entrypoint owns fresh data/log volumes then execs "
-                "ClickHouse non-root"
-            )
-        },
-        "networks": ["roehub"],
-        "volumes": [
-            "clickhouse-data:/var/lib/clickhouse",
-            "clickhouse-logs:/var/log/clickhouse-server",
             "runtime-secrets:/run/roehub-secrets:ro",
         ],
     }
@@ -720,6 +720,7 @@ def _runtime_role_service(
         "networks": _role_networks(role),
         "environment": _runtime_environment(profile=profile, config=config),
         "volumes": [
+            "pg-budget:/run/roehub-pg-budget",
             "./service-config.json:/etc/roehub/service-config.json:ro",
             "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
             "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
@@ -739,6 +740,7 @@ def _runtime_role_service(
             "io.roehub.role": role["name"],
         },
     }
+    service["volumes"].append("pg-trust:/run/roehub-pg-trust:ro")
     if role.get("config_mount"):
         service["volumes"].append(
             f"./service-configs/{role['config_mount']}:/etc/roehub/{role['config_mount']}:ro"
@@ -746,26 +748,47 @@ def _runtime_role_service(
     if role["name"] == "api":
         service["volumes"].extend(
             [
-                "./service-configs/plugin-publisher-keys.json:"
-                "/etc/roehub/plugin-publisher-keys.json:ro",
                 "./service-configs/strategy.yaml:/etc/roehub/strategy.yaml:ro",
             ]
         )
         service["environment"]["ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED"] = (
             "false" if profile == "base" else "true"
         )
-        service["environment"]["ROEHUB_OPERATIONAL_HEALTH_URL"] = (
-            "http://operational-health:9300"
-        )
+        service["environment"]["ROEHUB_OPERATIONAL_HEALTH_URL"] = "http://operational-health:9300"
+    if role["name"] == "storage-migrations":
+        service["environment"]["ROEHUB_STORAGE_POSTGRES_DSN"] = service["environment"][
+            "POSTGRES_DSN"
+        ].replace("user=roehub_app", "user=roehub")
+        service["environment"]["PGPASSFILE"] = "/run/roehub-pg-admin/pgpass"
+        service["volumes"].append("pg-admin-secrets:/run/roehub-pg-admin:ro")
     if role["name"] == "operational-health":
-        service["environment"] = {
-            "PYTHONUNBUFFERED": "1",
-            "ROEHUB_ENV": "prod",
-            "ROEHUB_PROFILE": profile,
+        service["environment"]["ROEHUB_PG_MONITOR_DSN"] = service["environment"][
+            "POSTGRES_DSN"
+        ].replace("user=roehub_app", "user=roehub_monitor")
+        service["environment"]["PGPASSFILE"] = "/run/roehub-pg-monitor/monitor-pgpass"
+        service["environment"]["ROEHUB_PG_MAINTENANCE_DSN"] = (
+            service["environment"]["POSTGRES_DSN"].replace(
+                "user=roehub_app", "user=roehub_maintenance"
+            )
+            + " passfile=/run/roehub-pg-maintenance/pgpass"
+        )
+        allowed = {
+            "PYTHONUNBUFFERED",
+            "ROEHUB_ENV",
+            "ROEHUB_PROFILE",
+            "PGPASSFILE",
+            "ROEHUB_PG_MONITOR_DSN",
+            "ROEHUB_PG_MAINTENANCE_DSN",
+            "ROEHUB_PG_BUDGET_ROOT",
+            "ROEHUB_PG_BUDGET_REQUIRED",
         }
+        service["environment"] = {k: v for k, v in service["environment"].items() if k in allowed}
         service["volumes"] = [
-            "./observability/operational-manifest.json:"
-            "/etc/roehub/operational-manifest.json:ro"
+            "pg-budget:/run/roehub-pg-budget",
+            "pg-trust:/run/roehub-pg-trust:ro",
+            "pg-monitor-secrets:/run/roehub-pg-monitor:ro",
+            "pg-maintenance-secrets:/run/roehub-pg-maintenance:ro",
+            "./observability/operational-manifest.json:/etc/roehub/operational-manifest.json:ro",
         ]
     if role["name"] == "strategy-live-runner":
         service["environment"]["ROEHUB_METRICS_BIND_HOST"] = "0.0.0.0"
@@ -803,6 +826,12 @@ def _runtime_role_service(
         }
         for dependency in role["depends_on"]
     }
+    service["depends_on"]["secret-init"] = {"condition": "service_completed_successfully"}
+    if (
+        role["name"] == "operational-health"
+        and config["stores"]["postgresql"]["mode"] == "embedded"
+    ):
+        service["depends_on"]["postgresql"] = {"condition": "service_healthy"}
     if lifecycle == "service":
         service["restart"] = "unless-stopped"
         service["init"] = True
@@ -846,7 +875,10 @@ def _role_networks(role: Mapping[str, Any]) -> list[str]:
 
 
 def _runtime_environment(*, profile: str, config: dict[str, Any]) -> dict[str, str]:
-    postgres_dsn = "host=postgresql port=5432 dbname=roehub user=roehub"
+    pg = config["stores"]["postgresql"]
+    postgres_dsn = f"host={pg['host']} port={pg['port']} dbname={pg['database']} user=roehub_app"
+    if pg["tls"]:
+        postgres_dsn += " sslmode=verify-full sslrootcert=/run/roehub-pg-trust/root.crt"
     insecure_localhost = config["tls"]["mode"] == "disabled" and config["domain"] == "localhost"
     origin_scheme = "http" if config["tls"]["mode"] == "disabled" else "https"
     origin_port = (
@@ -858,13 +890,14 @@ def _runtime_environment(*, profile: str, config: dict[str, Any]) -> dict[str, s
         "ROEHUB_PROFILE": profile,
         "NUMBA_CACHE_DIR": "/tmp/roehub-numba-cache",
         "ROEHUB_NUMBA_CACHE_DIR": "/tmp/roehub-numba-cache",
+        "ROEHUB_PG_BUDGET_REQUIRED": "1",
+        "ROEHUB_PG_BUDGET_ROOT": "/run/roehub-pg-budget",
         "PGPASSFILE": "/run/roehub-secrets/pgpass",
         "POSTGRES_DSN": postgres_dsn,
         "ROEHUB_STORAGE_POSTGRES_DSN": postgres_dsn,
         "ROEHUB_STORAGE_REDIS_URL": "redis://redis:6379/0",
         "ROEHUB_REDIS_PASSWORD_FILE": "/run/roehub-secrets/redis-password",
         "IDENTITY_PG_DSN": postgres_dsn,
-        "EXTENSIONS_PG_DSN": postgres_dsn,
         "IDENTITY_FAIL_FAST": "true",
         "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
         "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
@@ -877,10 +910,6 @@ def _runtime_environment(*, profile: str, config: dict[str, Any]) -> dict[str, s
         "NOTIFICATIONS_PG_DSN": postgres_dsn,
         "ROEHUB_REDIS_HOST": "redis",
         "ROEHUB_REDIS_PORT": "6379",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE": ("/etc/roehub/plugin-publisher-keys.json"),
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT": "false",
-        "ROEHUB_PLUGIN_GATEWAY_URL": "http://plugin-gateway:9209",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT": ("/var/lib/roehub/artifacts/plugin-bundles"),
         "WEB_API_BASE_URL": "http://web:8010",
         "WEB_API_UPSTREAM_URL": "http://api:8000",
         "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL": "http://exchange-control:9205",
@@ -893,17 +922,6 @@ def _runtime_environment(*, profile: str, config: dict[str, Any]) -> dict[str, s
         "ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED": "false",
         "ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED": "false",
     }
-    if profile != "base":
-        environment.update(
-            {
-                "CH_HOST": "clickhouse",
-                "CH_PORT": "8123",
-                "CH_DATABASE": "roehub",
-                "CH_USER": "default",
-                "ROEHUB_STORAGE_CLICKHOUSE_DSN": "http://clickhouse:8123",
-                "ROEHUB_CLICKHOUSE_PASSWORD_FILE": ("/run/roehub-secrets/clickhouse-password"),
-            }
-        )
     return environment
 
 

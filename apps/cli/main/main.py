@@ -9,7 +9,6 @@ from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishC
 from apps.cli.commands.funding_rate_catchup import FundingRateCatchupCli
 from apps.cli.commands.local_auth_bootstrap import LocalAuthBootstrapCli
 from apps.cli.commands.openbao_owner_init import OpenBaoOwnerInitCli
-from apps.cli.commands.plugins import PluginsCli
 from apps.cli.commands.providers import ProvidersCli
 from apps.cli.commands.rest_catchup_1m import RestCatchUp1mCli
 from apps.cli.commands.sync_instruments import SyncInstrumentsCli
@@ -41,7 +40,6 @@ def main(argv: list[str] | None = None) -> int:
             "  local-auth-bootstrap --output-file PATH\n"
             "  openbao-owner-init initialize|provision-services [args...]\n"
             "  providers install|add [args...]\n"
-            "  plugins init|validate|install|update|rollback|doctor [args...]\n"
             "  telegram connect [args...]\n"
             "\n"
             "Back-compat: if no command is provided, arguments are passed to backfill-1m."
@@ -69,8 +67,6 @@ def main(argv: list[str] | None = None) -> int:
         return OpenBaoOwnerInitCli().run(rest)
     if cmd == "providers":
         return ProvidersCli().run(rest)
-    if cmd == "plugins":
-        return PluginsCli().run(rest)
     if cmd == "telegram":
         return TelegramCli().run(rest)
 

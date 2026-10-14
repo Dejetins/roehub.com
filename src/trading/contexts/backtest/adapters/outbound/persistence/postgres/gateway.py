@@ -10,6 +10,8 @@ from typing import Any, Mapping, Protocol, cast
 import psycopg
 from psycopg.rows import dict_row
 
+from trading.platform.postgres_budget import connect as budget_connect
+
 
 class BacktestPostgresGateway(Protocol):
     """
@@ -150,7 +152,7 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
             with existing.transaction():
                 yield self
             return
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             token = self._connection.set((*self._execution_owner(), connection))
             try:
                 with connection.transaction():
@@ -164,7 +166,7 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
         if existing is not None:
             yield existing
         else:
-            with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+            with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
                 yield connection
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:

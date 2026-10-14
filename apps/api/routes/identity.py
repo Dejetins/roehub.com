@@ -19,7 +19,6 @@ from trading.contexts.identity.adapters.inbound.api.deps import (
 from trading.contexts.identity.adapters.inbound.api.routes import (
     build_auth_current_user_router,
     build_auth_local_router,
-    build_auth_oidc_router,
     build_exchange_keys_router,
     build_organizations_router,
 )
@@ -37,7 +36,6 @@ from trading.contexts.identity.application.use_cases import (
     DeleteExchangeKeyUseCase,
     ListExchangeKeysUseCase,
     LocalAuthService,
-    OidcAuthenticationService,
     OrganizationAccessService,
 )
 
@@ -54,7 +52,6 @@ def build_identity_router(
     session_absolute_ttl_seconds: int,
     cookie_samesite: Literal["lax", "strict", "none"] = "lax",
     cookie_path: str = "/",
-    oidc_authentication_service: OidcAuthenticationService | None = None,
     audit_events_repository: AccountSettingsRepository | None = None,
     create_exchange_key_use_case: CreateExchangeKeyUseCase | None = None,
     list_exchange_keys_use_case: ListExchangeKeysUseCase | None = None,
@@ -86,7 +83,6 @@ def build_identity_router(
         session_absolute_ttl_seconds: Persisted Roehub session absolute TTL in seconds.
         cookie_samesite: Cookie SameSite mode.
         cookie_path: Cookie path.
-        oidc_authentication_service: Optional provider-neutral OIDC orchestration service.
         create_exchange_key_use_case: Optional exchange-key create use-case.
         list_exchange_keys_use_case: Optional exchange-key list use-case.
         delete_exchange_key_use_case: Optional exchange-key delete use-case.
@@ -115,20 +111,6 @@ def build_identity_router(
             current_user_dependency=current_user_dependency,
         )
     )
-    if oidc_authentication_service is not None:
-        router.include_router(
-            build_auth_oidc_router(
-                service=oidc_authentication_service,
-                current_user_dependency=current_user_dependency,
-                cookie_name=cookie_name,
-                cookie_secure=cookie_secure,
-                session_repository=session_repository,
-                clock=clock,
-                session_absolute_ttl_seconds=session_absolute_ttl_seconds,
-                cookie_samesite=cookie_samesite,
-                cookie_path=cookie_path,
-            )
-        )
     if local_auth_service is not None:
         router.include_router(
             build_auth_local_router(

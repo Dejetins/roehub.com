@@ -1,0 +1,954 @@
+[
+  {
+    "pid": 79981,
+    "level": 0,
+    "name": "TopMemoryContext",
+    "total": 91008,
+    "used": 71176
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Prepared Queries",
+    "total": 16384,
+    "used": 9688
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "RegexpCacheMemoryContext",
+    "total": 1024,
+    "used": 264
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "RegexpMemoryContext",
+    "total": 9264,
+    "used": 6544
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "RegexpMemoryContext",
+    "total": 13360,
+    "used": 7616
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "TableSpace cache",
+    "total": 8192,
+    "used": 6064
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Type information cache",
+    "total": 24368,
+    "used": 21720
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Operator lookup cache",
+    "total": 24576,
+    "used": 13784
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Record information cache",
+    "total": 8192,
+    "used": 6576
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "RowDescriptionContext",
+    "total": 8192,
+    "used": 1296
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "MessageContext",
+    "total": 8192,
+    "used": 1296
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Operator class cache",
+    "total": 8192,
+    "used": 7600
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "smgr relation table",
+    "total": 32768,
+    "used": 15888
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "PgStat Shared Ref Hash",
+    "total": 25648,
+    "used": 24960
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "PgStat Shared Ref",
+    "total": 73728,
+    "used": 65864
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "PgStat Pending",
+    "total": 16384,
+    "used": 2008
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "TransactionAbortContext",
+    "total": 32768,
+    "used": 264
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Portal hash",
+    "total": 8192,
+    "used": 7600
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "TopPortalContext",
+    "total": 8192,
+    "used": 264
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Relcache by OID",
+    "total": 262144,
+    "used": 182080
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "CacheMemoryContext",
+    "total": 25281008,
+    "used": 17299496
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 32768,
+    "used": 21728
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 66560,
+    "used": 46432
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1840
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1840
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1392
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1504
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1840
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1320
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1840
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 984
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1936
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 952
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1320
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 984
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 1024,
+    "used": 984
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 4096,
+    "used": 3128
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 4096,
+    "used": 2248
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 4096,
+    "used": 2320
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 16384,
+    "used": 8576
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 32768,
+    "used": 17264
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 32768,
+    "used": 26856
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 8192,
+    "used": 4480
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 65536,
+    "used": 35256
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 16384,
+    "used": 9904
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 65536,
+    "used": 55784
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 32768,
+    "used": 17128
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 4096,
+    "used": 2656
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 32768,
+    "used": 20056
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 8192,
+    "used": 4600
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 2048,
+    "used": 1992
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 8192,
+    "used": 5896
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlan",
+    "total": 4096,
+    "used": 4048
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "CachedPlanSource",
+    "total": 2048,
+    "used": 2008
+  },
+  {
+    "pid": 79981,
+    "level": 3,
+    "name": "CachedPlanQuery",
+    "total": 8192,
+    "used": 5176
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 3072,
+    "used": 1872
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "index info",
+    "total": 2048,
+    "used": 1288
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "WAL record construction",
+    "total": 50200,
+    "used": 43824
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "PrivateRefCount",
+    "total": 8192,
+    "used": 5544
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "MdSmgr",
+    "total": 8192,
+    "used": 824
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "LOCALLOCK hash",
+    "total": 8192,
+    "used": 7600
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "GUCMemoryContext",
+    "total": 24576,
+    "used": 12000
+  },
+  {
+    "pid": 79981,
+    "level": 2,
+    "name": "GUC hash table",
+    "total": 32768,
+    "used": 20064
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "Timezones",
+    "total": 104112,
+    "used": 101464
+  },
+  {
+    "pid": 79981,
+    "level": 1,
+    "name": "ErrorContext",
+    "total": 8192,
+    "used": 264
+  }
+]

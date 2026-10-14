@@ -1,0 +1,38 @@
+[
+  {
+    "name": "roehub-s04-readers",
+    "id": "c5e2a83ce35f0b4fa8970a93c1c818359e2bc6da296ce0ac004fbb502d922d2a",
+    "image": "postgres:16",
+    "labels": {
+      "roehub.disposable": "s04"
+    },
+    "cpu_nanos": 2000000000,
+    "memory_bytes": 4294967296,
+    "ports": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "55895"
+        }
+      ]
+    }
+  },
+  {
+    "name": "roehub-s04-schema-check",
+    "id": "870069e93474f33954748d5c379abaa2cb4cbfb31ebfa73ff479b5e4c69046b1",
+    "image": "postgres:16",
+    "labels": {
+      "roehub.disposable": "S02"
+    },
+    "cpu_nanos": 2000000000,
+    "memory_bytes": 4294967296,
+    "ports": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "57710"
+        }
+      ]
+    }
+  }
+]

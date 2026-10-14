@@ -1,5 +1,22 @@
 # Strategy runtime config v1: `configs/*/strategy.yaml` + toggles + metrics port + env overrides
 
+## Consumer wiring — S05, 2026-10-14
+
+Активная цепочка repair: Redis hot cache → canonical PostgreSQL → REST. Source enum, circuit hooks и метрика используют `canonical_store` (`market_data_canonical_store_repair_circuit_state`). Миграция 0039 сохраняет audit IDs/timestamps и заменяет прежние source/error labels; ACK ordering и provider admission сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 Документ фиксирует STR-EPIC-06: единый runtime-конфиг для Strategy (API + live worker) с fail-fast валидацией, enable-тумблерами, метриками и поддержкой env overrides.
 
 ## Цель
@@ -45,7 +62,7 @@
 - Env overrides:
   - `ROEHUB_STRATEGY_CONFIG` (путь к YAML)
   - overrides для scalar: enable-тумблеры + metrics port
-  - секреты через env: `STRATEGY_PG_DSN`, `TELEGRAM_BOT_TOKEN`, `ROEHUB_REDIS_PASSWORD`, `CH_HOST/CH_PORT/...`.
+  - секреты через env: `STRATEGY_PG_DSN`, `TELEGRAM_BOT_TOKEN`, `ROEHUB_REDIS_PASSWORD`.
   - `TELEGRAM_BOT_TOKEN` используется только в strategy notifier path и не участвует в API user-auth.
 
 ## Non-goals
@@ -148,7 +165,7 @@ Loader live-worker обязан поддерживать два режима:
 - Postgres (strategy): `STRATEGY_PG_DSN` (см. `apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py`, `apps/api/wiring/modules/strategy.py`)
 - Telegram token: `TELEGRAM_BOT_TOKEN` (см. strategy notifier wiring; не используется в `apps/api/wiring/modules/identity.py`)
 - Redis password: `ROEHUB_REDIS_PASSWORD` (используется в `configs/*/*.yaml`)
-- ClickHouse: `CH_HOST/CH_PORT/CH_USER/CH_PASSWORD/CH_DATABASE/CH_SECURE/CH_VERIFY` (см. `apps/cli/wiring/db/clickhouse.py`)
+- PostgreSQL: `STRATEGY_PG_DSN` (см. `apps/cli/wiring/db/postgres.py`)
 
 Последствия:
 - безопаснее (секреты не версионируются),
@@ -198,7 +215,7 @@ Loader live-worker обязан поддерживать два режима:
 - `apps/api/main/app.py` — место включения/выключения strategy router по `strategy.api.enabled`.
 - `apps/api/wiring/modules/strategy.py` — wiring strategy API и fail-fast для Postgres DSN.
 - `src/trading/platform/config/indicators_compute_numba.py` — пример env -> YAML -> default и config-path resolution.
-- `apps/cli/wiring/db/clickhouse.py` — ClickHouse env settings loader (используется и в strategy worker).
+- `apps/cli/wiring/db/postgres.py` — PostgreSQL env settings loader (используется и в strategy worker).
 
 Новые файлы по результату реализации STR-EPIC-06:
 - `configs/dev/strategy.yaml` — dev source-of-truth.
@@ -221,7 +238,7 @@ uv run python -m tools.docs.generate_docs_index --check
 
 Smoke (концептуально, детально фиксируется в runbook):
 
-1) Поднять стек (postgres/clickhouse/redis + api + strategy live worker).
+1) Поднять стек (postgres/redis + api + strategy live worker).
 2) Создать стратегию через API.
 3) Запустить run.
 4) Увидеть события/метрики в Redis Streams (`strategy.metrics.v1.user.<user_id>`, `strategy.events.v1.user.<user_id>`).
@@ -235,4 +252,4 @@ Smoke (концептуально, детально фиксируется в ru
 Открытые вопросы:
 
 - На текущем этапе открытых вопросов по user-auth зависимости нет:
-  Keycloak является источником user-auth, а `TELEGRAM_BOT_TOKEN` остаётся только в strategy notifier scope.
+  Локальная сессия Roehub является источником user-auth, а `TELEGRAM_BOT_TOKEN` остаётся только в strategy notifier scope.

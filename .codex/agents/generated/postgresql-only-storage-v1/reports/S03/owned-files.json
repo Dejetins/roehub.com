@@ -1,0 +1,102 @@
+[
+  {
+    "path": "apps/migrations/market_data.py",
+    "status": "modified",
+    "sha256": "5b357c95ceb1eefdf1ac892262ef879e8cf63c4ffaccacba1cf789e5d350b1c7"
+  },
+  {
+    "path": "apps/migrations/storage.py",
+    "status": "modified",
+    "sha256": "14073b89c03b66a29d55c73a1cf7b515f9b36ea6c6f172dafab0929dfef23125"
+  },
+  {
+    "path": "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+    "status": "modified",
+    "sha256": "0e3f4ca090b4b1debe780ac883a0183315c332f3565dcf360ba76b95fd47f89e"
+  },
+  {
+    "path": "apps/worker/market_data_ws/wiring/persistent_writer.py",
+    "status": "modified",
+    "sha256": "bfaf2925949e500a9c274010eb6ae744f147890e8888a7a918370b10a9c704f0"
+  },
+  {
+    "path": "docs/architecture/project-map/PROJECT_MAP.md",
+    "status": "modified",
+    "sha256": "6c4a3f788c2f7431e9fe1521505d75c41a6802a0cf015d5853715d80e5466f9c"
+  },
+  {
+    "path": "docs/architecture/project-map/project-map.json",
+    "status": "modified",
+    "sha256": "42501ea45ad6b78787b958cecf4635debab1c393e5917787858c43d0aaed9c39"
+  },
+  {
+    "path": "migrations/postgres/0037_market_data_reference_versions_v1.sql",
+    "status": "created",
+    "sha256": "52b421e8c24d2b8d00a4ddc9fa93e0388399f1de526663eee212f31ff78cf178"
+  },
+  {
+    "path": "migrations/postgres/manifest.json",
+    "status": "modified",
+    "sha256": "7fb0d5873b8b2572ec2d3ea1a87ea683c507cc7241d8f3170c432af3bf107acb"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/INGESTION.md",
+    "status": "created",
+    "sha256": "a3aa6859e66a7d1c828375ba862331d797756d2e2f2e991d1fc2e4dca90f3cc9"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py",
+    "status": "modified",
+    "sha256": "35f504624ab1111cb31eec761b955b0a5cfe6aa099af0168520f498f7755d29f"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/funding_writer.py",
+    "status": "created",
+    "sha256": "3673c02ab567968f91b8775f2028827e8f6b12e34cfdf10c78f5201e2a824126"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py",
+    "status": "created",
+    "sha256": "210256fe765b235153f68cff903622d5db3c34565446fa05fcfa849e25f48afb"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py",
+    "status": "created",
+    "sha256": "336e7c6ee96e292944cd4db46caa06a20bc34143271438a5981c747c39c2821c"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py",
+    "status": "created",
+    "sha256": "1266f1a114d1e2b6267e9f238e6d46d7c9259162ebaaa46c441b830d34c33390"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/reference_writers.py",
+    "status": "created",
+    "sha256": "8f575127372a42fc135b9b215590c8e18056600fc6f02da8499064df0dca9c80"
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/raw_kline_writer.py",
+    "status": "modified",
+    "sha256": "85acdb92fab8b02bd80c0da5755b25bb857670e4415a3c2207f6dfda48ecd4f2"
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/services/stored_candle_signal.py",
+    "status": "modified",
+    "sha256": "877899079b823d920039a98af1a49fde968391845dbf24baedfe93426279b97c"
+  },
+  {
+    "path": "tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+    "status": "created",
+    "sha256": "f4f170559582bfb33d90110bad61c1ce997c4a26085c205c99b62822aa6a33ca"
+  },
+  {
+    "path": "tests/unit/apps/migrations/test_storage_lifecycle.py",
+    "status": "modified",
+    "sha256": "8abe2abb4d025f4b5b26e7a4afb2b8aacc11bb055d2d86b346da599613fb256d"
+  },
+  {
+    "path": "tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py",
+    "status": "modified",
+    "sha256": "12118ad42b1b798e1ce02fb8dfb2eedd414864c4f9f6893f763fb0aa9949b25f"
+  }
+]

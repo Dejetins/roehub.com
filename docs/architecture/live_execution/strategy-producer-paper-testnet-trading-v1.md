@@ -1,5 +1,12 @@
 # Strategy Producer Paper/Testnet Trading v1
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 Статус: `closed after Stage 14 accepted` — paper/testnet strategy-producer цикл закрыт 2026-07-02. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 6h acceptance с controlled burst/load и CPU/RAM evidence.
 
 Stage `14` closure decision: paper/testnet cycle is accepted/closed after final docs/ledger delivery evidence; mainnet real-money trading остается вне scope этого цикла и требует отдельного будущего плана с собственным ledger, prompt pack, risk controls, CI/deploy/runtime proof и explicit money-moving approval gates.
@@ -238,7 +245,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `01` | Baseline and handoff freeze | Зафиксировать текущее состояние Stage 17, Mac Studio services, `/settings`, `/backtests`, `/strategies`, Redis/Postgres/Prometheus. | SSH `macstudio`, API curls, SQL inventory, Redis `XINFO`, Monit/Prometheus probes, browser screenshots. |
 | `02` | Backtest-to-strategy launch UI | Пользовательский launch flow из доступных UI/top variants с `$50`, paper/testnet, market, exchange, sizing/risk/direction. | Playwright: `/backtests` -> launch -> `/strategies`; API/DB proof; rejected cases visible. |
 | `03` | Scenario matrix and compatibility | Найти фактические `entry sizing`, `risk mode`, `direction` из доступных variants и создать durable coverage matrix. | API/top variants calls, SQL matrix rows, compatibility/readiness calls, docs report with no guessed combinations. |
-| `04` | BTCUSDT market readiness | Проверить/provision readiness только для `BTCUSDT` across Binance/Bybit spot/futures; non-BTC остается out of scope. | Redis market-data freshness, ClickHouse/reference rows, API readiness, browser status. |
+| `04` | BTCUSDT market readiness | Проверить/provision readiness только для `BTCUSDT` across Binance/Bybit spot/futures; non-BTC остается out of scope. | Redis market-data freshness, PostgreSQL/reference rows, API readiness, browser status. |
 | `05` | Safe testnet exchange binding | Testnet exchange selection, futures guard, safe isolated short `1x`, no hidden order-time config mutation. | Real Binance/Bybit testnet account/config reads, SQL projection, guard mismatch block; later repair adds explicit account-config command rather than mutating during submit. |
 | `06` | Supervised strategy producer | Отдельный launchd/Monit service for strategy producer, per-user/per-strategy allowlist, admin switch, no mainnet. | launchd/Monit/Prometheus evidence, health/readiness, stop/restart proof, kill switch, allowlist block/allow. |
 | `07` | Paper full branch coverage | Полная matrix coverage в paper для launchable rows after current compatibility policy: long spot/futures and short-like futures; historical spot short-like remains unsupported/compatibility-only. | API/DB/Redis/browser proof for every matrix row; gross/net funding completeness flags where applicable; no exchange submit. |

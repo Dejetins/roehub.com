@@ -28,7 +28,7 @@ class MarketDataMarketItemResponse(BaseModel):
     Related:
       - apps/api/routes/market_data_reference.py
       - src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py
-      - migrations/clickhouse/market_data_ddl.sql
+      - migrations/postgres/0036_market_data_storage_v1.sql
     """
 
     market_id: int

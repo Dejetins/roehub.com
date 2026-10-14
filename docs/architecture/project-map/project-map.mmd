@@ -26,7 +26,7 @@ flowchart LR
   class n_redis store
   n_exchanges["Binance / Bybit"]
   class n_exchanges external
-  n_observability["Prometheus / Grafana / Loki"]
+  n_observability["Prometheus / Alertmanager / Blackbox / operational-health"]
   class n_observability service
   n_browser -->|"installation Web endpoint"| n_web
   n_web -->|"same-origin API"| n_api

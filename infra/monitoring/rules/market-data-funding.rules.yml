@@ -10,7 +10,7 @@ groups:
         annotations:
           summary: Funding catch-up scheduler job is failing
           runbook: docs/runbooks/market-data-metrics.md#funding-catch-up
-          action: Check market-data-scheduler logs, provider status and ClickHouse writes.
+          action: Check market-data-scheduler logs, provider status and PostgreSQL writes.
 
       - alert: MarketDataFundingNoRecentSuccess
         expr: time() - scheduler_funding_catchup_last_success_timestamp_seconds > 32400

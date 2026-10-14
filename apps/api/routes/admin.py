@@ -14,13 +14,6 @@ from apps.api.operational_health_client import (
     OperationalHealthClientError,
 )
 from apps.api.worker_control import worker_commands
-from trading.contexts.extensions.application import PluginLifecycleError, PluginLifecycleService
-from trading.contexts.extensions.domain import (
-    PluginEvent,
-    PluginInstallation,
-    PluginInstance,
-    PluginOperation,
-)
 from trading.contexts.identity.adapters.inbound.api.csrf import (
     same_origin_rejection_reason,
 )
@@ -71,37 +64,15 @@ class AdminMemberResponse(BaseModel):
     created_at: datetime
 
 
-class AdminPluginInstallationResponse(BaseModel):
-    plugin_installation_id: UUID
-    plugin_id: str
-    package_id: UUID
-    rollback_available: bool
-    granted_permissions: list[str]
-    status: Literal["enabled", "disabled", "degraded"]
-    updated_at: datetime
 
 
-class AdminPluginInstanceResponse(BaseModel):
-    instance_id: UUID
-    plugin_installation_id: UUID
-    name: str
-    config_revision: int
-    status: Literal["enabled", "disabled", "degraded"]
-    updated_at: datetime
 
 
-class AdminPluginOperationResponse(BaseModel):
-    operation_id: UUID
-    kind: str
-    target_id: str
-    status: Literal["pending", "running", "succeeded", "failed", "unknown"]
-    created_at: datetime
-    updated_at: datetime
 
 
 class AdminEventResponse(BaseModel):
     event_id: UUID
-    category: Literal["identity", "plugin"]
+    category: Literal["identity"]
     action: str
     target_type: str
     target_id: str
@@ -136,7 +107,6 @@ class AdminOperationalHealthResponse(BaseModel):
     profile: Literal["base", "trading", "ml", "unknown"]
     overall_state: Literal["ready", "degraded", "stopped", "unknown"]
     generated_at: datetime
-    grafana_path: str | None = None
     services: list[AdminOperationalServiceResponse]
 
 
@@ -152,9 +122,6 @@ class AdminSnapshotResponse(BaseModel):
     recent_auth: bool
     installation_owner: bool
     members: list[AdminMemberResponse]
-    plugin_installations: list[AdminPluginInstallationResponse]
-    plugin_instances: list[AdminPluginInstanceResponse]
-    plugin_operations: list[AdminPluginOperationResponse]
     events: list[AdminEventResponse]
     capabilities: AdminCapabilityResponse
     operational_health: AdminOperationalHealthResponse
@@ -188,7 +155,6 @@ class AdminOperationRequest(BaseModel):
 def build_admin_router(
     *,
     organization_service: OrganizationAccessService,
-    plugin_service: PluginLifecycleService,
     current_user_dependency: RequireCurrentUserDependency,
     clock: IdentityClock,
     control_agent_client: ApiControlAgentClient | None,
@@ -216,12 +182,6 @@ def build_admin_router(
                 principal=principal,
                 organization_id=scoped_id,
             )
-            installations, instances, operations, plugin_events = (
-                plugin_service.list_inventory(
-                    principal=principal,
-                    organization_id=scoped_id,
-                )
-            )
             identity_events = (
                 organization_service.list_audit_events(
                     principal=principal,
@@ -237,14 +197,8 @@ def build_admin_router(
                 code=code,
                 message="Administrative snapshot access is forbidden",
             ) from error
-        except PluginLifecycleError as error:
-            raise RoehubError(code=error.code, message=error.message) from error
-        visible_plugin_events = (
-            plugin_events if "audit.read" in access.permissions else ()
-        )
         events = [
             *_identity_events(identity_events),
-            *_plugin_events(visible_plugin_events),
         ]
         events.sort(key=lambda event: (event.created_at, str(event.event_id)), reverse=True)
         control_ready = (
@@ -265,14 +219,6 @@ def build_admin_router(
                 principal=principal
             ),
             members=[_member_response(member) for member in members],
-            plugin_installations=[
-                _plugin_installation_response(installation)
-                for installation in installations
-            ],
-            plugin_instances=[_plugin_instance_response(instance) for instance in instances],
-            plugin_operations=[
-                _plugin_operation_response(operation) for operation in operations
-            ],
             events=events[:100],
             capabilities=AdminCapabilityResponse(
                 updates="ready" if control_ready else "degraded",
@@ -600,42 +546,10 @@ def _member_response(member: OrganizationMembership) -> AdminMemberResponse:
     )
 
 
-def _plugin_installation_response(
-    installation: PluginInstallation,
-) -> AdminPluginInstallationResponse:
-    return AdminPluginInstallationResponse(
-        plugin_installation_id=installation.plugin_installation_id,
-        plugin_id=installation.plugin_id,
-        package_id=installation.package_id,
-        rollback_available=installation.previous_package_id is not None,
-        granted_permissions=list(installation.granted_permissions),
-        status=installation.status,
-        updated_at=installation.updated_at,
-    )
 
 
-def _plugin_instance_response(instance: PluginInstance) -> AdminPluginInstanceResponse:
-    return AdminPluginInstanceResponse(
-        instance_id=instance.instance_id,
-        plugin_installation_id=instance.plugin_installation_id,
-        name=instance.name,
-        config_revision=instance.config_revision,
-        status=instance.status,
-        updated_at=instance.updated_at,
-    )
 
 
-def _plugin_operation_response(
-    operation: PluginOperation,
-) -> AdminPluginOperationResponse:
-    return AdminPluginOperationResponse(
-        operation_id=operation.operation_id,
-        kind=operation.kind,
-        target_id=operation.target_id,
-        status=operation.status,
-        created_at=operation.created_at,
-        updated_at=operation.updated_at,
-    )
 
 
 def _identity_events(
@@ -655,19 +569,6 @@ def _identity_events(
     ]
 
 
-def _plugin_events(events: tuple[PluginEvent, ...]) -> list[AdminEventResponse]:
-    return [
-        AdminEventResponse(
-            event_id=event.event_id,
-            category="plugin",
-            action=event.event_type,
-            target_type=event.target_type,
-            target_id=event.target_id,
-            outcome=event.outcome,
-            created_at=event.created_at,
-        )
-        for event in events
-    ]
 
 
 __all__ = ["AdminSnapshotResponse", "build_admin_router"]

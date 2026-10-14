@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 
 import psycopg
 
+from trading.platform.postgres_budget import admin_connect as budget_connect
+
 
 class OrganizationRuntimeProofError(RuntimeError):
     """Raised when disposable organization database evidence is incomplete."""
@@ -24,7 +26,7 @@ def run_probe(*, dsn: str) -> dict[str, object]:
     primary_id = uuid4()
     secondary_id = uuid4()
 
-    with psycopg.connect(dsn, autocommit=True) as connection:
+    with budget_connect(dsn, autocommit=True) as connection:
         _seed_identity(
             connection=connection,
             user_ids=(owner_id, admin_id, operator_id, trader_id, viewer_id, support_id),
@@ -46,9 +48,7 @@ def run_probe(*, dsn: str) -> dict[str, object]:
                 "SELECT count(*) FROM identity_support_access_grants WHERE revoked_at IS NULL"
             )
             support_count = _count_row(cursor.fetchone())
-            cursor.execute(
-                "SELECT count(*) FROM identity_administrative_audit_events"
-            )
+            cursor.execute("SELECT count(*) FROM identity_administrative_audit_events")
             audit_count = _count_row(cursor.fetchone())
             cursor.execute(
                 """
@@ -148,15 +148,6 @@ def _seed_identity(
         )
         cursor.execute(
             """
-            INSERT INTO identity_plugin_permissions (
-                organization_id, plugin_id, user_id, permission, granted_by_user_id,
-                created_at, updated_at
-            ) VALUES (%s, 'roehub.stage05-proof', %s, 'operate', %s, %s, %s)
-            """,
-            (primary_id, viewer_id, admin_id, now, now),
-        )
-        cursor.execute(
-            """
             INSERT INTO identity_invitations (
                 invitation_id, organization_id, recipient_email_sha256, role,
                 status, created_by_user_id, expires_at, created_at
@@ -182,19 +173,37 @@ def _seed_identity(
             """,
             (
                 (
-                    uuid4(), installation_id, primary_id, owner_id,
-                    "installation.bootstrap", "installation", str(installation_id),
-                    json.dumps({"organization_id": str(primary_id)}), now,
+                    uuid4(),
+                    installation_id,
+                    primary_id,
+                    owner_id,
+                    "installation.bootstrap",
+                    "installation",
+                    str(installation_id),
+                    json.dumps({"organization_id": str(primary_id)}),
+                    now,
                 ),
                 (
-                    uuid4(), installation_id, primary_id, admin_id,
-                    "plugin.permission_set", "plugin_permission", "roehub.stage05-proof",
-                    json.dumps({"permission": "operate"}), now,
+                    uuid4(),
+                    installation_id,
+                    primary_id,
+                    admin_id,
+                    "membership.added",
+                    "membership",
+                    str(viewer_id),
+                    json.dumps({"role": "viewer"}),
+                    now,
                 ),
                 (
-                    uuid4(), installation_id, None, owner_id,
-                    "support_access.granted", "support_access", "time-bounded",
-                    json.dumps({"expires_at": (now + timedelta(hours=1)).isoformat()}), now,
+                    uuid4(),
+                    installation_id,
+                    None,
+                    owner_id,
+                    "support_access.granted",
+                    "support_access",
+                    "time-bounded",
+                    json.dumps({"expires_at": (now + timedelta(hours=1)).isoformat()}),
+                    now,
                 ),
             ),
         )
@@ -275,8 +284,13 @@ def _prove_database_constraints(
                           'bybit:spot:BTCUSDT', 'active', %s, 'stage05-proof')
             """,
             parameters=(
-                uuid4(), secondary_id, owner_user_id, connection_id,
-                strategy_id, uuid4(), now,
+                uuid4(),
+                secondary_id,
+                owner_user_id,
+                connection_id,
+                strategy_id,
+                uuid4(),
+                now,
             ),
         ),
         "strategy_provenance": _expect_database_error(
@@ -292,8 +306,17 @@ def _prove_database_constraints(
                           %s, '{}'::jsonb)
             """,
             parameters=(
-                strategy_id, primary_id, owner_user_id, uuid4(), "b" * 64,
-                "c" * 64, "d" * 64, "e" * 64, "f" * 64, "1" * 64, now,
+                strategy_id,
+                primary_id,
+                owner_user_id,
+                uuid4(),
+                "b" * 64,
+                "c" * 64,
+                "d" * 64,
+                "e" * 64,
+                "f" * 64,
+                "1" * 64,
+                now,
             ),
         ),
         "exchange_position_snapshot": _expect_database_error(
@@ -308,7 +331,12 @@ def _prove_database_constraints(
                           'bybit:spot:BTCUSDT', 'long', 1, %s)
             """,
             parameters=(
-                uuid4(), secondary_id, account_snapshot_id, owner_user_id, connection_id, now,
+                uuid4(),
+                secondary_id,
+                account_snapshot_id,
+                owner_user_id,
+                connection_id,
+                now,
             ),
         ),
         "last_owner": _expect_database_error(

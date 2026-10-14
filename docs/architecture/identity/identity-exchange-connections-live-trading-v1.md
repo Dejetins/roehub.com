@@ -514,7 +514,7 @@ healthcheck, launchd и Monit. Это не optional optimization, а gate без
 
 ## Контроли Безопасности
 
-- Keycloak step-up/recent-auth обязателен для add/rotate/delete/disable
+- локальный step-up/recent-auth обязателен для add/rotate/delete/disable
   credentials.
 - CSRF fail-closed обязателен для всех browser mutations. Принимается либо
   валидный CSRF token, либо строгий same-origin guard, который отклоняет
@@ -544,7 +544,7 @@ Backend:
 - Binance/Bybit validation adapters;
 - new-model audit events beyond the Stage 1 legacy create/delete bridge;
 - Stage 1 already added audit schema event types `exchange_*`;
-- Stage 1 already added Keycloak-backed recent-auth enforcement for legacy
+- Stage 1 already added local-session recent-auth enforcement for legacy
   add/delete hooks; rotate/disable hooks must reuse it when introduced;
 - Stage 1 already added CSRF fail-closed hardening for exchange mutations;
 - rate-limit/error redaction around validation;
@@ -677,7 +677,7 @@ audit schema для будущих exchange events.
 - сделать CSRF fail-closed для всех exchange mutations;
 - отклонять browser mutation без валидного CSRF token, если `Origin`/`Referer`
   отсутствуют или не совпадают с trusted host;
-- добавить Keycloak step-up/recent-auth gate для add/delete legacy ключей и для
+- добавить локальный step-up/recent-auth gate для add/delete legacy ключей и для
   будущих add/rotate/delete/disable actions;
 - добавить migration, расширяющую `identity_audit_events` event types:
   `exchange_key_created`, `exchange_key_deleted`,
@@ -755,7 +755,7 @@ LIMIT 10;
 Критерий выхода:
 
 - CSRF fail-closed доказан;
-- Keycloak recent-auth доказан;
+- Recent-auth был проверен в историческом этапе; текущий вход локальный;
 - audit schema/event types работают;
 - iteration ledger обновлен фактами, нужными Stage 2;
 - direct-main push в `origin/main` выполнен или stage явно заблокирован;

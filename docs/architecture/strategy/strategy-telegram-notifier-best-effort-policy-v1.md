@@ -10,7 +10,7 @@
 
 - В Strategy уже есть live-runner и realtime output в Redis Streams: `src/trading/contexts/strategy/application/services/live_runner.py`, `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`, `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md`.
 - В Identity уже есть модель Telegram binding: `identity_telegram_channels(user_id, chat_id, is_confirmed, confirmed_at)` в `migrations/postgres/0001_identity_v1.sql`.
-- User-auth в API после Keycloak cutover не зависит от Telegram; `TELEGRAM_BOT_TOKEN` используется только при явном rollback в direct `strategy.telegram.mode=telegram`.
+- Локальный user-auth в API не зависит от Telegram; `TELEGRAM_BOT_TOKEN` используется только при явном rollback в direct `strategy.telegram.mode=telegram`.
 - Для STR-EPIC-05 после Stage `10` нужно:
   - best-effort handoff в `notifications`;
   - rollback `log_only` adapter для diagnostics;

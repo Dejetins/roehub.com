@@ -108,7 +108,7 @@ test('real library, empty/cursor filters, independent deep link, focus, locale a
   expect(errors).toEqual([]); expect(http).toEqual([]);
   expect(failures.filter(item => item.reason !== 'net::ERR_ABORTED')).toEqual([]);
   writeFileSync(resolve(evidence, 'observations.json'), JSON.stringify({
-    boundary: 'Production local Web/auth/API + disposable PostgreSQL/ClickHouse; two real API-created jobs from 4320 synthetic candles',
+    boundary: 'Production local Web/auth/API + disposable PostgreSQL; two real API-created jobs from 4320 synthetic candles',
     jobs: [first, second], javascriptAndConsoleErrors: errors, httpErrors: http, transportFailures: failures,
     widths: [820, 1024, 1440], locales: ['en', 'ru'], axeViolations: 0,
     checks: ['real empty list', 'two real records', 'server risk empty-page cursor', 'state filter', 'deep-link refresh/back/forward', 'encoded variant', 'dialog keyboard containment/return', 'projection unavailable'],

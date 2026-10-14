@@ -25,7 +25,6 @@ def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> Tes
         status_code=200,
         user=WebCurrentUser(
             user_id="00000000-0000-0000-0000-000000000321",
-            paid_level="free",
         ),
         error_message=None,
     )
@@ -505,7 +504,7 @@ def test_authorized_admin_route_renders_typed_fail_closed_console() -> None:
     assert 'method: "PATCH"' in admin_js
     assert '"Idempotency-Key"' in admin_js
     assert ':reconcile`' in admin_js
-    assert "data-admin-plugin-diff" in admin_js
+    assert "data-admin-plugin-diff" not in admin_js
     assert "state.snapshot?.organization_name" in admin_js
 
 
@@ -866,40 +865,6 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "<select" not in response.text
 
 
-def test_plugin_panel_lab_is_disabled_by_default_and_host_owned_when_enabled() -> None:
-    assert _build_test_client().get("/__qa/plugin-panels").status_code == 404
-
-    app = create_app(
-        environ={
-            "WEB_API_BASE_URL": "http://web.local",
-            "WEB_API_UPSTREAM_URL": "http://api.local",
-            "ROEHUB_PLUGIN_PANEL_LAB": "true",
-            "ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID": (
-                "00000000-0000-0000-0000-000000000713"
-            ),
-        }
-    )
-    app.state.current_user_api_client = SimpleNamespace(
-        fetch_current_user=lambda *, cookie_header: CurrentUserApiResult(
-            status_code=200,
-            user=WebCurrentUser(
-                user_id="00000000-0000-0000-0000-000000000321",
-                paid_level="free",
-            ),
-            error_message=None,
-        )
-    )
-    response = TestClient(app).get("/__qa/plugin-panels")
-
-    assert response.status_code == 200
-    assert "RoehubDataFrame/v1" in response.text
-    assert 'data-plugin-panel-lab' in response.text
-    assert 'data-panel-table-alternative' in response.text
-    assert "/assets/js/components/plugin-panel.js" not in response.text
-    assert "/assets/js/pages/plugin-panel-lab.js" in response.text
-    assert "https://plugin" not in response.text
-    assert "script_url" not in response.text
-    assert "data-panel-fixture-state=\"partial\"" in response.text
 
 
 def test_authorized_monitoring_uses_task_first_summary_surface() -> None:
@@ -1178,3 +1143,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert ".command-bar" not in dashboard_css
     assert "--rh-financial-positive" in dashboard_css
     assert "--rh-financial-negative" in dashboard_css
+
+
+def test_removed_plugin_panel_lab_returns_404() -> None:
+    assert _build_test_client().get("/__qa/plugin-panels").status_code == 404

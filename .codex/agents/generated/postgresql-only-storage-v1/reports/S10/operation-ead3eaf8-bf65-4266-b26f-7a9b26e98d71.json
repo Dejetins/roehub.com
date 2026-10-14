@@ -1,0 +1,10 @@
+{
+  "action": "restart",
+  "services": [
+    "api"
+  ],
+  "operation_id": "ead3eaf8-bf65-4266-b26f-7a9b26e98d71",
+  "returncode": 0,
+  "stdout": "{\"action\": \"restart\", \"active_services\": [\"api\", \"backtest-artifact-publisher\", \"market-data-scheduler\", \"market-data-ws\", \"operational-health\", \"postgresql\", \"web\"], \"detail_code\": \"topology.restarted\", \"journal_sequence\": 378, \"operation_id\": \"ead3eaf8-bf65-4266-b26f-7a9b26e98d71\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

@@ -1,0 +1,6 @@
+### Result
+{"status":202,"data":{"command_id":"1c43ea8c-9f3c-451b-b9f1-274aba4ea53c","items":[{"coordinate":{"exchange":"binance","market_type":"futures","symbol":"0GUSDT"},"request_id":"c37e5568-4420-4531-861a-c0e60b082245","state":"queued","outcome":"submitted","control_version":1}]}}
+### Ran Playwright code
+```js
+await (async page => {const coordinate={exchange:"binance",market_type:"futures",symbol:"0GUSDT"};const r=await page.request.get("http://127.0.0.1:20120/api/backtest-artifacts/instruments/binance/futures/0GUSDT");const d=await r.json();const p=await page.request.post("http://127.0.0.1:20120/api/backtest-artifacts/build-requests",{headers:{Origin:"http://127.0.0.1:20120","Idempotency-Key":"s10-r1-20261014-futures-real"},data:{items:[{coordinate,expected_version:d.control_version}]}});return {status:p.status(),data:await p.json()};})(page);
+```

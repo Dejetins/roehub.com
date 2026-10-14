@@ -1,0 +1,107 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f4e8]:
+  - link "Skip to content" [ref=f4e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f4e10]:
+    - generic [ref=f4e11]: RoeHub
+    - navigation "Language" [ref=f4e12]:
+      - link "Русский" [ref=f4e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests
+      - link "English" [ref=f4e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests
+  - complementary [ref=f4e15]:
+    - navigation "Navigation" [ref=f4e16]:
+      - link "Overview" [ref=f4e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f4e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f4e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f4e29]:
+        - text: Data
+        - generic [ref=f4e34]: Unavailable
+      - link "Settings" [ref=f4e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f4e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f4e43]:
+    - generic [ref=f4e44]:
+      - heading "Backtests" [level=1] [ref=f4e45]
+      - generic [ref=f4e47]:
+        - region [ref=f4e48]:
+          - generic [ref=f4e49]:
+            - heading "Jobs" [level=2] [ref=f4e50]
+            - generic "Jobs on this page" [ref=f4e51]: "3"
+            - link "New backtest" [ref=f4e52] [cursor=pointer]:
+              - /url: /backtests/new
+            - generic [ref=f4e54]:
+              - button "Refresh" [disabled] [ref=f4e55]
+              - button "Filters" [ref=f4e62] [cursor=pointer]
+          - tablist "Jobs" [ref=f4e65]:
+            - tab "New backtest" [ref=f4e66] [cursor=pointer]
+            - tab "History" [selected] [ref=f4e67] [cursor=pointer]
+          - tabpanel "History" [ref=f4e68]:
+            - paragraph [ref=f4e69]: All states · All risk modes
+            - status [ref=f4e70]: Last read · Oct 14, 2026, 7:47 AM UTC
+            - region "Job history table" [ref=f4e71]:
+              - table [ref=f4e72]:
+                - caption [ref=f4e73]: Jobs on this page
+                - rowgroup [ref=f4e74]:
+                  - row [ref=f4e75]:
+                    - columnheader "Backtest" [ref=f4e76]
+                    - columnheader "State" [ref=f4e77]
+                    - columnheader "Created · UTC" [ref=f4e78]
+                - rowgroup [ref=f4e79]:
+                  - row [ref=f4e80]:
+                    - cell "Binance historical · BTCUSDT · EMA 5–50 BTCUSDT · spot · 15m" [ref=f4e81]:
+                      - link "Binance historical · BTCUSDT · EMA 5–50" [ref=f4e82] [cursor=pointer]:
+                        - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c
+                      - generic [ref=f4e83]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e84]
+                    - cell [ref=f4e85]:
+                      - time [ref=f4e86]: Sep 28, 2026, 8:20 PM
+                  - row [ref=f4e87]:
+                    - cell "Demo EMA · TP/SL BTCUSDT · spot · 15m" [ref=f4e88]:
+                      - link "Demo EMA · TP/SL" [ref=f4e89] [cursor=pointer]:
+                        - /url: /backtests/e9d85b78-58ff-495f-8b0b-2b8e5ac64b8a
+                      - generic [ref=f4e90]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e91]
+                    - cell [ref=f4e92]:
+                      - time [ref=f4e93]: Sep 28, 2026, 8:19 PM
+                  - row [ref=f4e94]:
+                    - cell "Demo EMA · baseline BTCUSDT · spot · 15m" [ref=f4e95]:
+                      - link "Demo EMA · baseline" [ref=f4e96] [cursor=pointer]:
+                        - /url: /backtests/2c252ee4-aa0a-4f1c-b560-7482d7122cdd
+                      - generic [ref=f4e97]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e98]
+                    - cell [ref=f4e99]:
+                      - time [ref=f4e100]: Sep 28, 2026, 8:19 PM
+            - navigation "Job pages" [ref=f4e101]:
+              - generic [ref=f4e102]:
+                - text: Rows per page
+                - combobox "Page size (1–250)" [ref=f4e103]:
+                  - option "5"
+                  - option "10"
+                  - option "25"
+                  - option "50" [selected]
+                  - option "100"
+                  - option "250"
+              - generic [ref=f4e104]: "Jobs on this page: 3"
+              - button "First page" [disabled] [ref=f4e105]
+              - button "Next page" [disabled] [ref=f4e109]
+            - paragraph [ref=f4e112]: Newest first. Risk filtering applies within each server page; an empty page can still have a next page.
+            - group [ref=f4e113]:
+              - generic "Search, instrument and date filters" [ref=f4e114] [cursor=pointer]
+        - region "Select a backtest" [ref=f4e115]:
+          - generic [ref=f4e116]:
+            - heading "Select a backtest" [level=2] [ref=f4e117]
+            - paragraph [ref=f4e118]: Open a job to read its identity, state and research inputs.
+            - paragraph [ref=f4e119]: Open a job to observe execution. Result views and exports are not available yet.
+  - contentinfo [ref=f4e120]:
+    - text: Artifact-backed backtests
+    - generic [ref=f4e121]: Library snapshots · live selected job
+```

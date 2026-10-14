@@ -8,68 +8,53 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-roehub}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roehub} -d ${POSTGRES_DB:-roehub}"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-roehub} -d ${POSTGRES_DB:-roehub}
       interval: 5s
       timeout: 5s
       retries: 20
     volumes:
-      - pg_data:/var/lib/postgresql/data
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.8
-    container_name: roehub-clickhouse-1
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8123:8123"
-      - "127.0.0.1:9000:9000"
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-roehub}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-roe}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    volumes:
-      - ch_data:/var/lib/clickhouse
-      - ch_logs:/var/log/clickhouse-server
-
+    - pg_data:/var/lib/postgresql/data
   redis:
     image: redis:7.2-bookworm
     container_name: redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
     volumes:
-      - redis_data:/data
-
+    - redis_data:/data
+    environment: {}
   db-bootstrap:
-    profiles: ["ui"]
+    profiles:
+    - ui
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     environment:
-      IDENTITY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
-      POSTGRES_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
+      IDENTITY_PG_DSN: host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub}
+        password=${POSTGRES_PASSWORD}
+      POSTGRES_DSN: host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub}
+        password=${POSTGRES_PASSWORD}
     command:
-      - python
-      - -m
-      - apps.migrations.bootstrap_main
-
+    - python
+    - -m
+    - apps.migrations.bootstrap_main
   api:
-    profiles: ["ui"]
+    profiles:
+    - ui
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     depends_on:
-      clickhouse:
-        condition: service_started
       redis:
         condition: service_started
       db-bootstrap:
@@ -81,45 +66,29 @@ services:
       IDENTITY_FAIL_FAST: ${IDENTITY_FAIL_FAST:-false}
       STRATEGY_FAIL_FAST: ${STRATEGY_FAIL_FAST:-false}
       BACKTEST_FAIL_FAST: ${BACKTEST_FAIL_FAST:-false}
-      KEYCLOAK_BASE_URL: ${KEYCLOAK_BASE_URL:-http://keycloak:8080}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-roehub}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-roehub-api}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-keycloak-client-secret}
-      KEYCLOAK_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI:-http://127.0.0.1:8010/auth/callback}
-      KEYCLOAK_LOGOUT_REDIRECT_URI: ${KEYCLOAK_LOGOUT_REDIRECT_URI:-http://127.0.0.1:8010/login}
-      KEYCLOAK_AUTH_URL: ${KEYCLOAK_AUTH_URL:-}
-      KEYCLOAK_TOKEN_URL: ${KEYCLOAK_TOKEN_URL:-}
-      KEYCLOAK_END_SESSION_URL: ${KEYCLOAK_END_SESSION_URL:-}
-      KEYCLOAK_INTROSPECTION_URL: ${KEYCLOAK_INTROSPECTION_URL:-}
       IDENTITY_SESSION_COOKIE_NAME: ${IDENTITY_SESSION_COOKIE_NAME:-roehub_session_id}
       IDENTITY_SESSION_IDLE_TTL_SECONDS: ${IDENTITY_SESSION_IDLE_TTL_SECONDS:-1800}
       IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: ${IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS:-43200}
-      IDENTITY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
-      STRATEGY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
-      CH_HOST: ${CH_HOST:-clickhouse}
-      CH_PORT: ${CH_PORT:-8123}
-      CH_DATABASE: ${CH_DATABASE:-market_data}
-      # Use the same credentials as clickhouse container init.
-      CH_USER: ${CLICKHOUSE_USER:-default}
-      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      CH_SECURE: ${CH_SECURE:-0}
-      CH_VERIFY: ${CH_VERIFY:-1}
+      IDENTITY_PG_DSN: host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub}
+        password=${POSTGRES_PASSWORD}
+      STRATEGY_PG_DSN: host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub}
+        password=${POSTGRES_PASSWORD}
       ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
     command:
-      - python
-      - -m
-      - apps.api.main.main
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
+    - python
+    - -m
+    - apps.api.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8000'
     ports:
-      - "${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8000}:8000"
+    - ${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8000}:8000
     expose:
-      - "8000"
-
+    - '8000'
   web:
-    profiles: ["ui"]
+    profiles:
+    - ui
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
@@ -130,115 +99,81 @@ services:
       WEB_API_BASE_URL: ${WEB_API_BASE_URL:-http://127.0.0.1:8010}
       WEB_API_UPSTREAM_URL: ${WEB_API_UPSTREAM_URL:-http://api:8000}
     command:
-      - python
-      - -m
-      - apps.web.main.main
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8010"
+    - python
+    - -m
+    - apps.web.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8010'
     ports:
-      - "127.0.0.1:${WEB_HOST_PORT:-8010}:8010"
+    - 127.0.0.1:${WEB_HOST_PORT:-8010}:8010
     expose:
-      - "8010"
-
+    - '8010'
   market-data-ws-worker:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
     depends_on:
-      - clickhouse
-      - redis
+    - redis
     environment:
-      CH_HOST: clickhouse
-      CH_PORT: 8123
-      CH_DATABASE: ${CH_DATABASE:-market_data}
-      CH_USER: ${CLICKHOUSE_USER:-default}
-      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      CH_SECURE: "0"
-      CH_VERIFY: "1"
       ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
     command:
-      - python
-      - -m
-      - apps.worker.market_data_ws.main.main
-      - --config
-      - /app/configs/prod/market_data.yaml
-      - --metrics-port
-      - "9201"
+    - python
+    - -m
+    - apps.worker.market_data_ws.main.main
+    - --config
+    - /app/configs/prod/market_data.yaml
+    - --metrics-port
+    - '9201'
     expose:
-      - "9201"
-
+    - '9201'
   market-data-scheduler:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
-    depends_on:
-      - clickhouse
-    environment:
-      CH_HOST: clickhouse
-      CH_PORT: 8123
-      CH_DATABASE: ${CH_DATABASE:-market_data}
-      CH_USER: ${CLICKHOUSE_USER:-default}
-      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      CH_SECURE: "0"
-      CH_VERIFY: "1"
+    depends_on: []
+    environment: {}
     command:
-      - python
-      - -m
-      - apps.scheduler.market_data_scheduler.main.main
-      - --config
-      - /app/configs/prod/market_data.yaml
-      - --whitelist
-      - /app/configs/prod/whitelist.csv
-      - --metrics-port
-      - "9202"
+    - python
+    - -m
+    - apps.scheduler.market_data_scheduler.main.main
+    - --config
+    - /app/configs/prod/market_data.yaml
+    - --whitelist
+    - /app/configs/prod/whitelist.csv
+    - --metrics-port
+    - '9202'
     expose:
-      - "9202"
-
-  grafana:
-    image: grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
-    environment:
-      GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL}
-    volumes:
-      - grafana_data:/var/lib/grafana
-
+    - '9202'
   prometheus:
     image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
     container_name: prometheus
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9090:9090"
+    - 127.0.0.1:9090:9090
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prom_data:/prometheus
+    - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - prom_data:/prometheus
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=90d"
-
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=90d
+    environment: {}
   blackbox:
     image: prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d
     container_name: blackbox
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9115:9115"
+    - 127.0.0.1:9115:9115
     volumes:
-      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     command:
-      - "--config.file=/etc/blackbox_exporter/config.yml"
-
+    - --config.file=/etc/blackbox_exporter/config.yml
+    environment: {}
 volumes:
   pg_data: {}
-  ch_data: {}
-  ch_logs: {}
   redis_data: {}
   prom_data: {}
-  grafana_data:
-    external: true

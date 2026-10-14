@@ -1,5 +1,22 @@
 # Бектест-сервис на артефактах v1
 
+## Consumer wiring — S05, 2026-10-14
+
+Canonical/funding export читает PostgreSQL. Перед pointer switch проверяются generation/content/funding revisions под shared generation lock; ready receipt сохраняется в той же control transaction. Изменение source во время compute запрещает публикацию. Для PG выполняется full rebuild без недоказанного prefix reuse. Native NPY/mmap/scoring semantics сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+NPY/mmap/CAS остаются compute path. Источник передаёт generation и durable content/funding revision; bounded sweep обнаруживает коррекцию старой минуты при неизменных bounds/count даже после потери post-commit hint. Публичные artifact IDs не кодируют SQL engine.
+
+
 Документ фиксирует целевую архитектуру бектест-сервиса на артефактах, его публичный API, поток выполнения задач, ленивую детализацию сделок и гейт бенчмарка по итерациям.
 
 Русская версия переводит человекочитаемое описание. Идентификаторы API routes,
@@ -12,7 +29,7 @@ config keys, metric names, timer names, backend ids, file paths и значен�
 Runtime готовит полный проверенный набор `.npy` перед scoring: пригодные
 производные переиспользуются, недостающие строки и risk levels строятся тем же
 `BacktestArtifactPrecomputeRunnerV2`, который обслуживает publication. Подготовка
-не читает canonical candle reader/ClickHouse и не меняет `current.yaml`.
+не читает canonical candle reader/PostgreSQL и не меняет `current.yaml`.
 `BacktestPreparePoolsService.prepare_artifact_inputs` выполняется один раз на
 attempt; warmup и основной расчёт используют тот же ready set. Loader открывает
 явные validated references через `np.load(mmap_mode="r", allow_pickle=False)`.
@@ -53,7 +70,7 @@ sweep сохраняет PG cursor и прежнюю паузу 30 секунд 
 
 Индекс производный: отсутствующая таблица/ошибка чтения останавливает observation
 с обычным failed cycle, без скрытого canonical fallback. Потерянные состояния
-могут временно скрывать source; существующий bounded `ClickHouseHistoryRangeVerifier`
+могут временно скрывать source; существующий bounded `PostgresHistoryRangeVerifier`
 восстанавливает ключи из canonical (максимум семь дней за вызов, обычные окна
 60/1440 минут). Source-absence markers не входят в artifact bounds. После
 административного удаления свечей необходим отдельный rebuild индекса; периодический
@@ -2480,8 +2497,8 @@ relocation refusal, guarded cleanup и установочные ограниче
 
 ### Integrated local verification and S09 recovery refinements
 
-Проверка `tests/real_infra/backtest/test_artifact_integrated.py` использует отдельные
-PostgreSQL/ClickHouse: raw INSERT → существующая MV → canonical → managed cycle →
+Проверка `tests/real_infra/backtest/test_artifact_integrated.py` использует отдельную
+PostgreSQL базу: raw/canonical/coverage COMMIT → managed cycle →
 11 price timeframes с независимым OHLCV oracle → выбранные catalog derivatives →
 manual/scheduled refresh → HTTP Backtest admission, immutable recipe/pin, реальный
 child compute и persisted `succeeded`. Пропущенная минута не становится готовым
@@ -2503,20 +2520,17 @@ Manual Update now сохраняет anchor. Эти изменения совм�
 уже admitted snapshots сохраняют свою прежнюю семантику.
 
 
-## ClickHouse budget publisher (S02, 2026-10-10)
+## PostgreSQL publisher budget and revision fence
 
-Publisher и его CLI выбирают `artifacts` в composition: discovery по индексу S01,
-чтение canonical/funding и подготовка native source разделяют одну server identity
-между процессами. Профиль ограничивает запрос 128 MiB, суммарную tracked memory
-пользователя 128 MiB, одновременный запрос одним и query threads одним; timeout
-30 секунд проверяется сервером кооперативно. Это не резервирование CPU/IO.
-Табличные права только SELECT; DDL, запись candles и смена caps запрещены.
+Publisher/CLI используют `bulk` workload общего PostgreSQL gateway. Installation-wide
+registry допускает до 8 bulk connections; deadline и память batch ограничены.
+Это не гарантия CPU/IO или полной изоляции workloads. Discovery читает summary/day
+masks, source generation/content/funding revision входит в immutable SourceTarget.
+Managed worker удерживает source guard через filesystem replacement, pointer commit
+и запись completion. Изменившаяся source revision запрещает публикацию.
 
-Class admission/memory refusal до начала публикации сохраняет durable attempt в
-существующем `retry_wait` с `transient_database`, backoff и пределом попыток.
-После начала публикации сохраняется `quarantined` и проверка receipt/pointer;
-ресурсный отказ не выдаётся за отсутствие source и не разрешает новую запись поверх
-неизвестного результата. Retry не меняет snapshot, ownership, authorization или
-reconciliation контракт. Установка/откат выполняются по S02 recovery runbook:
-сначала profiles/identities, затем drain и переключение клиентов; rollback
-оставляет additive identities неиспользуемыми и сохраняет свечи и артефакты.
+Временный ресурсный отказ до публикации сохраняет retry_wait/backoff. После
+неопределённого результата остаётся quarantined с проверкой receipt/pointer;
+retry не меняет snapshot, ownership, authorization или reconciliation contract.
+Auth/schema ошибки не становятся временной перегрузкой. Изолированный disposable
+тест не доказывает installed runtime или performance acceptance.

@@ -1,0 +1,39 @@
+from pathlib import Path
+import subprocess,json,re,hashlib,ast
+out=Path('.codex/agents/generated/postgresql-only-storage-v1/reports/S07')
+base=json.loads((out/'baseline-files.json').read_text())
+s01={x['path']:x for x in json.loads(Path('.codex/agents/generated/postgresql-only-storage-v1/reports/S01/inventory.json').read_text())['files']}
+files=sorted(set(subprocess.check_output(['git','ls-files','--cached','--others','--exclude-standard','-z']).decode().split('\0'))-{''})
+pat=re.compile(r'(?i)clickhouse|\bCH_(?:HOST|PORT|USER|PASSWORD|DATABASE|SECURE|VERIFY)\b|\bCH\b|MergeTree|groupBitmap|bitmapSubset|argMax\(|maxOrNull\(|toUnixTimestamp64Milli|DateTime64\(|LowCardinality|toYYYYMM|LIMIT\s+\d+\s+BY|FORMAT TabSeparated|\b(?:raw_\w+_to_canonical|mv_raw_\w+)\b')
+items=[];unresolved=[];imports=[];errors=[]
+for name in files:
+ if name.startswith('.codex/agents/generated/postgresql-only-storage-v1/'):continue
+ p=Path(name)
+ if not p.is_file():continue
+ try:s=p.read_text()
+ except UnicodeDecodeError:continue
+ except Exception as e:errors.append([name,type(e).__name__]);continue
+ h=hashlib.sha256(p.read_bytes()).hexdigest()
+ hits=[dict(line=i,text=l[:700]) for i,l in enumerate(s.splitlines(),1) if pat.search(l)]
+ if hits or pat.search(name):
+  old=s01.get(name,{})
+  category='unresolved'
+  if old.get('category')=='immutable-history' and h==base.get(name):category='immutable-history-exact-baseline'
+  if old.get('category')=='false-positive' and h==base.get(name):category='unrelated-exact-baseline'
+  item=dict(path=name,sha256=h,category=category,matches=hits)
+  items.append(item)
+  if category=='unresolved':unresolved.append((name,len(hits),old.get('category')))
+ if p.suffix=='.py':
+  try:t=ast.parse(s)
+  except SyntaxError as e:errors.append([name,str(e)]);continue
+  for n in ast.walk(t):
+   if isinstance(n,ast.Import):v=[x.name for x in n.names]
+   elif isinstance(n,ast.ImportFrom):v=[n.module or '']
+   elif isinstance(n,ast.Call) and isinstance(n.func,(ast.Name,ast.Attribute)) and (getattr(n.func,'id',None)=='__import__' or getattr(n.func,'attr',None)=='import_module'):
+    v=[x.value for x in n.args if isinstance(x,ast.Constant) and isinstance(x.value,str)]
+   else:continue
+   if any('clickhouse' in x.lower() for x in v):imports.append([name,n.lineno,v])
+(out/'residual-audit-draft.json').write_text(json.dumps(dict(pattern=pat.pattern,files_scanned=len(files),errors=errors,imports=imports,files=items),indent=2,ensure_ascii=False))
+(out/'residual-unresolved.txt').write_text('\n'.join(map(str,unresolved)))
+print('files',len(files),'residual files',len(items),'unresolved',len(unresolved),'imports',imports,'errors',errors)
+print('\n'.join(map(str,unresolved)))

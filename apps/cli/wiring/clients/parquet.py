@@ -45,7 +45,7 @@ class ParquetSourceFactory:
 
         # batch_size в parquet-сканере — это batch чтения.
         # CLI batch_size управляет batching use-case записи; чтение оставляем разумным.
-        scanner_batch_size = 50_000
+        scanner_batch_size = 8192
 
         return ParquetCandleIngestSource(
             scanner=scanner,

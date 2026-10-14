@@ -34,7 +34,7 @@ _STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS_ENV_KEY = (
 @dataclass(frozen=True, slots=True)
 class StrategyLiveRunnerRepairConfig:
     """
-    StrategyLiveRunnerRepairConfig — repair(read) retry policy for canonical ClickHouse lag.
+    StrategyLiveRunnerRepairConfig — repair(read) retry policy for canonical PostgreSQL lag.
 
     Docs:
       - docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md

@@ -16,6 +16,9 @@ _ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000001200"))
 def test_stage12_in_memory_repository_records_active_live_tickers_and_releases_slots() -> None:
     repository = InMemoryRlLiveTickerEntitlementRepository()
     owner = UserId(UUID("00000000-0000-0000-0000-000000001202"))
+    repository.set_override(
+        organization_id=_ORGANIZATION_ID, owner_user_id=owner, live_slots_allowed=1
+    )
     now = datetime(2026, 7, 3, 8, 0, tzinfo=UTC)
 
     first = repository.sync_profile(
@@ -74,7 +77,7 @@ def test_stage12_in_memory_repository_records_active_live_tickers_and_releases_s
     assert second.live_slots_used == 1
 
 
-def test_stage12_in_memory_repository_uses_enterprise_override() -> None:
+def test_stage12_in_memory_repository_uses_scoped_resource_override() -> None:
     repository = InMemoryRlLiveTickerEntitlementRepository()
     owner = UserId(UUID("00000000-0000-0000-0000-000000001203"))
     repository.set_override(
@@ -93,7 +96,7 @@ def test_stage12_in_memory_repository_uses_enterprise_override() -> None:
 
     assert snapshot.eligible is True
     assert snapshot.live_slots_allowed == 2
-    assert snapshot.product_label == "Enterprise"
+    assert snapshot.product_label == "Self-hosted"
     assert snapshot.entitlement_source == "override"
 
 

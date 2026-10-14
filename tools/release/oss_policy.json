@@ -11,7 +11,6 @@
     "SPDX-Apache-2.0": "https://spdx.org/licenses/Apache-2.0.html",
     "PostgreSQL": "https://www.postgresql.org/about/licence/",
     "Redis-7.2": "https://github.com/redis/redis/blob/7.2/COPYING",
-    "Grafana": "https://github.com/grafana/grafana/blob/main/LICENSING.md",
     "htmx-1.9.12": "https://github.com/bigskysoftware/htmx/blob/v1.9.12/LICENSE",
     "lightweight-charts-5.2.0": "https://github.com/tradingview/lightweight-charts/blob/v5.2.0/LICENSE"
   },
@@ -22,10 +21,6 @@
     },
     "argon2-cffi": {
       "license": "MIT",
-      "status": "compatible"
-    },
-    "clickhouse-connect": {
-      "license": "Apache-2.0",
       "status": "compatible"
     },
     "cryptography": {
@@ -200,15 +195,6 @@
       "license": "PostgreSQL",
       "status": "compatible"
     },
-    "clickhouse": {
-      "reference": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "license": "Apache-2.0",
-      "status": "compatible"
-    },
     "redis": {
       "reference": "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
       "platforms": [
@@ -264,26 +250,6 @@
       ],
       "license": "Apache-2.0",
       "status": "compatible"
-    },
-    "grafana": {
-      "reference": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "license": "AGPL-3.0-only",
-      "status": "conditional",
-      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
-    },
-    "loki": {
-      "reference": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "license": "AGPL-3.0-only",
-      "status": "conditional",
-      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
     }
   },
   "container_images": {
@@ -291,14 +257,6 @@
       "license": "LicenseRef-Alpine-Base-Image",
       "status": "conditional",
       "obligation": "Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers."
-    },
-    "clickhouse/clickhouse-server:24.8": {
-      "license": "Apache-2.0",
-      "status": "compatible"
-    },
-    "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b": {
-      "license": "Apache-2.0",
-      "status": "compatible"
     },
     "docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11": {
       "license": "LicenseRef-Alpine-Base-Image",
@@ -323,16 +281,6 @@
       "license": "MPL-2.0 AND MIT",
       "status": "conditional",
       "obligation": "Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest."
-    },
-    "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa": {
-      "license": "AGPL-3.0-only",
-      "status": "conditional",
-      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
-    },
-    "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745": {
-      "license": "AGPL-3.0-only",
-      "status": "conditional",
-      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
     },
     "postgres:16": {
       "license": "PostgreSQL",
@@ -394,6 +342,11 @@
       "license": "Apache-2.0 AND LicenseRef-Alpine-Base-Image",
       "status": "conditional",
       "obligation": "Only Docker CLI and Compose plugin binaries are copied into the local controller. Preserve upstream Docker/Compose Apache-2.0 notices and audit the copied binaries for each distributed image digest; the Alpine base layer is a build-stage input."
+    },
+    "roehub/s06-native-proof:local": {
+      "license": "Apache-2.0",
+      "status": "conditional",
+      "obligation": "Local diagnostic image only, not a release image. Rebuild from repository source and audit base-image and transitive package notices before redistribution."
     }
   },
   "bundled_assets": {
@@ -5356,10 +5309,123 @@
     ".codex/delivery/evidence/streaming-status-2026-10-04/whole-row-selection.png": {
       "license": "Apache-2.0",
       "sha256": "16866d6bb7ebcc13c3a489f594d6bda21865242a9c9288ed4426eb962ea609df"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/browser/foundation/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "447e804bb8eb82636d58268b9dffc3436a2e7cf731f1c130e42138b5e42793c3"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/browser/foundation/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "16abe5bbfc199be9aba062fed5275636e16340bd948a12d5c788d9fac1c3980b"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/browser/foundation/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "cf5932188851f1d22d9685dcaa7157d527a25aff40a060998ad6499d86769e2a"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/browser/foundation/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "68f4b07a752bb7f89a7b038aba1127b54e29ff3533084eae15804bf4ed75efe6"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/browser/foundation/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "29e18efa4cb142895668e4b99787905f0bfb21ec8814444165d467efc5c3dabe"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-metrics.png": {
+      "license": "Apache-2.0",
+      "sha256": "527d3d5466ddea50da9946fa56a299694678e088e2a679bc9cf7ced677712130"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-overview-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "0cf38b479ed29f3d231ddc387fc9df973abf2c433d41c38d889d384c8c433dd4"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-trades.png": {
+      "license": "Apache-2.0",
+      "sha256": "4312b35d28a8dd25517d038c835c4770d9dce0de769bef1fc1b6af41fc113e15"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/data-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "c20419764965065a0ea6f9b652c518a78d56bb55e9360d5d25dead20091e7441"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-monthly.png": {
+      "license": "Apache-2.0",
+      "sha256": "19bff8e0aa2fbe99c74838bf97ff9fcd3dd37e7cb199b862f047e8aad3a4bcdc"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-metrics-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "053532c6e4ef87c9c68d168e3bafaa8bb0bab325a449d508b06a5e51ebe5603f"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10-r1/backtest-overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "cf99a0731ac31102d22e8d7788a0d21c829c749f7477241b602bd1b1e446e3be"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-progress.png": {
+      "license": "Apache-2.0",
+      "sha256": "156ff3b43be8b234efcd17d5d61a9a8442851dfb3c06568e272bce53d3228ffc"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-complete.png": {
+      "license": "Apache-2.0",
+      "sha256": "7caa30360f39a862bcf2a312be88964024f0b69a3b20b8b15761a59ba2f94837"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/integrated-monitoring.png": {
+      "license": "Apache-2.0",
+      "sha256": "e1374182e57e526efeac67cdaa74198e5417e71063b76860591e5441dbe61781"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/backtest-no-history.png": {
+      "license": "Apache-2.0",
+      "sha256": "b4378a118393200d84beff5f23196a1bc4fadb5187ae96a9518ed49d5542c7df"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-download-log.png": {
+      "license": "Apache-2.0",
+      "sha256": "fe6142fd897797151acd276040be1fbc8add1445b46b8b35efd19217ea49eede"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-monitoring.png": {
+      "license": "Apache-2.0",
+      "sha256": "5d884da00654deb853d4b51ea467c8c79354a0150b3b101d7e10192b442f88f3"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-offline.png": {
+      "license": "Apache-2.0",
+      "sha256": "e4b774be442a8cd7481012b77470f49dc95cebdb5fc63cd841ca87dcfdb473ea"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/settings-market-data.png": {
+      "license": "Apache-2.0",
+      "sha256": "15c9ba929f26a174e9b2dc7a280bcff19176a323b3012c4a2beaeea517a9e346"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/backtest-builder.png": {
+      "license": "Apache-2.0",
+      "sha256": "11138e2dd53b82de75f4bb4c097b8022593f55f38bdf412de809b3a21bde1d4a"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-stream-events.png": {
+      "license": "Apache-2.0",
+      "sha256": "13060b7d7d7d46d2e8d01618657d7fca506e182f2b27d7b91b5ef9d65c46196a"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/accepted-platform.png": {
+      "license": "Apache-2.0",
+      "sha256": "461951ce246ee8b66a4a2e739aa66b970756d3bfed6b47ff259ddb10be5edfc0"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S08/browser/navigator-queued.png": {
+      "license": "Apache-2.0",
+      "sha256": "08a5145a7552d476537dfb0c0844f7f69bbdf74595bd5da682165bdbc7edcfff"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10/browser/platform-job-completed.png": {
+      "license": "Apache-2.0",
+      "sha256": "111b20e4d7c58b0659ac2a510b2ebe8bad28da3a0c1b5430ebd823b9e4f90690"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10/browser/old-backtest-results.png": {
+      "license": "Apache-2.0",
+      "sha256": "d5ff8f7eafdeedc2e65d52f70e2edaf96e2950228234b70db74a4d429c6eb64a"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10/browser/final-login.png": {
+      "license": "Apache-2.0",
+      "sha256": "e0216b5fb6baa490b24c5073bff13251d2ab8f45e7043737730638c5ca9884de"
+    },
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S10/browser/platform-job-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "88c22bc54854be68b5293eb9013aca87980435333bcd735de862074a3db62ee7"
     }
   },
   "excluded_path_prefixes": {
-    "prototypes/": "Design-only source and evidence; not part of source or binary release artifacts."
+    "prototypes/": "Design-only source and evidence; not part of source or binary release artifacts.",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/": "Immutable accepted S05 runtime evidence; not a distributed product asset."
   },
   "known_transitive_risks": [
     "Raw Syft NOASSERTION records in first-party runtime images must be resolved by the digest-bound runtime license audit; any new or unmatched record blocks release.",

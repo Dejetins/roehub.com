@@ -53,78 +53,102 @@ class Access:
 
 @pytest.fixture
 def managed(catalog):  # noqa: F811
-    schema = "artifact_management_test_" + uuid4().hex
-    installation, org, other, actor, viewer, admin = [uuid4() for _ in range(6)]
-    with psycopg.connect(DSN) as conn:
-        conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
-        conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
-        conn.execute("""CREATE TABLE identity_installations(installation_id UUID PRIMARY KEY);
-            CREATE TABLE identity_users(user_id UUID PRIMARY KEY);
-            CREATE TABLE identity_organizations(organization_id UUID PRIMARY KEY,
-              installation_id UUID NOT NULL REFERENCES identity_installations,status TEXT,
-              UNIQUE(installation_id,organization_id));
-            CREATE TABLE identity_memberships(organization_id UUID,user_id UUID,
-                role TEXT,status TEXT);
-            CREATE TABLE identity_installation_owners(installation_id UUID,user_id UUID);
-            CREATE TABLE backtest_jobs(job_id UUID PRIMARY KEY);""")
-        conn.execute("INSERT INTO identity_installations VALUES (%s)", (installation,))
-        for user in (actor, viewer, admin):
-            conn.execute("INSERT INTO identity_users VALUES (%s)", (user,))
-        for tenant in (org, other):
-            conn.execute(
-                "INSERT INTO identity_organizations VALUES (%s,%s,'active')", (tenant, installation)
-            )
-            for user, role in ((actor, "owner"), (viewer, "viewer"), (admin, "admin")):
+    from tests.real_infra.market_data.pg_source_fixture import market_source
+
+    with market_source(DSN) as source_gateway:
+        schema = "artifact_management_test_" + uuid4().hex
+        installation, org, other, actor, viewer, admin = [uuid4() for _ in range(6)]
+        with psycopg.connect(source_gateway._dsn) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute("""CREATE TABLE identity_installations(installation_id UUID PRIMARY KEY);
+                CREATE TABLE identity_users(user_id UUID PRIMARY KEY);
+                CREATE TABLE identity_organizations(organization_id UUID PRIMARY KEY,
+                  installation_id UUID NOT NULL REFERENCES identity_installations,status TEXT,
+                  UNIQUE(installation_id,organization_id));
+                CREATE TABLE identity_memberships(organization_id UUID,user_id UUID,
+                    role TEXT,status TEXT);
+                CREATE TABLE identity_installation_owners(installation_id UUID,user_id UUID);
+                CREATE TABLE backtest_jobs(job_id UUID PRIMARY KEY);""")
+            conn.execute("INSERT INTO identity_installations VALUES (%s)", (installation,))
+            for user in (actor, viewer, admin):
+                conn.execute("INSERT INTO identity_users VALUES (%s)", (user,))
+            for tenant in (org, other):
                 conn.execute(
-                    "INSERT INTO identity_memberships VALUES (%s,%s,%s,'active')",
-                    (tenant, user, role),
+                    "INSERT INTO identity_organizations VALUES (%s,%s,'active')",
+                    (tenant, installation),
                 )
-        conn.execute(
-            "INSERT INTO identity_installation_owners VALUES (%s,%s)", (installation, actor)
-        )
-        for name in (
-            "0028_backtest_input_recipe_v1.sql",
-            "0029_backtest_artifact_management_v1.sql",
-            "0030_backtest_artifact_dispatch_v1.sql",
-        ):
+                for user, role in ((actor, "owner"), (viewer, "viewer"), (admin, "admin")):
+                    conn.execute(
+                        "INSERT INTO identity_memberships VALUES (%s,%s,%s,'active')",
+                        (tenant, user, role),
+                    )
             conn.execute(
-                sql.SQL(cast(LiteralString, (Path("migrations/postgres") / name).read_text()))
+                "INSERT INTO identity_installation_owners VALUES (%s,%s)", (installation, actor)
             )
-    dsn = make_conninfo(DSN, options=f"-c search_path={schema}")
-    db = PsycopgBacktestPostgresGateway(dsn=dsn)
-    repo = PostgresArtifactManagementRepository(gateway=db, catalog=catalog, access=Access())
-    schedule = Schedule(
-        interval_days=1, timezone="Europe/Moscow", local_time=time(2), anchor=date(2026, 10, 8)
-    )
-    repo.initialize_settings(
-        organization_id=org, actor_id=actor, root_id="backtest-primary", schedule=schedule
-    )
-    # Test-only activation: does not invoke any scheduler or change installation config.
-    db.execute(
-        query="""UPDATE backtest_artifact_installation_settings SET
-        capability_enabled=TRUE,paused=FALSE,legacy_handoff='complete',budget_bytes=10737418240""",
-        parameters={},
-    )
-    try:
-        yield dict(
-            repo=repo,
-            db=db,
-            dsn=dsn,
-            installation=installation,
-            org=org,
-            other=other,
-            actor=actor,
-            viewer=viewer,
-            admin=admin,
-            schedule=schedule,
-            catalog=catalog,
+            for name in (
+                "0028_backtest_input_recipe_v1.sql",
+                "0029_backtest_artifact_management_v1.sql",
+                "0030_backtest_artifact_dispatch_v1.sql",
+            ):
+                conn.execute(
+                    sql.SQL(cast(LiteralString, (Path("migrations/postgres") / name).read_text()))
+                )
+        dsn = make_conninfo(source_gateway._dsn, options=f"-c search_path={schema}")
+        db = PsycopgBacktestPostgresGateway(dsn=dsn)
+        repo = PostgresArtifactManagementRepository(gateway=db, catalog=catalog, access=Access())
+        schedule = Schedule(
+            interval_days=1, timezone="Europe/Moscow", local_time=time(2), anchor=date(2026, 10, 8)
         )
-    finally:
-        with psycopg.connect(DSN) as conn:
-            conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+        repo.initialize_settings(
+            organization_id=org, actor_id=actor, root_id="backtest-primary", schedule=schedule
+        )
+        # Test-only activation: does not invoke any scheduler or change installation config.
+        db.execute(
+            query="""UPDATE backtest_artifact_installation_settings SET
+            capability_enabled=TRUE,paused=FALSE,legacy_handoff='complete',budget_bytes=10737418240""",
+            parameters={},
+        )
+        try:
+            yield dict(
+                source_gateway=source_gateway,
+                repo=repo,
+                db=db,
+                dsn=dsn,
+                installation=installation,
+                org=org,
+                other=other,
+                actor=actor,
+                viewer=viewer,
+                admin=admin,
+                schedule=schedule,
+                catalog=catalog,
+            )
+        finally:
+            with psycopg.connect(source_gateway._dsn) as conn:
+                conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
 
 
 def item(m, symbol="BTCUSDT", *, version=0, profile=None, source=True):
+    from tests.real_infra.market_data.test_postgres_readers_frontier import candle
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.publication_fence import (  # noqa: E501
+        PostgresPublicationFence,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
+    )
+
+    coordinate = Coordinate(exchange="binance", market_type="spot", symbol=symbol)
+    if source and not m["source_gateway"].run(
+        lambda c: c.execute(
+            "SELECT EXISTS(SELECT 1 FROM market_data.canonical_candles_1m "
+            "WHERE market_id=1 AND symbol=%s)",
+            (symbol,),
+        ).fetchone()[0]
+    ):
+        PostgresRawKlineWriter(m["source_gateway"]).write_1m(
+            [candle(symbol, i, base=datetime(2026, 10, 1, tzinfo=UTC)) for i in range(180)]
+        )
     return PolicyItem(
         coordinate=Coordinate(exchange="binance", market_type="spot", symbol=symbol),
         expected_version=version,
@@ -133,6 +157,7 @@ def item(m, symbol="BTCUSDT", *, version=0, profile=None, source=True):
         source=SourceTarget(
             history=History(kind="range", start_utc=datetime(2026, 10, 1, tzinfo=UTC), end_utc=NOW),
             revision="fixture-revision",
+            **PostgresPublicationFence(m["db"]).capture(coordinate),
             watermark=NOW,
             compute_identity="v2",
             funding_identity="spot",

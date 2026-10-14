@@ -1,0 +1,74 @@
+[
+  {
+    "query": "INSERT INTO market_data.instrument_generations (market_id,symbol) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+    "seconds": 0.0020705830029328354
+  },
+  {
+    "query": "SELECT generation,index_state,invalidation_reason FROM market_data.instrument_generations WHERE market_id=%s AND symbol=%s FOR UPDATE",
+    "seconds": 0.0005402079987106845
+  },
+  {
+    "query": "Composed([SQL('CREATE TEMP TABLE '), Identifier('raw_binance_klines_1m_stage'), SQL(' (LIKE market_data.'), Identifier('raw_binance_klines_1m'), SQL(' INCLUDING DEFAULTS) ON COMMIT DROP')])",
+    "seconds": 0.0027578330045798793
+  },
+  {
+    "query": "Composed([SQL('INSERT INTO market_data.'), Identifier('raw_binance_klines_1m'), SQL(' ('), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('instrument_key'), SQL(','), Identifier('open'), SQL(','), Identifier('high'), SQL(','), Identifier('low'), SQL(','), Identifier('close'), SQL(','), Identifier('source'), SQL(','), Identifier('ingested_at'), SQL(','), Identifier('ingest_id'), SQL(','), Identifier('volume'), SQL(','), Identifier('open_time'), SQL(','), Identifier('close_time'), SQL(','), Identifier('quote_asset_volume'), SQL(','), Identifier('number_of_trades'), SQL(','), Identifier('taker_buy_base_asset_volume'), SQL(','), Identifier('taker_buy_quote_asset_volume')]), SQL(') SELECT '), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('instrument_key'), SQL(','), Identifier('open'), SQL(','), Identifier('high'), SQL(','), Identifier('low'), SQL(','), Identifier('close'), SQL(','), Identifier('source'), SQL(','), Identifier('ingested_at'), SQL(','), Identifier('ingest_id'), SQL(','), Identifier('volume'), SQL(','), Identifier('open_time'), SQL(','), Identifier('close_time'), SQL(','), Identifier('quote_asset_volume'), SQL(','), Identifier('number_of_trades'), SQL(','), Identifier('taker_buy_base_asset_volume'), SQL(','), Identifier('taker_buy_quote_asset_volume')]), SQL(' FROM '), Identifier('raw_binance_klines_1m_stage')])",
+    "seconds": 0.003951083999709226
+  },
+  {
+    "query": "Composed([SQL('CREATE TEMP TABLE '), Identifier('candle_stage'), SQL(' (LIKE market_data.'), Identifier('canonical_candles_1m'), SQL(' INCLUDING DEFAULTS) ON COMMIT DROP')])",
+    "seconds": 0.0006275839987210929
+  },
+  {
+    "query": "CREATE TEMP TABLE candle_winners ON COMMIT DROP AS SELECT DISTINCT ON (market_id,symbol,ts_open) * FROM candle_stage ORDER BY market_id,symbol,ts_open,ingested_at DESC,payload_order DESC",
+    "seconds": 0.0015207500036922283
+  },
+  {
+    "query": "\n            SELECT DISTINCT s.market_id,s.symbol FROM candle_winners s\n            LEFT JOIN market_data.canonical_candles_1m c USING (market_id,symbol,ts_open)\n            WHERE (c.ts_open IS NULL OR (s.ingested_at,s.payload_order) >\n                   (c.ingested_at,c.payload_order)) AND\n              (c.ts_open IS NULL OR ROW(s.instrument_key,s.ts_close,s.open,s.high,s.low,s.close,\n                 s.volume_base,s.volume_quote,s.trades_count,s.taker_buy_volume_base,\n                 s.taker_buy_volume_quote) IS DISTINCT FROM\n               ROW(c.instrument_key,c.ts_close,c.open,c.high,c.low,c.close,c.volume_base,\n                   c.volume_quote,c.trades_count,c.taker_buy_volume_base,c.taker_buy_volume_quote))\n        ",
+    "seconds": 0.14690654100559186
+  },
+  {
+    "query": "Composed([SQL('CREATE TEMP TABLE '), Identifier('ingest_stage'), SQL(' (LIKE market_data.'), Identifier('canonical_candles_1m'), SQL(' INCLUDING DEFAULTS) ON COMMIT DROP')])",
+    "seconds": 0.0006396250028046779
+  },
+  {
+    "query": "Composed([SQL('INSERT INTO market_data.'), Identifier('canonical_candles_1m'), SQL(' AS target ('), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('instrument_key'), SQL(','), Identifier('ts_open'), SQL(','), Identifier('ts_close'), SQL(','), Identifier('open'), SQL(','), Identifier('high'), SQL(','), Identifier('low'), SQL(','), Identifier('close'), SQL(','), Identifier('volume_base'), SQL(','), Identifier('volume_quote'), SQL(','), Identifier('trades_count'), SQL(','), Identifier('taker_buy_volume_base'), SQL(','), Identifier('taker_buy_volume_quote'), SQL(','), Identifier('source'), SQL(','), Identifier('ingested_at'), SQL(','), Identifier('ingest_id'), SQL(','), Identifier('payload_order')]), SQL(') SELECT DISTINCT ON ('), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('ts_open')]), SQL(') '), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('instrument_key'), SQL(','), Identifier('ts_open'), SQL(','), Identifier('ts_close'), SQL(','), Identifier('open'), SQL(','), Identifier('high'), SQL(','), Identifier('low'), SQL(','), Identifier('close'), SQL(','), Identifier('volume_base'), SQL(','), Identifier('volume_quote'), SQL(','), Identifier('trades_count'), SQL(','), Identifier('taker_buy_volume_base'), SQL(','), Identifier('taker_buy_volume_quote'), SQL(','), Identifier('source'), SQL(','), Identifier('ingested_at'), SQL(','), Identifier('ingest_id'), SQL(','), Identifier('payload_order')]), SQL(' FROM '), Identifier('ingest_stage'), SQL(' ORDER BY '), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('ts_open')]), SQL(', '), Identifier('ingested_at'), SQL(' DESC, '), Identifier('payload_order'), SQL(' DESC ON CONFLICT ('), Composed([Identifier('market_id'), SQL(','), Identifier('symbol'), SQL(','), Identifier('ts_open')]), SQL(') DO UPDATE SET '), Composed([Composed([Identifier('instrument_key'), SQL('=EXCLUDED.'), Identifier('instrument_key')]), SQL(','), Composed([Identifier('ts_close'), SQL('=EXCLUDED.'), Identifier('ts_close')]), SQL(','), Composed([Identifier('open'), SQL('=EXCLUDED.'), Identifier('open')]), SQL(','), Composed([Identifier('high'), SQL('=EXCLUDED.'), Identifier('high')]), SQL(','), Composed([Identifier('low'), SQL('=EXCLUDED.'), Identifier('low')]), SQL(','), Composed([Identifier('close'), SQL('=EXCLUDED.'), Identifier('close')]), SQL(','), Composed([Identifier('volume_base'), SQL('=EXCLUDED.'), Identifier('volume_base')]), SQL(','), Composed([Identifier('volume_quote'), SQL('=EXCLUDED.'), Identifier('volume_quote')]), SQL(','), Composed([Identifier('trades_count'), SQL('=EXCLUDED.'), Identifier('trades_count')]), SQL(','), Composed([Identifier('taker_buy_volume_base'), SQL('=EXCLUDED.'), Identifier('taker_buy_volume_base')]), SQL(','), Composed([Identifier('taker_buy_volume_quote'), SQL('=EXCLUDED.'), Identifier('taker_buy_volume_quote')]), SQL(','), Composed([Identifier('source'), SQL('=EXCLUDED.'), Identifier('source')]), SQL(','), Composed([Identifier('ingested_at'), SQL('=EXCLUDED.'), Identifier('ingested_at')]), SQL(','), Composed([Identifier('ingest_id'), SQL('=EXCLUDED.'), Identifier('ingest_id')]), SQL(','), Composed([Identifier('payload_order'), SQL('=EXCLUDED.'), Identifier('payload_order')])]), SQL(' WHERE (EXCLUDED.'), Identifier('ingested_at'), SQL(',EXCLUDED.'), Identifier('payload_order'), SQL(') > (target.'), Identifier('ingested_at'), SQL(',target.'), Identifier('payload_order'), SQL(')')])",
+    "seconds": 0.003673541003081482
+  },
+  {
+    "query": "\n            SELECT market_id,symbol,ts_open::date,\n                bit_or(set_bit(0::bit(1440),\n                    (extract(hour FROM ts_open)*60+extract(minute FROM ts_open))::int,1)),\n                min(ts_open),max(ts_open)\n            FROM candle_winners GROUP BY market_id,symbol,ts_open::date\n            ORDER BY market_id,symbol,ts_open::date\n        ",
+    "seconds": 0.00290895900252508
+  },
+  {
+    "query": "INSERT INTO market_data.candle_coverage_days (market_id,symbol,day,generation,policy_version) VALUES (%s,%s,%s,%s,1) ON CONFLICT DO NOTHING",
+    "seconds": 0.0008314579972648062
+  },
+  {
+    "query": "SELECT actual_count FROM market_data.candle_coverage_days WHERE market_id=%s AND symbol=%s AND day=%s FOR UPDATE",
+    "seconds": 0.00021012499928474426
+  },
+  {
+    "query": "UPDATE market_data.candle_coverage_days SET actual=actual | %s::bit(1440), source_absent=source_absent & ~%s::bit(1440) WHERE market_id=%s AND symbol=%s AND day=%s RETURNING actual_count",
+    "seconds": 0.0001834579961723648
+  },
+  {
+    "query": "INSERT INTO market_data.candle_coverage_summary AS s\n                (market_id,symbol,generation,actual_count,first_ts,last_ts)\n                VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (market_id,symbol) DO UPDATE SET\n                actual_count=s.actual_count+%s,\n                first_ts=least(s.first_ts,EXCLUDED.first_ts),\n                last_ts=greatest(s.last_ts,EXCLUDED.last_ts)",
+    "seconds": 0.0005544170053326525
+  },
+  {
+    "query": "DELETE FROM market_data.source_absent_candles_1m a\n            USING candle_winners s WHERE a.market_id=s.market_id AND a.symbol=s.symbol\n            AND a.minute_key=extract(epoch FROM s.ts_open)::bigint/60",
+    "seconds": 0.00037475000135600567
+  },
+  {
+    "query": "UPDATE market_data.instrument_generations SET content_revision=content_revision+1,updated_at=clock_timestamp() WHERE market_id=%s AND symbol=%s",
+    "seconds": 0.0002544579983805306
+  },
+  {
+    "query": "DELETE FROM market_data.candle_history_verification WHERE market_id=%s AND symbol=%s",
+    "seconds": 0.00025183300022035837
+  },
+  {
+    "query": "UPDATE market_data.instrument_generations SET index_state='ready' WHERE market_id=%s AND symbol=%s",
+    "seconds": 0.00013191600010031834
+  }
+]

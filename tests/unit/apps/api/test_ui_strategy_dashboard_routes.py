@@ -189,10 +189,10 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["rl_ml"]["model_status"]["model_family"] == "rl-trading-agent-platform-v1"
     assert payload["rl_ml"]["model_status"]["artifact_root"] == ("/opt/roehub/state/rl_trading/")
     assert payload["rl_ml"]["model_status"]["registry_status"] == "not_configured"
-    assert payload["rl_ml"]["ticker_slots"]["paid_level"] == "free"
-    assert payload["rl_ml"]["ticker_slots"]["product_label"] == "Free"
-    assert payload["rl_ml"]["ticker_slots"]["entitlement_source"] == "paid_level"
-    assert payload["rl_ml"]["ticker_slots"]["live_slots_allowed"] == 1
+    assert "paid_level" not in payload["rl_ml"]["ticker_slots"]
+    assert payload["rl_ml"]["ticker_slots"]["product_label"] == "Self-hosted"
+    assert payload["rl_ml"]["ticker_slots"]["entitlement_source"] == "self_host"
+    assert payload["rl_ml"]["ticker_slots"]["live_slots_allowed"] == 5
     assert payload["rl_ml"]["ticker_slots"]["live_slots_used"] == 0
     assert payload["rl_ml"]["ticker_slots"]["degradation_reason"] is None
     assert payload["rl_ml"]["ticker_slots"]["items"][0]["symbol"] == "BTCUSDT"

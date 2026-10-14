@@ -182,10 +182,8 @@ TEST_SHARDS: dict[str, TestShard] = {
     "platform-contracts": TestShard(
         name="platform-contracts",
         target=_target(
-            "tests/unit/contexts/extensions",
             "tests/unit/contexts/operations",
             "tests/unit/integration",
-            "tests/unit/sdk",
             "tests/unit/docs",
             "tests/unit/identity",
         ),
@@ -265,6 +263,8 @@ def _is_code_path(path: str) -> bool:
             "configs/",
             "alembic/",
             "migrations/",
+            "tests/real_infra/market_data/",
+            "tests/real_infra/backtest/",
             "infra/",
             "schemas/",
             "sdk/",
@@ -375,6 +375,8 @@ def _needs_migration_check(path: str) -> bool:
             "configs/",
             "alembic/",
             "migrations/",
+            "tests/real_infra/market_data/",
+            "tests/real_infra/backtest/",
             "scripts/backtest/",
             "infra/scripts/",
         ),

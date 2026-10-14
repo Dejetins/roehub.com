@@ -26,7 +26,6 @@
 | `torch` | `2.7.1+cpu` | `BSD-3-Clause` | `compatible` |
 | `alembic` | `1.14.0` | `MIT` | `compatible` |
 | `argon2-cffi` | `25.1.0` | `MIT` | `compatible` |
-| `clickhouse-connect` | `0.8.10` | `Apache-2.0` | `compatible` |
 | `cryptography` | `43.0.3` | `Apache-2.0 OR BSD-3-Clause` | `compatible` |
 | `fastapi` | `0.115.5` | `MIT` | `compatible` |
 | `httpx` | `0.27.2` | `BSD-3-Clause` | `compatible` |
@@ -56,8 +55,6 @@
 | ↳ обязательство |  |  | Local control image inherits the installation-owned runtime supplied through RUNTIME_IMAGE (default roehub/local-runtime:managed). Resolve and retain the actual runtime digest and its existing dependency notices before distributing a built image; this variable is not a fixed third-party release image. |
 | `alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `LicenseRef-Alpine-Base-Image` | `conditional` |
 | ↳ обязательство |  |  | Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers. |
-| `clickhouse/clickhouse-server:24.8` | `24.8` | `Apache-2.0` | `compatible` |
-| `clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b` | `1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b` | `Apache-2.0` | `compatible` |
 | `docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11` | `5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11` | `LicenseRef-Alpine-Base-Image` | `conditional` |
 | ↳ обязательство |  |  | Build-only and runtime base for the OpenBao derivative; preserve exact package notices and audit the final digest. |
 | `docker.io/library/golang@sha256:8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45` | `8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45` | `BSD-3-Clause AND LicenseRef-Alpine-Base-Image` | `conditional` |
@@ -69,10 +66,6 @@
 | `ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0` | `40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0` | `Apache-2.0 OR MIT` | `compatible` |
 | `ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `MPL-2.0 AND MIT` | `conditional` |
 | ↳ обязательство |  |  | Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest. |
-| `grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa` | `b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa` | `AGPL-3.0-only` | `conditional` |
-| ↳ обязательство |  |  | Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest. |
-| `grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745` | `a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745` | `AGPL-3.0-only` | `conditional` |
-| ↳ обязательство |  |  | Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest. |
 | `postgres:16` | `16` | `PostgreSQL` | `compatible` |
 | `postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c` | `be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c` | `PostgreSQL` | `compatible` |
 | `prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba` | `27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba` | `Apache-2.0` | `compatible` |
@@ -86,6 +79,8 @@
 | ↳ обязательство |  |  | Audit and notice Debian packages and all transitive image layers for the final digest. |
 | `redis:7.2-bookworm` | `7.2-bookworm` | `BSD-3-Clause` | `compatible` |
 | `redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42` | `e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42` | `BSD-3-Clause` | `compatible` |
+| `roehub/s06-native-proof:local` | `local` | `Apache-2.0` | `conditional` |
+| ↳ обязательство |  |  | Local diagnostic image only, not a release image. Rebuild from repository source and audit base-image and transitive package notices before redistribution. |
 
 ## Образы комплекта выпуска
 
@@ -93,13 +88,8 @@
 |---|---:|---|---|
 | `prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba` | `27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba` | `Apache-2.0` | `compatible` |
 | `prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d` | `a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d` | `Apache-2.0` | `compatible` |
-| `clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b` | `1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b` | `Apache-2.0` | `compatible` |
 | `alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `LicenseRef-Alpine-Base-Image` | `conditional` |
 | ↳ обязательство |  |  | Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution. |
-| `grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa` | `b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa` | `AGPL-3.0-only` | `conditional` |
-| ↳ обязательство |  |  | Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest. |
-| `grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745` | `a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745` | `AGPL-3.0-only` | `conditional` |
-| ↳ обязательство |  |  | Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest. |
 | `ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `MPL-2.0 AND MIT` | `conditional` |
 | ↳ обязательство |  |  | Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest. |
 | `postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c` | `be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c` | `PostgreSQL` | `compatible` |

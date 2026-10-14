@@ -1,0 +1,1 @@
+{"child_exit": 7, "remote_backend_count_after_exit": 0, "unknown_reservation_retained": true, "counts": {"market": {"active": 0, "quarantined": 1, "limit": 16}, "control": {"active": 0, "quarantined": 0, "limit": 24}, "admin": {"active": 0, "quarantined": 0, "limit": 8}}, "target": "roehub-s10r1-test-pg", "installed_registry_used": false}

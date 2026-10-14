@@ -1,0 +1,5 @@
+### Error
+Error: net::ERR_EMPTY_RESPONSE at http://127.0.0.1:20121/backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f?variant=job_ad277dfde18f__ema_close_w10__risk_none__vh_a7f9fb5e
+Call log:
+[2m  - navigating to "http://127.0.0.1:20121/backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f?variant=job_ad277dfde18f__ema_close_w10__risk_none__vh_a7f9fb5e", waiting until "domcontentloaded"[22m
+

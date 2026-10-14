@@ -325,8 +325,9 @@ def test_only_completed_source_and_write_can_confirm_absence():
     instrument = InstrumentId(MarketId(1), Symbol("AAVEUSDT"))
     start = datetime(2020, 11, 30, 6, tzinfo=timezone.utc)
     end = start + timedelta(hours=1)
-    task = RestFillTask(instrument, TimeRange(UtcTimestamp(start), UtcTimestamp(end)),
-                        "user_requested_fill")
+    task = RestFillTask(
+        instrument, TimeRange(UtcTimestamp(start), UtcTimestamp(end)), "user_requested_fill"
+    )
     confirmed = []
 
     class Source:
@@ -338,9 +339,23 @@ def test_only_completed_source_and_write_can_confirm_absence():
                 raise RuntimeError("interrupted_response")
 
     source = Source()
-    fill = RestFillRange1mUseCase(source, _FakeWriter(), _FixedClock(UtcTimestamp(end)), 1, 500,
-        history_verifier=cast(HistoryRangeVerifier,
-                             SimpleNamespace(confirm=lambda **kw: confirmed.append(kw))))
+    fill = RestFillRange1mUseCase(
+        source,
+        _FakeWriter(),
+        _FixedClock(UtcTimestamp(end)),
+        1,
+        500,
+        history_verifier=cast(
+            HistoryRangeVerifier,
+            SimpleNamespace(
+                confirm=lambda **kw: confirmed.append(kw),
+                acquire=lambda **kw: "fence",
+                release=lambda **kw: None,
+                renew=lambda **kw: None,
+                origin=lambda **kw: start,
+            ),
+        ),
+    )
     source.fail = True
     with pytest.raises(RuntimeError, match="interrupted_response"):
         fill.run(task)

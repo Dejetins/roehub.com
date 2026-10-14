@@ -9,7 +9,6 @@ import pytest
 import yaml
 
 from tools.release import verify_greenfield_lifecycle as lifecycle
-from tools.release.greenfield_oidc_fixture import _DisposableProvider
 from tools.release.verify_greenfield_lifecycle import (
     GreenfieldLifecycleError,
     Installation,
@@ -55,17 +54,11 @@ def test_stage21_monitoring_override_keeps_internal_services_unpublished() -> No
     for service in (
         "alertmanager",
         "blackbox",
-        "grafana",
-        "loki",
         "operational-health",
         "prometheus",
         "web",
     ):
         assert "ports" not in services[service]
-    assert services["grafana"]["environment"] == {
-        "GF_SECURITY_ADMIN_PASSWORD": "stage21-disposable-only",
-        "GF_SECURITY_ADMIN_PASSWORD__FILE": "",
-    }
 
 
 def test_json_output_requires_object() -> None:
@@ -394,20 +387,3 @@ def test_sha256_bytes_uses_explicit_algorithm_prefix() -> None:
     assert _sha256_bytes(b"stage23") == (
         "sha256:cce661c1b393cf8d2c1423340dbcc841698d7bd8faec9b7a159a5d1ffd34322b"
     )
-
-
-def test_disposable_oidc_provider_returns_only_fixture_identity() -> None:
-    provider = _DisposableProvider(
-        email="viewer-a@stage23.invalid.example",
-        subject="stage23-disposable-subject-a",
-    )
-
-    identity = provider.exchange_code(
-        code="fixture",
-        code_verifier="fixture",
-        expected_nonce_sha256="fixture",
-    )
-
-    assert provider.provider_id == "stage23-disposable-oidc"
-    assert identity.email == "viewer-a@stage23.invalid.example"
-    assert identity.email_verified is True

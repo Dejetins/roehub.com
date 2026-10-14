@@ -1,0 +1,23 @@
+import json,time
+from tools.qa.postgres_production_soak import APP_DSN,OUT
+from tools.qa.postgres_production_workload import replay
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import IngestionGateway
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import PostgresRawKlineWriter
+plans={}
+class Connection:
+    def __init__(self,c):self.c=c
+    def __getattr__(self,k):return getattr(self.c,k)
+    def execute(self,q,p=None):
+        if 'SELECT DISTINCT s.market_id,s.symbol FROM candle_winners' in str(q):
+            for mode in ('force_custom_plan','force_generic_plan'):
+                self.c.execute('SET LOCAL plan_cache_mode='+mode)
+                plans[mode]=self.c.execute('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+q,p).fetchone()[0]
+            self.c.execute('SET LOCAL plan_cache_mode=auto')
+        return self.c.execute(q,p)
+class Writer(PostgresRawKlineWriter):
+    def _write(self,c,b):return super()._write(Connection(c),b)
+g=IngestionGateway(APP_DSN,deadline_s=30)
+try:Writer(g).write_1m(replay('S09CACHEPROFILE',0,100))
+finally:g.close()
+(OUT/'plan-cache-profile.json').write_text(json.dumps(plans,indent=2))
+print({k:(v[0]['Planning Time'],v[0]['Execution Time']) for k,v in plans.items()})

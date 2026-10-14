@@ -123,7 +123,7 @@ class RestCatchUp1mUseCase:
         self._writer = writer
         self._clock = clock
         self._max_days = max_days_per_insert
-        self._batch_size = batch_size
+        self._batch_size = min(batch_size, 8192)
         self._ingest_id = ingest_id
 
     def run(self, instrument_id: InstrumentId) -> RestCatchUp1mReport:
@@ -351,7 +351,7 @@ class RestCatchUp1mUseCase:
         Side effects:
         - Reads canonical index and writes repaired rows to raw storage.
         """
-        # day -> count (IMPORTANT: day is datetime.date from ClickHouse)
+        # day -> count (IMPORTANT: day is datetime.date from PostgreSQL)
         day_counts = self._index.daily_counts(instrument_id=instrument_id, time_range=time_range)
         counts_map = {r.day: int(r.count) for r in day_counts}
 
@@ -387,7 +387,9 @@ class RestCatchUp1mUseCase:
                 instrument_id=instrument_id,
                 time_range=TimeRange(start=UtcTimestamp(day_start), end=UtcTimestamp(day_end)),
             )
-            missing_ranges = _missing_ranges_for_day(existing=existing, start=day_start, end=day_end)  # noqa: E501
+            missing_ranges = _missing_ranges_for_day(
+                existing=existing, start=day_start, end=day_end
+            )  # noqa: E501
 
             for mr in missing_ranges:
                 rr, rw, bb, rs = self._ingest_time_range(

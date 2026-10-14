@@ -15,9 +15,9 @@ import yaml
 
 from trading.platform.secrets import SecretKind, SecretReference, SecretReferenceError
 
-INSTALLATION_SCHEMA_ID = "io.roehub.installation/v1alpha1"
+INSTALLATION_SCHEMA_ID = "io.roehub.installation/v2alpha1"
 RELEASE_SCHEMA_ID = "io.roehub.release/v1alpha1"
-RUNTIME_SCHEMA_ID = "io.roehub.runtime-config/v1alpha1"
+RUNTIME_SCHEMA_ID = "io.roehub.runtime-config/v2alpha1"
 GENERATION_SCHEMA_ID = "io.roehub.config-generation/v1alpha1"
 SUPPORTED_PROFILES = ("base", "trading", "ml")
 
@@ -47,8 +47,8 @@ PROFILE_FEATURES: dict[str, tuple[str, ...]] = {
 
 PROFILE_STORES: dict[str, tuple[str, ...]] = {
     "base": ("postgresql", "redis"),
-    "trading": ("postgresql", "clickhouse", "redis"),
-    "ml": ("postgresql", "clickhouse", "redis"),
+    "trading": ("postgresql", "redis"),
+    "ml": ("postgresql", "redis"),
 }
 
 PROFILE_METRICS_TARGETS: dict[str, tuple[str, ...]] = {
@@ -335,7 +335,6 @@ def _effective_profile_config(config: dict[str, Any], profile: str) -> dict[str,
         "domain": config["domain"],
         "installation_id": config["installation_id"],
         "notifications": copy.deepcopy(config["notifications"]),
-        "oidc": copy.deepcopy(config["oidc"]),
         "openbao": copy.deepcopy(config["openbao"]),
         "paths": copy.deepcopy(config["paths"]),
         "ports": copy.deepcopy(config["ports"]),
@@ -349,14 +348,6 @@ def _effective_profile_config(config: dict[str, Any], profile: str) -> dict[str,
         "update_checks": copy.deepcopy(config["update_checks"]),
     }
     return payload
-
-
-def _oidc_input(config: dict[str, Any], profile: str) -> dict[str, Any]:
-    return {
-        "oidc": copy.deepcopy(config["oidc"]),
-        "profile": profile,
-        "schema": "io.roehub.oidc-input/v1alpha1",
-    }
 
 
 def _openbao_input(config: dict[str, Any], profile: str) -> dict[str, Any]:
@@ -398,7 +389,6 @@ def _compose_fragment(
     resources = config["resources"][profile]
     command = (
         "test -s /etc/roehub/service-config.json; "
-        "test -s /etc/roehub/oidc.json; "
         "test -s /etc/roehub/openbao.json; "
         "test -s /etc/roehub/prometheus.yml; "
         f'grep -F \'"profile": "{profile}"\' /etc/roehub/service-config.json >/dev/null; '
@@ -433,7 +423,6 @@ def _compose_fragment(
                 "user": "65534:65534",
                 "volumes": [
                     "./service-config.json:/etc/roehub/service-config.json:ro",
-                    "./oidc.json:/etc/roehub/oidc.json:ro",
                     "./openbao.json:/etc/roehub/openbao.json:ro",
                     "./prometheus.yml:/etc/roehub/prometheus.yml:ro",
                 ],
@@ -471,7 +460,6 @@ def render_profile(
     outputs = {
         "compose.yaml": yaml_bytes(_compose_fragment(config, release_manifest, profile)),
         "effective-config.redacted.json": json_bytes(_redact_secret_refs(effective)),
-        "oidc.json": json_bytes(_oidc_input(config, profile)),
         "openbao.json": json_bytes(_openbao_input(config, profile)),
         "prometheus.yml": yaml_bytes(_prometheus_input(profile)),
         "service-config.json": json_bytes(effective),

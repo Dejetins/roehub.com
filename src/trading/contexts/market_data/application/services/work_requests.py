@@ -292,10 +292,14 @@ class MarketDataWorkRequestRunner:
         except Exception as error:
             check()
             # Never persist provider payloads, URLs, credentials, or exception messages.
-            log.warning(
-                "market data work error phase=%s error_type=%s", phase, type(error).__name__
-            )
             storage_error = self.retryable_storage_error(error)
+            safe_code = (storage_error if isinstance(storage_error, str) else
+                         "storage_unavailable" if storage_error else
+                         "source_or_storage_unavailable")
+            log.warning(
+                "market_data_work_waiting job_id=%s phase=%s error_type=%s code=%s",
+                job["job_id"], phase, type(error).__name__, safe_code,
+            )
             if storage_error:
                 self.store.defer(
                     job={**job, "error_phase": phase},

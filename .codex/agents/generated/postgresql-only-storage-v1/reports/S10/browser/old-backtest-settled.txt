@@ -1,0 +1,279 @@
+### Page
+- Page URL: http://127.0.0.1:20120/backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w50__risk_tp_sl_grid__tp_1__sl_2__vh_b4392968
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f5e8]:
+  - link "Skip to content" [ref=f5e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - complementary [ref=f5e10]:
+    - generic "RoeHub" [ref=f5e11]: R
+    - navigation "Navigation" [ref=f5e12]:
+      - link "Overview" [ref=f5e13] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f5e20] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f5e24] [cursor=pointer]:
+        - /url: /strategies
+      - link "Data" [ref=f5e28] [cursor=pointer]:
+        - /url: /data
+      - link "Connections" [ref=f5e34] [cursor=pointer]:
+        - /url: /connections
+      - link "Monitoring" [ref=f5e38] [cursor=pointer]:
+        - /url: /monitoring
+      - link "Settings" [ref=f5e42] [cursor=pointer]:
+        - /url: /settings/profile
+    - group [ref=f5e47]:
+      - 'generic "Language: EN" [ref=f5e48] [cursor=pointer]': EN
+    - link "Sign out" [ref=f5e51] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f5e56]:
+    - generic [ref=f5e57]:
+      - text: Backtests
+      - generic [ref=f5e58]: Navigator
+    - generic [ref=f5e60]:
+      - heading "Backtests" [level=1] [ref=f5e61]
+      - generic [ref=f5e63]:
+        - region [ref=f5e64]:
+          - generic [ref=f5e65]:
+            - generic [ref=f5e66]:
+              - heading "Jobs" [level=2] [ref=f5e67]
+              - generic "Jobs on this page" [ref=f5e106]: "4"
+            - generic [ref=f5e68]:
+              - link "New backtest" [ref=f5e70] [cursor=pointer]:
+                - /url: /backtests/new?limit=10
+              - button "Search jobs" [ref=f5e73] [cursor=pointer]
+              - button "Refresh" [disabled] [ref=f5e78]
+              - button "Filters" [ref=f5e86] [cursor=pointer]
+          - tablist "Jobs" [ref=f5e89]:
+            - tab "New backtest" [ref=f5e90] [cursor=pointer]
+            - tab "History" [selected] [ref=f5e91] [cursor=pointer]
+          - tabpanel "History" [ref=f5e92]:
+            - region "Job history table" [ref=f5e107]:
+              - table [ref=f5e108]:
+                - caption [ref=f5e109]: Jobs on this page
+                - rowgroup [ref=f5e110]:
+                  - row [ref=f5e111]:
+                    - cell "S10 PG-only retained history proof ACTUSDT · spot · 15m" [ref=f5e112]:
+                      - link "S10 PG-only retained history proof" [ref=f5e113] [cursor=pointer]:
+                        - /url: /backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f?limit=10
+                      - generic [ref=f5e114]: ACTUSDT · spot · 15m
+                    - cell [ref=f5e115]:
+                      - img "Completed" [ref=f5e116]
+                  - row [ref=f5e120]:
+                    - cell "Binance historical · BTCUSDT · EMA 5–50 BTCUSDT · spot · 15m" [ref=f5e121]:
+                      - link "Binance historical · BTCUSDT · EMA 5–50" [ref=f5e122] [cursor=pointer]:
+                        - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10
+                      - generic [ref=f5e123]: BTCUSDT · spot · 15m
+                    - cell [ref=f5e124]:
+                      - img "Completed" [ref=f5e125]
+                  - row [ref=f5e129]:
+                    - cell "Demo EMA · TP/SL BTCUSDT · spot · 15m" [ref=f5e130]:
+                      - link "Demo EMA · TP/SL" [ref=f5e131] [cursor=pointer]:
+                        - /url: /backtests/e9d85b78-58ff-495f-8b0b-2b8e5ac64b8a?limit=10
+                      - generic [ref=f5e132]: BTCUSDT · spot · 15m
+                    - cell [ref=f5e133]:
+                      - img "Completed" [ref=f5e134]
+                  - row [ref=f5e138]:
+                    - cell "Demo EMA · baseline BTCUSDT · spot · 15m" [ref=f5e139]:
+                      - link "Demo EMA · baseline" [ref=f5e140] [cursor=pointer]:
+                        - /url: /backtests/2c252ee4-aa0a-4f1c-b560-7482d7122cdd?limit=10
+                      - generic [ref=f5e141]: BTCUSDT · spot · 15m
+                    - cell [ref=f5e142]:
+                      - img "Completed" [ref=f5e143]
+            - navigation "Job pages" [ref=f5e95]:
+              - generic [ref=f5e96]: 4 jobs
+              - generic [ref=f5e97]:
+                - button "First page" [disabled] [ref=f5e98]
+                - button "Next page" [disabled] [ref=f5e102]
+        - region "Backtest detail" [ref=f5e105]:
+          - generic [ref=f5e147]:
+            - generic [ref=f5e148]:
+              - heading "Binance historical · BTCUSDT · EMA 5–50" [level=2]
+            - generic [ref=f5e149]:
+              - status: Completed
+              - region "Selected variant" [ref=f5e151]:
+                - generic [ref=f5e152]:
+                  - generic [ref=f5e153]:
+                    - term [ref=f5e154]: Return · %
+                    - definition [ref=f5e155]: "-14.2"
+                  - generic [ref=f5e156]:
+                    - term [ref=f5e157]: Maximum drawdown · %
+                    - definition [ref=f5e158]: "14.2"
+                  - generic [ref=f5e159]:
+                    - term [ref=f5e160]: Profit factor
+                    - definition [ref=f5e161]: "0.6"
+                  - generic [ref=f5e162]:
+                    - term [ref=f5e163]: Win rate · %
+                    - definition [ref=f5e164]: "22"
+                  - generic [ref=f5e165]:
+                    - term [ref=f5e166]: Trades
+                    - definition [ref=f5e167]: "109"
+                - generic [ref=f5e168]:
+                  - generic [ref=f5e169]:
+                    - generic [ref=f5e170]:
+                      - group "Chart" [ref=f5e171]:
+                        - button "Equity" [pressed] [ref=f5e172] [cursor=pointer]
+                        - button "Price & trades" [ref=f5e173] [cursor=pointer]
+                        - button "Drawdown" [ref=f5e174] [cursor=pointer]
+                      - generic [ref=f5e175]:
+                        - group "Chart period" [ref=f5e176]:
+                          - button "1D" [ref=f5e177] [cursor=pointer]
+                          - button "1W" [ref=f5e178] [cursor=pointer]
+                          - button "1M" [ref=f5e179] [cursor=pointer]
+                          - button "1Y" [disabled] [ref=f5e180]
+                          - button "All" [pressed] [ref=f5e181] [cursor=pointer]
+                          - button "Date range" [ref=f5e183] [cursor=pointer]
+                        - button "Chart display" [ref=f5e187] [cursor=pointer]
+                    - button "Expand chart" [ref=f5e191] [cursor=pointer]
+                  - generic [ref=f5e198]:
+                    - img "Equity" [ref=f5e199]
+                    - group [ref=f5e202]:
+                      - generic "Show accessible data table" [ref=f5e203] [cursor=pointer]
+                - generic [ref=f5e204]:
+                  - generic [ref=f5e205]:
+                    - generic [ref=f5e206]:
+                      - tablist "Details" [ref=f5e207]:
+                        - tab "Ranked variants" [selected] [ref=f5e208] [cursor=pointer]
+                        - tab "Metrics" [ref=f5e209] [cursor=pointer]
+                        - tab "Trades" [ref=f5e210] [cursor=pointer]
+                        - tab "Monthly statistics" [ref=f5e211] [cursor=pointer]
+                      - region "Export trades" [ref=f5e214]:
+                        - button "Download" [ref=f5e216] [cursor=pointer]
+                    - button "Expand tables" [ref=f5e220] [cursor=pointer]
+                  - tabpanel "Ranked variants" [ref=f5e227]:
+                    - region "Ranked variants" [ref=f5e228]:
+                      - table [ref=f5e229]:
+                        - rowgroup [ref=f5e230]:
+                          - row [ref=f5e231] [cursor=pointer]:
+                            - columnheader "Selected variant" [ref=f5e232]
+                            - columnheader [ref=f5e233]:
+                              - button "Return · % ↓" [ref=f5e234]
+                            - columnheader [ref=f5e235]:
+                              - button "Maximum drawdown · %" [ref=f5e236]
+                            - columnheader [ref=f5e237]:
+                              - button "Profit factor" [ref=f5e238]
+                            - columnheader [ref=f5e239]:
+                              - button "Win rate · %" [ref=f5e240]
+                            - columnheader [ref=f5e241]:
+                              - button "Trades" [ref=f5e242]
+                        - rowgroup [ref=f5e243]:
+                          - row [ref=f5e244] [cursor=pointer]:
+                            - 'cell "EMA 50 #1 · TP 1% · SL 2%" [ref=f5e245]':
+                              - link "EMA 50" [ref=f5e246]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w50__risk_tp_sl_grid__tp_1__sl_2__vh_b4392968
+                              - generic [ref=f5e247]: "#1 · TP 1% · SL 2%"
+                            - cell "-14.19" [ref=f5e248]
+                            - cell "14.19" [ref=f5e249]
+                            - cell "0.56" [ref=f5e250]
+                            - cell "22.02" [ref=f5e251]
+                            - cell "109" [ref=f5e252]
+                          - row [ref=f5e253] [cursor=pointer]:
+                            - 'cell "EMA 45 #2 · TP 2% · SL 2%" [ref=f5e254]':
+                              - link "EMA 45" [ref=f5e255]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w45__risk_tp_sl_grid__tp_2__sl_2__vh_b8791280
+                              - generic [ref=f5e256]: "#2 · TP 2% · SL 2%"
+                            - cell "-15.54" [ref=f5e257]
+                            - cell "15.65" [ref=f5e258]
+                            - cell "0.56" [ref=f5e259]
+                            - cell "17.54" [ref=f5e260]
+                            - cell "114" [ref=f5e261]
+                          - row [ref=f5e262] [cursor=pointer]:
+                            - 'cell "EMA 40 #3 · TP 2% · SL 1%" [ref=f5e263]':
+                              - link "EMA 40" [ref=f5e264]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w40__risk_tp_sl_grid__tp_2__sl_1__vh_f81b046d
+                              - generic [ref=f5e265]: "#3 · TP 2% · SL 1%"
+                            - cell "-17.17" [ref=f5e266]
+                            - cell "17.28" [ref=f5e267]
+                            - cell "0.53" [ref=f5e268]
+                            - cell "16.95" [ref=f5e269]
+                            - cell "118" [ref=f5e270]
+                          - row [ref=f5e271] [cursor=pointer]:
+                            - 'cell "EMA 25 #4 · TP 2% · SL 2%" [ref=f5e272]':
+                              - link "EMA 25" [ref=f5e273]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w25__risk_tp_sl_grid__tp_2__sl_2__vh_d19842ce
+                              - generic [ref=f5e274]: "#4 · TP 2% · SL 2%"
+                            - cell "-21.17" [ref=f5e275]
+                            - cell "21.33" [ref=f5e276]
+                            - cell "0.53" [ref=f5e277]
+                            - cell "20" [ref=f5e278]
+                            - cell "150" [ref=f5e279]
+                          - row [ref=f5e280] [cursor=pointer]:
+                            - 'cell "EMA 30 #5 · TP 2% · SL 2%" [ref=f5e281]':
+                              - link "EMA 30" [ref=f5e282]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w30__risk_tp_sl_grid__tp_2__sl_2__vh_cf0c7395
+                              - generic [ref=f5e283]: "#5 · TP 2% · SL 2%"
+                            - cell "-21.58" [ref=f5e284]
+                            - cell "21.88" [ref=f5e285]
+                            - cell "0.51" [ref=f5e286]
+                            - cell "19.01" [ref=f5e287]
+                            - cell "142" [ref=f5e288]
+                          - row [ref=f5e289] [cursor=pointer]:
+                            - 'cell "EMA 35 #6 · TP 1% · SL 2%" [ref=f5e290]':
+                              - link "EMA 35" [ref=f5e291]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w35__risk_tp_sl_grid__tp_1__sl_2__vh_82a2112a
+                              - generic [ref=f5e292]: "#6 · TP 1% · SL 2%"
+                            - cell "-22.4" [ref=f5e293]
+                            - cell "23.05" [ref=f5e294]
+                            - cell "0.43" [ref=f5e295]
+                            - cell "20.61" [ref=f5e296]
+                            - cell "131" [ref=f5e297]
+                          - row [ref=f5e298] [cursor=pointer]:
+                            - 'cell "EMA 20 #7 · TP 2% · SL 2%" [ref=f5e299]':
+                              - link "EMA 20" [ref=f5e300]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w20__risk_tp_sl_grid__tp_2__sl_2__vh_23c73236
+                              - generic [ref=f5e301]: "#7 · TP 2% · SL 2%"
+                            - cell "-24.66" [ref=f5e302]
+                            - cell "24.74" [ref=f5e303]
+                            - cell "0.52" [ref=f5e304]
+                            - cell "18.72" [ref=f5e305]
+                            - cell "187" [ref=f5e306]
+                          - row [ref=f5e307] [cursor=pointer]:
+                            - 'cell "EMA 15 #8 · TP 2% · SL 2%" [ref=f5e308]':
+                              - link "EMA 15" [ref=f5e309]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w15__risk_tp_sl_grid__tp_2__sl_2__vh_92bcb861
+                              - generic [ref=f5e310]: "#8 · TP 2% · SL 2%"
+                            - cell "-29.62" [ref=f5e311]
+                            - cell "31.1" [ref=f5e312]
+                            - cell "0.5" [ref=f5e313]
+                            - cell "18.06" [ref=f5e314]
+                            - cell "227" [ref=f5e315]
+                          - row [ref=f5e316] [cursor=pointer]:
+                            - 'cell "EMA 10 #9 · TP 1% · SL 1%" [ref=f5e317]':
+                              - link "EMA 10" [ref=f5e318]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w10__risk_tp_sl_grid__tp_1__sl_1__vh_4732ee1f
+                              - generic [ref=f5e319]: "#9 · TP 1% · SL 1%"
+                            - cell "-37.38" [ref=f5e320]
+                            - cell "37.42" [ref=f5e321]
+                            - cell "0.42" [ref=f5e322]
+                            - cell "17.86" [ref=f5e323]
+                            - cell "280" [ref=f5e324]
+                          - row [ref=f5e325] [cursor=pointer]:
+                            - 'cell "EMA 5 #10 · TP 2% · SL 2%" [ref=f5e326]':
+                              - link "EMA 5" [ref=f5e327]:
+                                - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c?limit=10&variant=job_54429a5c6d7c__ema_close_w5__risk_tp_sl_grid__tp_2__sl_2__vh_4ba9967e
+                              - generic [ref=f5e328]: "#10 · TP 2% · SL 2%"
+                            - cell "-44.73" [ref=f5e329]
+                            - cell "44.96" [ref=f5e330]
+                            - cell "0.43" [ref=f5e331]
+                            - cell "20.21" [ref=f5e332]
+                            - cell "381" [ref=f5e333]
+                - complementary [ref=f5e334]:
+                  - generic [ref=f5e335]:
+                    - heading "Research workspace" [level=3] [ref=f5e336]
+                    - generic [ref=f5e337]:
+                      - term [ref=f5e338]: Instrument
+                      - definition [ref=f5e339]: BTCUSDT · spot
+                      - term [ref=f5e340]: Timeframe
+                      - definition [ref=f5e341]: 15m
+                      - term [ref=f5e342]: Research period · [start, end)
+                      - definition [ref=f5e343]: 2026-02-27 — 2026-03-29
+                      - term [ref=f5e344]: Risk mode
+                      - definition [ref=f5e345]: TP/SL grid
+                  - group [ref=f5e346]:
+                    - generic "Job information" [ref=f5e347] [cursor=pointer]
+                  - region "Delete history" [ref=f5e348]:
+                    - button "Delete history" [ref=f5e349] [cursor=pointer]
+                  - region "Save to Strategies" [ref=f5e356]:
+                    - button "Save to Strategies" [ref=f5e357] [cursor=pointer]
+```

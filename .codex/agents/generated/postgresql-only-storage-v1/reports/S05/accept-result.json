@@ -1,0 +1,1 @@
+{"status": "ok", "action": "accept", "stage": "S05", "stage_status": "accepted", "ledger_status": "active", "executor": "s05-20261014-consumers", "receipt": "receipts/S05/receipt-aa42a38497f048d194b183c6be6eed95.md", "next_allowed": ["S06"]}

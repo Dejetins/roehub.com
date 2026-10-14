@@ -36,8 +36,7 @@ class ClosedCandleHotCache(Protocol):
         instrument_key: str,
         start: UtcTimestamp,
         end: UtcTimestamp,
-    ) -> tuple[ClosedCandleTailRow, ...]:
-        ...
+    ) -> tuple[ClosedCandleTailRow, ...]: ...
 
     def write_closed_1m(self, candle) -> bool:  # noqa: ANN001
         ...
@@ -49,7 +48,7 @@ class ClosedCandleTailProviderHooks:
 
     on_repair_attempt: Callable[[str, str], None] | None = None
     on_repair_latency: Callable[[str, str, float], None] | None = None
-    on_clickhouse_circuit_state: Callable[[int], None] | None = None
+    on_canonical_store_circuit_state: Callable[[int], None] | None = None
 
 
 class MarketDataClosedCandleTailProvider:
@@ -66,7 +65,7 @@ class MarketDataClosedCandleTailProvider:
         audit_repository: CandleRepairAuditRepository,
         clock: Clock,
         policy: ClosedCandleTailRepairPolicy | None = None,
-        clickhouse_circuit_open_seconds: float = 30.0,
+        canonical_store_circuit_open_seconds: float = 30.0,
         hooks: ClosedCandleTailProviderHooks | None = None,
     ) -> None:
         if hot_cache is None:  # type: ignore[truthy-bool]
@@ -79,8 +78,8 @@ class MarketDataClosedCandleTailProvider:
             raise ValueError("MarketDataClosedCandleTailProvider requires audit_repository")
         if clock is None:  # type: ignore[truthy-bool]
             raise ValueError("MarketDataClosedCandleTailProvider requires clock")
-        if clickhouse_circuit_open_seconds <= 0:
-            raise ValueError("clickhouse_circuit_open_seconds must be > 0")
+        if canonical_store_circuit_open_seconds <= 0:
+            raise ValueError("canonical_store_circuit_open_seconds must be > 0")
 
         self._hot_cache = hot_cache
         self._canonical_reader = canonical_reader
@@ -88,8 +87,8 @@ class MarketDataClosedCandleTailProvider:
         self._audit_repository = audit_repository
         self._clock = clock
         self._policy = policy if policy is not None else ClosedCandleTailRepairPolicy()
-        self._clickhouse_circuit_open_seconds = clickhouse_circuit_open_seconds
-        self._clickhouse_circuit_open_until: datetime | None = None
+        self._canonical_store_circuit_open_seconds = canonical_store_circuit_open_seconds
+        self._canonical_store_circuit_open_until: datetime | None = None
         self._hooks = hooks if hooks is not None else ClosedCandleTailProviderHooks()
 
     def get_closed_1m_tail(
@@ -102,7 +101,7 @@ class MarketDataClosedCandleTailProvider:
         correlation_id: str,
     ) -> ClosedCandleTailResult:
         """
-        Return closed 1m candles from Redis hot cache, ClickHouse, and REST tail.
+        Return closed 1m candles from Redis hot cache, canonical store, and REST tail.
         """
         started_at = time.perf_counter()
         time_range = TimeRange(start=start_ts_open, end=end_ts_open)
@@ -165,7 +164,7 @@ class MarketDataClosedCandleTailProvider:
 
         self._merge_rows(
             rows_by_ts,
-            self._read_clickhouse(
+            self._read_canonical_store(
                 instrument_id=instrument_id,
                 time_range=time_range,
                 attempts=attempts,
@@ -245,7 +244,7 @@ class MarketDataClosedCandleTailProvider:
         )
         return rows
 
-    def _read_clickhouse(
+    def _read_canonical_store(
         self,
         *,
         instrument_id: InstrumentId,
@@ -253,40 +252,39 @@ class MarketDataClosedCandleTailProvider:
         attempts: list[CandleRepairSourceAttempt],
     ) -> tuple[ClosedCandleTailRow, ...]:
         now = self._clock.now().value
-        if self._clickhouse_circuit_open_until is not None:
-            if now < self._clickhouse_circuit_open_until:
+        if self._canonical_store_circuit_open_until is not None:
+            if now < self._canonical_store_circuit_open_until:
                 attempts.append(
                     CandleRepairSourceAttempt(
-                        source="clickhouse",
+                        source="canonical_store",
                         status="circuit_open",
-                        error_code="clickhouse_circuit_open",
+                        error_code="canonical_store_circuit_open",
                     )
                 )
                 return ()
-            self._clickhouse_circuit_open_until = None
+            self._canonical_store_circuit_open_until = None
 
         try:
             candles = tuple(self._canonical_reader.read_1m(instrument_id, time_range))
         except Exception:  # noqa: BLE001
-            self._clickhouse_circuit_open_until = now + timedelta(
-                seconds=self._clickhouse_circuit_open_seconds
+            self._canonical_store_circuit_open_until = now + timedelta(
+                seconds=self._canonical_store_circuit_open_seconds
             )
             attempts.append(
                 CandleRepairSourceAttempt(
-                    source="clickhouse",
+                    source="canonical_store",
                     status="failed",
-                    error_code="clickhouse_exception",
+                    error_code="canonical_store_exception",
                 )
             )
             return ()
 
         rows = tuple(
-            ClosedCandleTailRow(candle=candle, source="clickhouse")
-            for candle in candles
+            ClosedCandleTailRow(candle=candle, source="canonical_store") for candle in candles
         )
         attempts.append(
             CandleRepairSourceAttempt(
-                source="clickhouse",
+                source="canonical_store",
                 status="succeeded" if _continuous(_rows_by_ts(rows), time_range) else "miss",
             )
         )
@@ -307,9 +305,7 @@ class MarketDataClosedCandleTailProvider:
             attempts.append(CandleRepairSourceAttempt(source="rest", status="miss"))
             return ()
 
-        oldest_allowed = now_floor.value - timedelta(
-            minutes=self._policy.rest_tail_limit_minutes
-        )
+        oldest_allowed = now_floor.value - timedelta(minutes=self._policy.rest_tail_limit_minutes)
         if any(item.start.value < oldest_allowed for item in missing_ranges):
             attempts.append(
                 CandleRepairSourceAttempt(
@@ -322,9 +318,7 @@ class MarketDataClosedCandleTailProvider:
 
         restored: list[ClosedCandleTailRow] = []
         missing_ts = {
-            ts_open
-            for item in missing_ranges
-            for ts_open in _expected_minute_values(item)
+            ts_open for item in missing_ranges for ts_open in _expected_minute_values(item)
         }
         try:
             for missing_range in missing_ranges:
@@ -442,16 +436,16 @@ class MarketDataClosedCandleTailProvider:
                 duration_seconds,
             )
 
-        clickhouse_attempts = [
-            attempt for attempt in result.sources_attempted if attempt.source == "clickhouse"
+        canonical_store_attempts = [
+            attempt for attempt in result.sources_attempted if attempt.source == "canonical_store"
         ]
-        if not clickhouse_attempts:
+        if not canonical_store_attempts:
             return
-        last_status = clickhouse_attempts[-1].status
+        last_status = canonical_store_attempts[-1].status
         if last_status in {"failed", "circuit_open"}:
-            _emit_circuit_state(self._hooks.on_clickhouse_circuit_state, 1)
+            _emit_circuit_state(self._hooks.on_canonical_store_circuit_state, 1)
         elif last_status in {"succeeded", "miss"}:
-            _emit_circuit_state(self._hooks.on_clickhouse_circuit_state, 0)
+            _emit_circuit_state(self._hooks.on_canonical_store_circuit_state, 0)
 
 
 def _continuous(rows_by_ts: dict[datetime, ClosedCandleTailRow], time_range: TimeRange) -> bool:

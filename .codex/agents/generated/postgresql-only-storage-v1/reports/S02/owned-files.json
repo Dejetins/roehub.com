@@ -1,0 +1,36 @@
+{
+  "product_and_generated_paths": {
+    "migrations/postgres/0036_market_data_storage_v1.sql": "34543fdd22aef3a6224ba29046cd894f917d5bb4b0809c6f8563c1d8daa6a7b9",
+    "migrations/postgres/manifest.json": "9cda2f385b25de77bfea8594612c5b7d6ec2bfbb193878c61c9f44d34d07116a",
+    "apps/migrations/market_data.py": "20ead2fc9f6392f1028cfb0220cd9fd97c9b43fbd90543c034dced63576c5d54",
+    "apps/migrations/storage.py": "05439a0bad74f220d84621bf3a425b728c29d95c4dbcc63f7c4d1b078f4b14d5",
+    "tests/unit/apps/migrations/test_storage_lifecycle.py": "0729ec18a2356648440a4ecf1d13334e746690e1350a4cf2e4ce7d664a2d1b38",
+    "tests/real_infra/market_data/test_storage_schema_postgres.py": "bfa7f1457ef4cb9a2295624f12adc3ce2ef3979830cc0b22144e589793afe285",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/SCHEMA.md": "70529e6d41cb9d2d3ccc90a0b3cbd6dfb5487ed34beae1361cb22851d418c2e1",
+    "docs/architecture/project-map/PROJECT_MAP.md": "dd6a8fb82a0986e68802d04669dc2a34053432522d28075a994acc3565278f18",
+    "docs/architecture/project-map/project-map.json": "be4675bbe3ba6479e26daf945e7f9c667d1ad9ae139ad7a0877c39fc015794b4"
+  },
+  "evidence_files": [
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/baseline-files.json",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/baseline-status.txt",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/commands-and-corrections.md",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/diff-check.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/disposable-cleanup.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/disposable-runtime.json",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/entry-check.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/independent-review.md",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/ownership-check.json",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/postgres-version.txt",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/project-map-check.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/project-map-generate.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/pyright-attempt1.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/pyright.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-attempt1.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-attempt2.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-attempt3.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-final.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-verified.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/ruff.log",
+    ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/unit-tests.log"
+  ]
+}

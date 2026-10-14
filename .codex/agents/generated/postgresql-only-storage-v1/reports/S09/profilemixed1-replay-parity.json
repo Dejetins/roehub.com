@@ -1,0 +1,16 @@
+{
+  "stream": {
+    "canonical_rows": 3000,
+    "raw_rows": 3001,
+    "input_sha256": "dd8bcd79f93f4df7abaf8846682db8d174030dd192fec2926f2ae989bc0ad453",
+    "output_sha256": "dd8bcd79f93f4df7abaf8846682db8d174030dd192fec2926f2ae989bc0ad453",
+    "all_17_fields_equal": true
+  },
+  "history": {
+    "canonical_rows": 15000,
+    "raw_rows": 15000,
+    "input_sha256": "e15be04e1e1df32ec3bdc2ffed8e0f7b4bb23ad72ceabfd0291be7abc7ec852a",
+    "output_sha256": "e15be04e1e1df32ec3bdc2ffed8e0f7b4bb23ad72ceabfd0291be7abc7ec852a",
+    "all_17_fields_equal": true
+  }
+}

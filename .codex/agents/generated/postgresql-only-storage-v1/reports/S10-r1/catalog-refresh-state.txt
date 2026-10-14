@@ -1,0 +1,6 @@
+### Result
+{"status":200,"body":{"job_id":"9d960080-472a-4120-8fbe-e2b9adc30d53","kind":"catalog_refresh","market_id":1,"symbols":[],"timeframe":"1m","start_at":null,"end_at":null,"state":"succeeded","attempt":1,"completed_units":1,"total_units":1,"rows_read":0,"rows_written":0,"error_code":null,"created_at":"2026-10-14T08:54:49.451979Z","updated_at":"2026-10-14T08:54:53.212514Z","started_at":"2026-10-14T08:54:51.251990Z","finished_at":"2026-10-14T08:54:53.212514Z","attempts":[{"attempt":1,"state":"succeeded","error_code":null,"finished_at":"2026-10-14T08:54:53.212514Z","rows_read":0,"rows_written":0}],"can_cancel":false,"can_retry":false,"can_pause":false,"can_resume":false,"control_version":0,"progress_epoch":0,"retry_count":0,"next_retry_at":null,"error_phase":null,"queue_waiting":false,"storage_retry_at":null}}
+### Ran Playwright code
+```js
+await (async page=>{const r=await page.request.get("http://127.0.0.1:20120/api/market-data/work-requests/9d960080-472a-4120-8fbe-e2b9adc30d53");return {status:r.status(),body:await r.json()};})(page);
+```

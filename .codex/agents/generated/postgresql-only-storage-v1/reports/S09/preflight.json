@@ -1,0 +1,88 @@
+{
+  "settings": [
+    [
+      "autovacuum",
+      "on",
+      null
+    ],
+    [
+      "checkpoint_timeout",
+      "300",
+      "s"
+    ],
+    [
+      "fsync",
+      "on",
+      null
+    ],
+    [
+      "full_page_writes",
+      "on",
+      null
+    ],
+    [
+      "jit",
+      "on",
+      null
+    ],
+    [
+      "maintenance_work_mem",
+      "65536",
+      "kB"
+    ],
+    [
+      "max_connections",
+      "48",
+      null
+    ],
+    [
+      "max_wal_size",
+      "1024",
+      "MB"
+    ],
+    [
+      "server_version",
+      "16.15 (Debian 16.15-1.pgdg13+2)",
+      null
+    ],
+    [
+      "shared_buffers",
+      "32768",
+      "8kB"
+    ],
+    [
+      "synchronous_commit",
+      "on",
+      null
+    ],
+    [
+      "work_mem",
+      "4096",
+      "kB"
+    ]
+  ],
+  "roles": [
+    [
+      "roehub_app",
+      false,
+      false,
+      false
+    ],
+    [
+      "roehub_maintenance",
+      false,
+      false,
+      false
+    ],
+    [
+      "roehub_monitor",
+      false,
+      false,
+      false
+    ]
+  ],
+  "linux": "Linux",
+  "machine": "aarch64",
+  "registry_required": "1",
+  "registry_owner": 0
+}

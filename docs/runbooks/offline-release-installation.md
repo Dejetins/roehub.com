@@ -1,5 +1,12 @@
 # Автономная установка подписанного выпуска
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Текущие процедуры используют PostgreSQL-only bootstrap/health/recovery. Installed cutover и точный scoped reset manifest принадлежат S10; target определяется отдельно перед операциями.
+
+
 ## Область применения
 
 Инструкция относится к распакованному комплекту
@@ -34,7 +41,7 @@ python3 tools/release/offline_bundle.py verify \
 - точный список, размер, режим и SHA-256 каждого файла;
 - digest OCI index и child manifests для `linux/amd64`/`linux/arm64`;
 - два непустых SPDX 2.3 SBOM для каждого образа;
-- соответствующие исходники Grafana/Loki и запрет phone-home по умолчанию.
+- соответствующие исходники OpenBao и запрет phone-home по умолчанию.
 
 Любая ошибка является fail-closed: не переходите к импорту или запуску.
 
@@ -223,8 +230,7 @@ TTL не разрешает удаление. Partial/unknown IO сохраня�
 
 Before any separately authorized installation activation, run the current disposable
 proof with the existing Python environment. `ROEHUB_BACKTEST_TEST_DSN` must point to a
-new disposable PostgreSQL service; `ROEHUB_BASE_TEST_CLICKHOUSE_PORT` must point to a
-new loopback disposable ClickHouse service. Fixtures create/drop their own databases
+new loopback disposable PostgreSQL 16 service with create-database permission. Fixtures create/drop their own databases
 and schemas. Never point these variables at user/preview databases.
 
 ```sh
@@ -256,24 +262,15 @@ owned work for rollback; retain schema-aware readers after sparse schema-2 publi
 Local tests do not certify shared production mounts, S3, providers or full-market load.
 
 
-### Managed local ClickHouse budgets (S02, 2026-10-10)
+### PostgreSQL-only connection budgets
 
-Для существующей managed local установки `tools/installation/local_platform.py`
-имеет явные режимы `clickhouse_workload_budgets`: `legacy`, `provisioned`, `active`.
-Это отдельный локальный installation lifecycle, не изменение подписанного
-комплекта или автоматическое включение generic offline topology. Включение требует
-совместимого image-bound candidate и сохранения текущего trust binding.
+Новая конфигурация local installation использует `io.roehub.local-installation/v2alpha1`.
+Legacy workload keys отклоняются. Runtime source PostgreSQL-only не разрешает
+автоматически переключать существующую установку. Общий reservation registry и
+разделение 16/24/8 описаны в [storage lifecycle](storage-bootstrap-and-migrations.md).
+Все replicas должны использовать одну authority; S06 runtime acceptance остаётся
+отдельным обязательным условием. Legacy receipts сохраняются как история.
 
-Сначала `tools.installation.clickhouse_workloads` готовит additive private
-credentials (0700 directory / 0600 files), не заменяя существующие. Публичные
-outputs содержат profiles, paths и bootstrap, но не пароли. Bootstrap передаёт
-private password-hash XML ClickHouse с корректным UID/mode, затем запускает
-официальный entrypoint. После проверки `provisioned` server следует drain и
-переключение `active` clients. Rollback возвращает prior application image и
-`provisioned`, оставляя identities и данные; cleanup/rotation не подразумеваются.
-Таблица caps, grants/MV, исключения admin, диагностика отказов и воспроизводимые
-проверки находятся в разделе S02 local market-data recovery runbook. Существующие
-storage migration manifests не меняются: candle/index/PG schemas сохранены.
 
 ### REST provider admission rollout (S03, 2026-10-10)
 
@@ -288,7 +285,7 @@ storage migration manifests не меняются: candle/index/PG schemas со�
 market-data config и generation manifests, `--check` проверяет drift. Не править
 сгенерированные файлы вручную. Scope `local-installation-egress` — явный пример
 для одной установки, не определение NAT/IP. Сохраняются prod cap 3/factor 0.7,
-selections, credentials и S02 ClickHouse resource contract; новая выдача секретов
+selections, credentials и accepted resource contract; новая выдача секретов
 для provider admission не требуется.
 
 Rollback требует drain новых клиентов и восстановления предыдущих image **и**
@@ -297,3 +294,48 @@ config (legacy parser не понимает `shared_conservative`). Additive т�
 возможно только после подтверждённой остановки всех его I/O; см. раздел S03
 `docs/runbooks/navigator-local-market-data-recovery.md`. Подготовка артефактов и
 локальная проверка не означают установку или production delivery.
+
+## Состав self-host после удаления внешних функций
+
+Перечень ниже сверён с `configs/installation/generated/{base,trading,ml}/compose.yaml`.
+Это конфигурация исходников, а не утверждение о запущенных контейнерах.
+
+| Профиль | Compose-сервисы |
+|---|---|
+| `base` | `alertmanager`, `api`, `blackbox`, `domain-cli`, `job-runtime`, `notification-dispatcher`, `notification-report-scheduler`, `openbao`, `operational-health`, `postgresql`, `prometheus`, `redis`, `secret-init`, `storage-migrations`, `telegram-bot-worker`, `web` |
+| `trading` | Всё из `base`, плюс `backtest-artifact-publisher`, `backtest-job-runner`, `exchange-control`, `exchange-execution`, `market-data-scheduler`, `market-data-ws`, `strategy-live-runner` |
+| `ml` | Всё из `trading`, плюс `rl-inference`, `rl-trainer` |
+
+`storage-migrations` и `secret-init` — завершаемые подготовительные задачи;
+`domain-cli` — инструмент ручного запуска. Наличие этих записей в Compose не
+означает постоянно работающий процесс. Роли и зависимости приложения задаёт
+`configs/installation/runtime-service-manifest.json`; инфраструктуру и наблюдаемость
+добавляют генераторы topology. `control-agent`/`roehubctl` относятся к управляющему
+контуру, а не к дополнительным контейнерам из этой таблицы.
+
+
+Grafana, Loki и Plugin Gateway исключены из новых профилей `base`, `trading`,
+`ml` и offline bundle. Отправка событий в Loki удалена. Prometheus,
+Alertmanager, Blackbox и `operational-health` сохранены. Обычные логи процессов
+остаются; встроенный мониторинг хранит последние 200 событий в памяти
+наблюдателя и теряет эту историю при его перезапуске.
+
+Внешние Keycloak/OIDC входы, API/CLI/SDK плагинов и тарифные ограничения удалены.
+Локальная аутентификация, роли, CSRF, recent-auth и OpenBao сохраняются.
+Backtest admission использует единый раздел `resources` конфигурации версии 2
+с конечными лимитами; для live RL действует общий предел 5 слотов с прежними
+scoped overrides. Legacy `paid_level` не определяет доступ и не отображается.
+
+Это `breaking-change` для удалённых API/config полей и plugin контрактов.
+История SQL migrations и существующие данные не очищаются; старые таблицы
+OIDC/plugins и поля тарифов остаются для совместимости хранения, без активных
+потребителей этих функций. Старые OIDC/plugin настройки больше не поддерживаются.
+
+Новый offline manifest использует `io.roehub.offline-release-bundle/v1alpha2`;
+проверяйте каждый комплект его собственными подписанными инструментами.
+Старые комплекты `v1alpha1` требуют сохранённого старого verifier.
+Существующие установки автоматически не изменяются. При отдельном обновлении
+остановите и удалите только исключённые контейнеры выбранного Compose-проекта;
+их тома с данными сохраняйте до отдельного решения владельца. Не используйте
+общую очистку Docker volumes или чужих orphan-контейнеров. Эти изменения исходников
+не означают пересборку, переустановку или удаление работающих контейнеров.

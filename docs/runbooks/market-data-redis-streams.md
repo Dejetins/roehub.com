@@ -1,5 +1,12 @@
 # Runbook — Market Data Redis Streams
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 ## Назначение
 
 Операционные команды для live feed stream'ов, которые публикует `market-data-ws-worker`.
@@ -110,7 +117,7 @@ redis-cli -h 127.0.0.1 -p 6379 XTRIM md.candles.1m.binance:spot:BTCUSDT MINID 17
 ## Диагностика
 
 Публикация в Redis работает в режиме best-effort.
-Если Redis недоступен, worker продолжает запись raw свечей в ClickHouse.
+Если Redis недоступен, worker продолжает запись raw свечей в PostgreSQL.
 
 Проверка Redis-метрик worker:
 

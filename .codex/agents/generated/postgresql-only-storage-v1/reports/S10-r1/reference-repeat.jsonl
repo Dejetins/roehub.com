@@ -1,0 +1,5 @@
+{"seed": {"inserted": 0}}
+{"market_id": 1, "status": "failed", "error_type": "RuntimeError", "message": "source_invalid_json"}
+{"market_id": 2, "status": "synced", "report": {"markets_total": 1, "instruments_total": 927, "rows_upserted": 927}}
+{"market_id": 3, "status": "synced", "report": {"markets_total": 1, "instruments_total": 527, "rows_upserted": 527}}
+{"market_id": 4, "status": "synced", "report": {"markets_total": 1, "instruments_total": 906, "rows_upserted": 906}}

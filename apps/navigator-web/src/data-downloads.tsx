@@ -10,6 +10,7 @@ import {workState} from './market-data-ui';
 import {useReadSnapshot} from './read-snapshot';
 import {deniesRead,formatTime,ReadFeedback,useWords,WorkError} from './workspace-ui';
 import {Confirm} from './results';
+import {StreamJournal} from './stream-journal';
 
 import {activeDownload,downloadState,downloadPercent,useSharedDownload,type DownloadEta} from './download-progress';
 export {activeDownload} from './download-progress';
@@ -60,14 +61,16 @@ export function jobSource(job:WorkJob,markets:Market[],w:ReturnType<typeof useWo
 /** Loaded only while expanded; the catalogue remains mounted above this journal. */
 export function DownloadJournal({subject,markets,blocked,onDenied,onClose,onSelect,jobHref}:{subject:string;markets:Market[];blocked:boolean;onDenied:()=>void;onClose:()=>void;onSelect:()=>void;jobHref:(job:WorkJob)=>string}){
  const w=useWords(),{i18n}=useTranslation(),[params,setParams]=useSearchParams();
+ const streamEvents=params.get('journalview')==='stream';
  const state=params.get('jobstate')??'',kind=params.get('jobkind')??'';
- const history=useInfiniteQuery({queryKey:['data-jobs',subject,state,kind],enabled:!blocked,initialPageParam:{},maxPages:5,retry:false,
+ const history=useInfiniteQuery({queryKey:['data-jobs',subject,state,kind],enabled:!blocked&&!streamEvents,initialPageParam:{},maxPages:5,retry:false,
   queryFn:({signal,pageParam})=>marketRead(`work-requests?${new URLSearchParams({limit:'30',...(state?{state}:{}),...(kind?{kind}:{}),...pageParam})}`,workHistorySchema,signal),getNextPageParam:p=>p.next_cursor??undefined});
  const view=useReadSnapshot(subject,`${state}:${kind}`,history.isSuccess?history.data:undefined,blocked||deniesRead(history.error));
  useEffect(()=>{if(accessDenied(history.error))onDenied();},[history.error]);
  function filter(name:string,value:string){const next=new URLSearchParams(params);value?next.set(name,value):next.delete(name);setParams(next,{replace:true});}
+ if(streamEvents)return <StreamJournal subject={subject} markets={markets} blocked={blocked} onDenied={onDenied} onClose={onClose} onJobs={()=>filter('journalview','')}/>;
  return <section id="data-download-journal" className="data-download-journal" aria-label={w('Download log','Журнал загрузок')} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}}}>
-  <header><h2>{w('Download log','Журнал загрузок')}</h2><span>{w('All exchanges','Все биржи')}</span><button className="library-icon-action work-icon" title={w('Refresh download log','Обновить журнал загрузок')} aria-label={w('Refresh download log','Обновить журнал загрузок')} disabled={history.isFetching||blocked} onClick={()=>void history.refetch()}><RefreshCw aria-hidden="true"/></button><button className="library-icon-action work-icon" title={w('Close download log','Закрыть журнал загрузок')} aria-label={w('Close download log','Закрыть журнал загрузок')} onClick={onClose}><X aria-hidden="true"/></button></header>
+  <header><h2>{w('Download log','Журнал загрузок')}</h2><button className="work-link-button" onClick={()=>filter('journalview','stream')}>{w('Stream events','События потока')}</button><span>{w('All exchanges','Все биржи')}</span><button className="library-icon-action work-icon" title={w('Refresh download log','Обновить журнал загрузок')} aria-label={w('Refresh download log','Обновить журнал загрузок')} disabled={history.isFetching||blocked} onClick={()=>void history.refetch()}><RefreshCw aria-hidden="true"/></button><button className="library-icon-action work-icon" title={w('Close download log','Закрыть журнал загрузок')} aria-label={w('Close download log','Закрыть журнал загрузок')} onClick={onClose}><X aria-hidden="true"/></button></header>
   <div className="data-journal-filters">
    <label className="data-select"><span className="sr-only">{w('Job state','Состояние задания')}</span><select value={state} onChange={e=>filter('jobstate',e.target.value)}><option value="">{w('All states','Все состояния')}</option>{['queued','running','pause_requested','paused','retry_wait','cancel_requested','cancelled','succeeded','failed'].map(s=><option key={s} value={s}>{workState(s,w)}</option>)}</select><ChevronDown aria-hidden="true"/></label>
    <label className="data-select"><span className="sr-only">{w('Job type','Тип задания')}</span><select value={kind} onChange={e=>filter('jobkind',e.target.value)}><option value="">{w('All tasks','Все задачи')}</option><option value="candle_ingestion">{w('Candles','Свечи')}</option><option value="catalog_refresh">{w('Catalog refresh','Обновление каталога')}</option></select><ChevronDown aria-hidden="true"/></label>
@@ -100,7 +103,7 @@ export function DownloadJobDetails({subject,job,eta,locked,markets,onDenied,onCh
   {job.state==='cancel_requested'&&<p role="status">{w('Stopping after the current write. Stored candles are preserved.','Загрузка остановится после текущей записи. Сохранённые свечи останутся.')}</p>}
   {job.state==='pause_requested'&&<p role="status">{w('Finishing the current write before pausing.','Завершаем текущую запись перед паузой.')}</p>}
   {job.state==='paused'&&<p>{w('Progress is saved. Resume when ready.','Прогресс сохранён. Можно продолжить в любое время.')}</p>}
-  {job.state==='retry_wait'&&<p role="status">{job.error_code==='source_history_incomplete'?w('Retrying history verification.','Повторяем проверку истории.'):job.error_code==='source_rate_limited'?w('Exchange rate limit.','Ограничение частоты запросов биржи.'):job.error_code==='storage_memory_pressure'?w('Storage is waiting for memory to become available.','Хранилище ожидает освобождения памяти.'):job.error_code==='storage_unavailable'?w('Storage temporarily unavailable.','Хранилище временно недоступно.'):job.error_code==='worker_lost'?w('Recovering the download worker.','Восстановление обработчика загрузки.'):w('Source temporarily unavailable.','Источник временно недоступен.')} {w('Will retry automatically','Автоповтор')}{job.next_retry_at?` · ${formatTime(job.next_retry_at,i18n.language)} · UTC`:''}. {w('Progress is saved.','Прогресс сохранён.')}</p>}
+  {job.state==='retry_wait'&&<p role="status">{job.error_code==='source_history_incomplete'?w('Retrying history verification.','Повторяем проверку истории.'):job.error_code==='source_rate_limited'?w('Exchange rate limit.','Ограничение частоты запросов биржи.'):job.error_code==='storage_memory_pressure'?w('Storage is waiting for memory to become available.','Хранилище ожидает освобождения памяти.'):job.error_code==='storage_busy'?w('Storage query slots are busy.','Все слоты запросов хранилища заняты.'):job.error_code==='storage_unavailable'?w('Storage temporarily unavailable.','Хранилище временно недоступно.'):job.error_code==='worker_lost'?w('Recovering the download worker.','Восстановление обработчика загрузки.'):w('Source temporarily unavailable.','Источник временно недоступен.')} {w('Will retry automatically','Автоповтор')}{job.next_retry_at?` · ${formatTime(job.next_retry_at,i18n.language)} · UTC`:''}. {w('Progress is saved.','Прогресс сохранён.')}</p>}
   {job.state==='queued'&&job.storage_retry_at&&<p role="status">{w('Storage recovery. Queue will continue automatically after','Восстановление хранилища. Очередь автоматически продолжится после')} {formatTime(job.storage_retry_at,i18n.language)} · UTC.</p>}
   {job.state==='queued'&&job.queue_waiting&&!job.storage_retry_at&&<p>{w('Waiting for an available download slot.','Ожидание свободного слота загрузки.')}</p>}
   <DownloadJobActions subject={subject} job={job} locked={locked} onDenied={onDenied} onChanged={onChanged}/>
@@ -174,7 +177,8 @@ export function DownloadJobActions({subject,job,locked,onDenied,onChanged,compac
 }
 
 function eventReason(code:string|null,w:ReturnType<typeof useWords>){
- return code==='storage_memory_pressure'?w('ClickHouse needs more free memory.','ClickHouse ожидает освобождения памяти.'):
+ return code==='storage_memory_pressure'?w('PostgreSQL needs more free memory.','PostgreSQL ожидает освобождения памяти.'):
+ code==='storage_busy'?w('Waiting for a free storage query slot.','Ожидание свободного слота запроса к хранилищу.'):
  code==='storage_unavailable'?w('Storage is temporarily unavailable.','Хранилище временно недоступно.'):
  code==='source_rate_limited'?w('The exchange requested a cooldown.','Биржа запросила перерыв между запросами.'):
  code==='source_unavailable'?w('The exchange is temporarily unavailable.','Биржа временно недоступна.'):

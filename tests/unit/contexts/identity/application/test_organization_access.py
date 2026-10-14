@@ -49,11 +49,11 @@ def _bootstrap() -> tuple[
 def test_role_matrix_keeps_owner_only_mainnet_and_admin_management() -> None:
     assert "mainnet.approve" in permissions_for_role("owner")
     assert "mainnet.approve" not in permissions_for_role("admin")
-    assert "plugins.manage" in permissions_for_role("admin")
+    assert "plugins.manage" not in permissions_for_role("admin")
     assert "roles.manage" in permissions_for_role("admin")
     assert "members.manage" not in permissions_for_role("operator")
     assert permissions_for_role("viewer") == frozenset(
-        {"organization.read", "members.read", "plugins.read"}
+        {"organization.read", "members.read"}
     )
 
 
@@ -152,7 +152,7 @@ def test_two_organization_scope_is_server_derived_and_cross_org_is_denied() -> N
     }
 
 
-def test_admin_member_role_plugin_and_last_owner_invariants() -> None:
+def test_admin_member_role_and_last_owner_invariants() -> None:
     service, _repository, owner, organization = _bootstrap()
     organization_id = organization.organization_id  # type: ignore[attr-defined]
     admin = _principal()
@@ -179,16 +179,6 @@ def test_admin_member_role_plugin_and_last_owner_invariants() -> None:
         now=NOW,
     )
     assert changed.role == "trader"
-    grant = service.set_plugin_permission(
-        principal=admin,
-        organization_id=organization_id,
-        plugin_id="roehub.sample-plugin",
-        user_id=member.user_id,
-        permission="operate",
-        now=NOW,
-    )
-    assert grant.permission == "operate"
-
     with pytest.raises(OrganizationAccessError) as escalation:
         service.change_member_role(
             principal=admin,

@@ -238,14 +238,14 @@ def test_app_stop_interrupts_writer_warmup_and_reaps_child():
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize('code,expected', [(202,'storage_unavailable'),
-                                         (241,'storage_memory_pressure'),
-                                         (516,None), (497,None)])
+@pytest.mark.parametrize('code,expected', [('53300','storage_busy'),
+                                         ('53200','storage_memory_pressure'),
+                                         ('28P01',None), ('42501',None)])
 def test_only_resource_errors_enter_bounded_ingestion_retry(code, expected):
-    from clickhouse_connect.driver.exceptions import DatabaseError
+    from psycopg.errors import lookup
 
     from apps.worker.market_data_ws.wiring.io_process import classify_io_error
     from trading.contexts.market_data.application.services.ingestion_retry import retry_delay
-    error=DatabaseError(f'Code: {code}. synthetic test')
+    error=lookup(code)('synthetic test')
     assert classify_io_error(error)==expected
     assert retry_delay(error, 100) == 300

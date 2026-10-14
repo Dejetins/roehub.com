@@ -2,12 +2,13 @@
 
 from uuid import uuid4
 
-import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
+from trading.platform.postgres_budget import connect as budget_connect
+
 DSN = "host=127.0.0.1 port=25437 dbname=postgres user=postgres"
-with psycopg.connect(DSN) as conn:
+with budget_connect(DSN) as conn:
     schemas = conn.execute(
         (
             "SELECT schema_name FROM information_schema.schemata WHERE "

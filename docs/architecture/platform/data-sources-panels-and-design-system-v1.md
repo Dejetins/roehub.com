@@ -1,5 +1,10 @@
 # Источники данных, декларативные панели и визуальная система v1
 
+> Статус: historical / retired, 2026-10-13. Plugin RPC, DataFrame/panel/app
+> contribution contracts, схемы и QA-маршрут удалены. Этот документ сохраняет
+> прежнее решение; он не задаёт действующую интеграционную поверхность.
+> Текущий состав: [инструкция установки](../../runbooks/offline-release-installation.md).
+
 ## Статус и область
 
 - Контракт: `RoehubDataFrame/v1`, `DataSourceQuery/v1`,

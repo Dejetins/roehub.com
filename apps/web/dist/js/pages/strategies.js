@@ -864,7 +864,6 @@ function renderRlOperatorControls(root, operator) {
 
 function renderRlTickerSlots(root, slots) {
   setText("[data-rl-slots-state]", panelStatusText(slots?.state, slots?.degradation_reason, slots?.source), root);
-  setText("[data-rl-paid-level]", slots?.paid_level || "--", root);
   setText("[data-rl-product-label]", slots?.product_label || "--", root);
   setText(
     "[data-rl-live-slots]",

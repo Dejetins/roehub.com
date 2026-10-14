@@ -17,8 +17,6 @@ from trading.contexts.identity.domain.entities import (
     OrganizationInvitation,
     OrganizationMembership,
     OrganizationRole,
-    PluginPermission,
-    PluginPermissionGrant,
     SupportAccessGrant,
     permissions_for_role,
 )
@@ -37,9 +35,6 @@ class InMemoryOrganizationRepository(OrganizationRepository):
         self._invitations: dict[object, OrganizationInvitation] = {}
         self._invitation_recipient_hashes: dict[object, str] = {}
         self._accepted_invitations: set[object] = set()
-        self._plugin_permissions: dict[
-            tuple[OrganizationId, str, UserId], PluginPermissionGrant
-        ] = {}
         self._support_grants: dict[object, SupportAccessGrant] = {}
         self._audit_events: list[AdministrativeAuditEvent] = []
 
@@ -345,37 +340,6 @@ class InMemoryOrganizationRepository(OrganizationRepository):
                 )
             return len(matches)
 
-    def set_plugin_permission(
-        self,
-        *,
-        organization_id: OrganizationId,
-        plugin_id: str,
-        user_id: UserId,
-        permission: PluginPermission,
-        actor_user_id: UserId,
-        updated_at: datetime,
-    ) -> PluginPermissionGrant:
-        with self._lock:
-            if (organization_id, user_id) not in self._memberships:
-                raise OrganizationRepositoryInvariantError(code="membership_not_found")
-            grant = PluginPermissionGrant(
-                organization_id=organization_id,
-                plugin_id=plugin_id,
-                user_id=user_id,
-                permission=permission,
-                updated_at=updated_at,
-            )
-            self._plugin_permissions[(organization_id, plugin_id, user_id)] = grant
-            self._append_audit(
-                organization_id=organization_id,
-                actor_user_id=actor_user_id,
-                action="plugin.permission_set",
-                target_type="plugin_permission",
-                target_id=f"{plugin_id}:{user_id}",
-                metadata={"permission": permission},
-                created_at=updated_at,
-            )
-            return grant
 
     def grant_support_access(
         self,

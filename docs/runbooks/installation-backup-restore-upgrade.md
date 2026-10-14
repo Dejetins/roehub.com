@@ -1,11 +1,19 @@
 # Резервное копирование, восстановление, обновление и откат установки
 
+## Формат PostgreSQL-only
+
+Installation/runtime-config/storage-status используют `v2alpha1`. Backup, capture и
+backup-policy также используют `v2alpha1`, compatibility — `postgresql-only-v2`.
+Старые форматы отвергаются до записи. Семь владельцев, quiesce, digest, signing и
+path guards сохраняются. Это breaking-change: смешанный restore старого формата
+не поддерживается. Эта инструкция не означает переключение действующей установки.
+
 ## Назначение и граница
 
 Эта инструкция описывает единый аварийный жизненный цикл Roehub через
 host-side `control-agent` и `roehubctl`. Web и API для него не требуются.
 Операции разрешены только `installation_owner`, используют закрытый
-`io.roehub.installation-backup-policy/v1alpha1` и не принимают произвольные
+`io.roehub.installation-backup-policy/v2alpha1` и не принимают произвольные
 команды оболочки.
 
 Восстановление всегда выполняется в новый пустой каталог или новую установку.
@@ -14,13 +22,12 @@ host-side `control-agent` и `roehubctl`. Web и API для него не тре
 
 ## Владельцы состояния
 
-Подписанный манифест обязан содержать ровно восемь владельцев:
+Подписанный манифест обязан содержать ровно семь владельцев:
 
 | Владелец | Режим согласованности | Ограничение |
 |---|---|---|
 | `release_config` | `application_quiesced` | Версия релиза и снимок сгенерированной конфигурации должны относиться к одному окну остановки записей. |
 | `postgresql` | `database_snapshot` | Каноническое транзакционное состояние приложения. |
-| `clickhouse` | `database_snapshot` | Диапазоны времени и число строк сверяются после импорта. |
 | `redis_checkpoint` | `durable_checkpoint` | Это восстанавливаемая контрольная точка, но не единственный источник истины. |
 | `openbao` | `encrypted_raft_snapshot` | Raft snapshot уже зашифрован операторским `age`-ключом; recovery/unseal values в комплект и отчёты не входят. |
 | `artifacts` | `content_addressed_snapshot` | Blob и каталог сверяются по SHA-256. |
@@ -104,12 +111,12 @@ roehubctl restore \
 До расшифровки проверяются identity подписи, detached signature, manifest hash,
 полнота владельцев, форма каталога и digest каждого ciphertext. Каждый
 plaintext-файл записывается атомарно и повторно сверяется с manifest. Затем
-typed state coordinator импортирует PostgreSQL, ClickHouse и Redis checkpoint,
+typed state coordinator импортирует PostgreSQL и Redis checkpoint,
 восстанавливает OpenBao только на свежем storage, публикует
 content-addressed artifacts и release/config, после чего сверяет:
 
 - строки пользователей, конфигурации, plugin/operation state и аудита;
-- число строк и временной диапазон ClickHouse;
+- канонические свечи PostgreSQL, actual/absence index, generation/revisions и verified frontier;
 - Redis checkpoint с учётом того, что Redis не источник истины;
 - SHA-256 артефактов, конфигурации и всех восьми plaintext snapshot;
 - версию релиза и installation fingerprint.

@@ -170,7 +170,7 @@ The four tags are independent and may coexist on one record:
 
 `source_refs` and `remaining_work` explain each classification. Historical and
 QA/nonvisual records carry an explicit disposition; they are not extra product
-screens. The registry contains 44 records, 43 source surfaces and 18 journeys.
+screens. The registry contains 42 records, 42 source surfaces and 18 journeys.
 
 ## Product coverage
 
@@ -189,7 +189,7 @@ screens. The registry contains 44 records, 43 source surfaces and 18 journeys.
 | `/jobs`, `/jobs/{job_id}` | Cross-capability queue/history, attempts, inputs/outputs, measured progress, errors, cancellation/retry eligibility | Runtime exists; browser APIs/UI and explicit per-capability identity mapping |
 | `/monitoring`, `/monitoring/{service_id}` | Functional groups, service/datastore detail, freshness, metrics/backlog, dependency impact, jobs, runbook and safe action | Target projections/UI; databases remain services, not separate navigation sections |
 | Personal settings | Profile, preferences, notification routes, sessions, audit and recovery | Reuse account/local-auth APIs; target UI |
-| Administration | Members, last-owner protection, separate resource budgets, extensions, backup/update/rollback and operation reconciliation | Reuse administration APIs; map target installation authority and remaining projections |
+| Administration | Members, last-owner protection, separate resource budgets, backup/update/rollback and operation reconciliation | Reuse administration APIs; map target installation authority and remaining projections |
 | `/docs`, canonical runbooks | Local version matching, search, visibility, 403/404, incident context and safe login continuation | Product docs UI and explicit framework-doc route migration |
 
 Grouped navigation is Overview (`/dashboard`), Research (`/data`, `/artifacts`,

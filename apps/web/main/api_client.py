@@ -22,7 +22,6 @@ class WebCurrentUser:
     """
 
     user_id: str
-    paid_level: str
 
 
 @dataclass(frozen=True)
@@ -205,8 +204,7 @@ def _build_success_result(*, response: httpx.Response) -> CurrentUserApiResult:
         )
 
     user_id = str(payload.get("user_id", "")).strip()
-    paid_level = str(payload.get("paid_level", "")).strip()
-    if not user_id or not paid_level:
+    if not user_id:
         return CurrentUserApiResult(
             status_code=502,
             user=None,
@@ -215,6 +213,6 @@ def _build_success_result(*, response: httpx.Response) -> CurrentUserApiResult:
 
     return CurrentUserApiResult(
         status_code=200,
-        user=WebCurrentUser(user_id=user_id, paid_level=paid_level),
+        user=WebCurrentUser(user_id=user_id),
         error_message=None,
     )

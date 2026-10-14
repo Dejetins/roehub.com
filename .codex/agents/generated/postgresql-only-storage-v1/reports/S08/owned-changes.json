@@ -1,0 +1,91 @@
+{
+  "modified_from_entry": [
+    {
+      "path": "apps/migrations/research_runtime_probe.py",
+      "entry_sha256": "c215057dc6f3fe8224d396bda7796fec281f481f703cc9e89c73697538c5826a",
+      "current_sha256": "5dfe0a1130a024b5c7e4ae3546ad3b37db4dd82015d26ec9541814273b965bd7"
+    },
+    {
+      "path": "pyproject.toml",
+      "entry_sha256": "856b82dc9ef191c06baa4b75a9eaa8670465d8f721b6fb3a21e4432b94b6c350",
+      "current_sha256": "972b21eef83e7ab86f14bc039c75eec01fdc0cb801dd482f6c243eb1fe1c2ea4"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/catalog_coverage_reader.py",
+      "entry_sha256": "f0f552e9b43db7ce7d4312ac5463b296ef7dfa7cabe43b22f76e0b5dd22a3f43",
+      "current_sha256": "f37a76fb2e3edde210da0e61a56ca1ab99e72abbfcd28250c7dd9c7afa1adcb0"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py",
+      "entry_sha256": "879d58676e6f457f73892c93cc0cc1e94ba8cf80fb053120cadee0f68f2cbcb9",
+      "current_sha256": "545083e4ae4c6bc114f29c86081612740948052269236ae95f95e631c36b725e"
+    },
+    {
+      "path": "src/trading/platform/postgres_budget.py",
+      "entry_sha256": "e91ee804393e6014614a4105c29fd7f422b9e1767ae75db25c7049ba725ff566",
+      "current_sha256": "e2a9ba45bef206be70dd352eb4840fe3ecd4f6f2a4e38e79327dde8d88fb8ba6"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "entry_sha256": "0a543e40e756543f60af4d739ec1122cbfa57099ac778e14d21f3b4cb493afe6",
+      "current_sha256": "9b140f73471eebde2c10c042a5faec4c3b9fede201e7c0e2698ab66ed220a0b6"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_postgres_consumers.py",
+      "entry_sha256": "5b78a72877b9956a02b523461fa212c0b0c6224029140bf9ee94a3d65ac7c091",
+      "current_sha256": "dcbe3a39b3c0d7820e1df892981c0a59552014ff670a63c15a991ec303535748"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_provider_admission.py",
+      "entry_sha256": "db4e0777cd0d9046797f00fb5696e3f410705fbaac191cbb9c8596ba2be09ed9",
+      "current_sha256": "e7e52b3a9e2e2b11580f6a0d51fc89165697f5c349313c0c695b1578d63ac7d9"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_stream_events_postgres.py",
+      "entry_sha256": "357c98f60599c440290f0801850ddf8b96b66adf25c529b13b4e7b32b35084cf",
+      "current_sha256": "6d0c0781608403dab12c90e9e57eb774156283992c757126f38fd4e8cea8db5a"
+    },
+    {
+      "path": "tests/unit/apps/worker/test_stream_event_transitions.py",
+      "entry_sha256": "abba8da6c57ef7285b677e651d29506c99796f2355b8a7454864014a121beb39",
+      "current_sha256": "27962b742ffb5a87822682e58da682ded9fb1cbcf860fe46091a38ebf84e6672"
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py",
+      "entry_sha256": "d5b02278531a553f2703ba427b0a42d558dc6ff9c7cb42d010ffec708a85a989",
+      "current_sha256": "171d00a782b0ce389700e921686112884e1dba8eddda38a14b893831bc667511"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_dns_lifecycle.py",
+      "entry_sha256": "e95df8548e26f69a41407553e7414a14327cbc876cd4635f64971ea350fd4c21",
+      "current_sha256": "8b8048c39d763cb126fdd1fa810312ba64ef9dfc6cee7b0a8fda0c3c2e16dd20"
+    },
+    {
+      "path": "tools/backup/market_fixture.py",
+      "entry_sha256": "fbc370b6e47ccdcc6caadecd5127f8280c62ab0be6451105247d98bbeaaf3ca1",
+      "current_sha256": "a97852b89db12c787ced27ea7595ead7975dc64aa79fa3bdca01b4b62aa6d473"
+    },
+    {
+      "path": "tools/qa/backtests_client_fixture.py",
+      "entry_sha256": "c65dd0bd5e8bd0bf014600fe3366fd94c1f3f7dcac7a5379170fe3a370fc087b",
+      "current_sha256": "12f3a39c94e3d5f7bc99e8f0835ac424e8df65c79cb3b6f676098f94136724fc"
+    },
+    {
+      "path": "tools/qa/workpages_monitoring.py",
+      "entry_sha256": "fbcf2b7525c0b777964de60e0e925ec5b6187eaec6036522465bf37c648fa01e",
+      "current_sha256": "ae1f56099980910dd3a2d895de4e9edc972849905a1cd3837ef0aec6d2344491"
+    }
+  ],
+  "new_source_files": [
+    "apps/platform-web/e2e/storage-recovery.spec.ts",
+    "tests/real_infra/market_data/test_shared_pg_outage.py",
+    "tests/unit/tools/test_s08_old_backup_rejection.py"
+  ],
+  "new_evidence": "reports/S08/ and reports/S08.md",
+  "ownership": "Only deltas from the captured entry state; preexisting dirty files/hunks remain foreign. Ledger transaction tracked separately.",
+  "new_source_hashes": {
+    "apps/platform-web/e2e/storage-recovery.spec.ts": "8a3051f46b6288267bb6068ea6edd2319b2e6ad3b70fbf400655cf60e072af95",
+    "tests/real_infra/market_data/test_shared_pg_outage.py": "b6a6a2ba61ac5fddbb8970a93d837d4d96a3c234e4863cc0853165895436daf1",
+    "tests/unit/tools/test_s08_old_backup_rejection.py": "0773ec18f7938fd592b3ea3e7ce4d6e26d32109f3a0a9a786b378f0fce63f964"
+  }
+}

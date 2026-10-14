@@ -1,0 +1,249 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f4e8]:
+  - link "Skip to content" [ref=f4e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f4e10]:
+    - generic [ref=f4e11]: RoeHub
+    - navigation "Language" [ref=f4e12]:
+      - link "Русский" [ref=f4e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests
+      - link "English" [ref=f4e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests
+  - complementary [ref=f4e15]:
+    - navigation "Navigation" [ref=f4e16]:
+      - link "Overview" [ref=f4e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f4e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f4e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f4e29]:
+        - text: Data
+        - generic [ref=f4e34]: Unavailable
+      - link "Settings" [ref=f4e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f4e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f4e43]:
+    - generic [ref=f4e44]:
+      - heading "Backtests" [level=1] [ref=f4e45]
+      - generic [ref=f4e47]:
+        - region [ref=f4e48]:
+          - generic [ref=f4e49]:
+            - heading "Jobs" [level=2] [ref=f4e50]
+            - generic "Jobs on this page" [ref=f4e51]: "3"
+            - link "New backtest" [ref=f4e52] [cursor=pointer]:
+              - /url: /backtests/new
+          - tablist "Jobs" [ref=f4e65]:
+            - tab "New backtest" [selected] [ref=f4e66] [cursor=pointer]
+            - tab "History" [ref=f4e67] [cursor=pointer]
+          - tabpanel "New backtest" [ref=f4e122]:
+            - region "New backtest" [ref=f4e123]:
+              - paragraph [ref=f4e125]:
+                - text: ACTUSDT · 15m
+                - generic [ref=f4e126]: Oct 11, 2026 — Oct 12, 2026
+                - generic [ref=f4e127]: Not checked yet
+              - generic [ref=f4e130]:
+                - region [ref=f4e131]:
+                  - heading "Calculation console" [level=2] [ref=f4e133]
+                  - generic [ref=f4e134]:
+                    - alert [active] [ref=f4e250]:
+                      - heading "Correct the configuration" [level=3] [ref=f4e251]
+                      - list [ref=f4e252]:
+                        - listitem [ref=f4e253]:
+                          - 'link "time_range.end: End exceeds the published artifact date bound." [ref=f4e254] [cursor=pointer]':
+                            - /url: "#field-time_range.end"
+                    - group "Calculation console" [ref=f4e135]:
+                      - generic [ref=f4e138]:
+                        - generic [ref=f4e139] [cursor=pointer]: Job label (optional)
+                        - textbox "Job label (optional)" [ref=f4e140]:
+                          - /placeholder: Name
+                          - text: S10 PG-only retained history proof
+                      - region [ref=f4e141]:
+                        - heading "Market" [level=3] [ref=f4e142]
+                        - generic [ref=f4e144]:
+                          - generic [ref=f4e145]:
+                            - generic [ref=f4e146] [cursor=pointer]: Exchange
+                            - combobox "Exchange" [ref=f4e147]:
+                              - option "Binance" [selected]
+                              - option "Bybit"
+                          - generic [ref=f4e148]:
+                            - generic [ref=f4e149] [cursor=pointer]: Market type
+                            - combobox "Market type" [ref=f4e150]:
+                              - option "Spot" [selected]
+                              - option "Futures"
+                          - generic [ref=f4e151]:
+                            - generic [ref=f4e152] [cursor=pointer]: Symbol
+                            - combobox "Symbol" [ref=f4e153]:
+                              - option "0GUSDT"
+                              - option "AAPLBUSDT"
+                              - option "AAVEUSDT"
+                              - option "ACTUSDT" [selected]
+                          - generic [ref=f4e154]:
+                            - generic [ref=f4e155] [cursor=pointer]: Timeframe
+                            - combobox "Timeframe" [ref=f4e156]:
+                              - option "15m" [selected]
+                              - option "30m"
+                              - option "1h"
+                              - option "2h"
+                              - option "4h"
+                              - option "6h"
+                              - option "8h"
+                              - option "1d"
+                              - option "2d"
+                              - option "3d"
+                          - generic [ref=f4e157]:
+                            - generic [ref=f4e158] [cursor=pointer]: Start date
+                            - textbox "Start date" [ref=f4e159]: 2026-10-11
+                          - generic [ref=f4e160]:
+                            - generic [ref=f4e161] [cursor=pointer]: End date
+                            - textbox "End date" [invalid] [ref=f4e162]: 2026-10-12
+                            - generic [ref=f4e255]: End exceeds the published artifact date bound.
+                      - region [ref=f4e163]:
+                        - heading "Signal" [level=3] [ref=f4e164]
+                        - generic [ref=f4e165]:
+                          - region "Indicator 1" [ref=f4e166]:
+                            - generic [ref=f4e167]:
+                              - generic [ref=f4e168]: "1"
+                              - button "Move up" [disabled] [ref=f4e169]
+                              - button "Move down" [disabled] [ref=f4e172]
+                              - button "Remove indicator" [ref=f4e175] [cursor=pointer]
+                            - generic [ref=f4e179]:
+                              - generic [ref=f4e180]:
+                                - generic [ref=f4e181] [cursor=pointer]: Indicator
+                                - combobox "Indicator" [ref=f4e182]:
+                                  - option "ma.dema"
+                                  - option "ma.ema" [selected]
+                                  - option "ma.hma"
+                                  - option "ma.lwma"
+                                  - option "ma.rma"
+                                  - option "ma.sma"
+                                  - option "ma.tema"
+                                  - option "ma.vwma"
+                                  - option "ma.wma"
+                                  - option "ma.zlema"
+                                  - option "momentum.cci"
+                                  - option "momentum.fisher"
+                                  - option "momentum.roc"
+                                  - option "momentum.rsi"
+                                  - 'option "momentum.stoch — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "momentum.trix"
+                                  - option "momentum.williams_r"
+                                  - 'option "structure.candle_stats — Unavailable: this API requires a window axis." [disabled]'
+                                  - 'option "structure.candle_stats_atr_norm — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.distance_to_ma_norm"
+                                  - option "structure.percent_rank"
+                                  - 'option "structure.pivots — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.zscore"
+                                  - option "trend.adx"
+                                  - option "trend.aroon"
+                                  - option "trend.donchian"
+                                  - option "trend.linreg_slope"
+                                  - 'option "trend.psar — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "trend.vortex"
+                                  - option "volatility.atr"
+                                  - option "volatility.hv"
+                                  - option "volatility.stddev"
+                                  - 'option "volatility.tr — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volatility.variance"
+                                  - 'option "volume.ad_line — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.cmf"
+                                  - option "volume.mfi"
+                                  - 'option "volume.obv — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.volume_sma"
+                                  - option "volume.vwap"
+                              - generic [ref=f4e183]:
+                                - generic [ref=f4e184]: Price sources
+                                - group [ref=f4e185]:
+                                  - generic "Price sources close" [ref=f4e186] [cursor=pointer]:
+                                    - generic [ref=f4e187]: close
+                                    - text: ⌄
+                              - generic [ref=f4e188]:
+                                - generic [ref=f4e189] [cursor=pointer]: Window start
+                                - spinbutton "Window start" [ref=f4e190]: "10"
+                              - generic [ref=f4e191]:
+                                - generic [ref=f4e192] [cursor=pointer]: Window stop
+                                - spinbutton "Window stop" [ref=f4e193]: "10"
+                              - generic [ref=f4e194]:
+                                - generic [ref=f4e195] [cursor=pointer]: Window step
+                                - spinbutton "Window step" [ref=f4e196]: "1"
+                            - group [ref=f4e197]:
+                              - generic "Materialized window values" [ref=f4e198] [cursor=pointer]
+                          - button "Add indicator" [ref=f4e199] [cursor=pointer]
+                      - region [ref=f4e201]:
+                        - heading "Trade" [level=3] [ref=f4e202]
+                        - generic [ref=f4e204]:
+                          - generic [ref=f4e205]:
+                            - generic [ref=f4e206] [cursor=pointer]: Direction
+                            - combobox "Direction" [ref=f4e207]:
+                              - option "Long only" [selected]
+                              - option "Short"
+                              - option "Long/short reversal"
+                          - generic [ref=f4e208]:
+                            - generic [ref=f4e209] [cursor=pointer]: Initial cash (quote)
+                            - spinbutton "Initial cash (quote)" [ref=f4e210]: "10000"
+                          - generic [ref=f4e211]:
+                            - generic [ref=f4e212] [cursor=pointer]: Fee (%)
+                            - spinbutton "Fee (%)" [ref=f4e213]: "0.075"
+                          - generic [ref=f4e214]:
+                            - generic [ref=f4e215] [cursor=pointer]: Slippage (%)
+                            - spinbutton "Slippage (%)" [ref=f4e216]: "0.01"
+                          - generic [ref=f4e217]:
+                            - generic [ref=f4e218] [cursor=pointer]: Position sizing
+                            - combobox "Position sizing" [ref=f4e219]:
+                              - option "All available capital" [selected]
+                              - option "Fixed quote amount"
+                              - option "Fixed equity share"
+                              - option "Equity share with minimum amount"
+                              - option "Equity share with maximum amount"
+                      - region [ref=f4e220]:
+                        - heading "Risk" [level=3] [ref=f4e221]
+                        - generic [ref=f4e223] [cursor=pointer]:
+                          - switch "Take profit / Stop loss" [ref=f4e224]
+                          - text: Take profit / Stop loss
+                      - region [ref=f4e225]:
+                        - heading "Ranking" [level=3] [ref=f4e226]
+                        - generic [ref=f4e227]:
+                          - generic [ref=f4e228]:
+                            - generic [ref=f4e229]:
+                              - generic [ref=f4e230] [cursor=pointer]: Primary metric
+                              - combobox "Primary metric" [ref=f4e231]:
+                                - option "Total return (%)" [selected]
+                                - option "Return after funding (%)"
+                                - option "Maximum drawdown (%)"
+                                - option "Return / maximum drawdown"
+                                - option "Profit factor"
+                                - option "Trade Sharpe ratio"
+                                - option "Winning trades (%)"
+                            - generic [ref=f4e232]:
+                              - generic [ref=f4e233] [cursor=pointer]: Ranking direction
+                              - combobox "Ranking direction" [ref=f4e234]:
+                                - option "Ascending"
+                                - option "Descending" [selected]
+                            - generic [ref=f4e235]:
+                              - generic [ref=f4e236] [cursor=pointer]: Top N
+                              - spinbutton "Top N" [ref=f4e237]: "10"
+                          - group [ref=f4e238]:
+                            - generic "Server policies" [ref=f4e239] [cursor=pointer]
+                    - generic [ref=f4e240]:
+                      - status [ref=f4e241]: Not checked yet
+                      - button "Reset form" [ref=f4e242] [cursor=pointer]
+                      - button "Check configuration" [ref=f4e243] [cursor=pointer]
+                      - button "Submit backtest" [disabled] [ref=f4e244]
+                - group [ref=f4e245]:
+                  - generic "Preflight review Data coverage, cost and effective settings" [ref=f4e246] [cursor=pointer]:
+                    - text: Preflight review
+                    - generic [ref=f4e247]: Data coverage, cost and effective settings
+        - region "Select a backtest" [ref=f4e115]:
+          - generic [ref=f4e116]:
+            - heading "Select a backtest" [level=2] [ref=f4e117]
+            - paragraph [ref=f4e118]: Open a job to read its identity, state and research inputs.
+            - paragraph [ref=f4e119]: Open a job to observe execution. Result views and exports are not available yet.
+  - contentinfo [ref=f4e120]:
+    - text: Artifact-backed backtests
+    - generic [ref=f4e121]: Library snapshots · live selected job
+```

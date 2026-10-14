@@ -24,7 +24,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 OperationalState = Literal["ready", "degraded", "stopped", "unknown"]
 ProbeFunction = Callable[["OperationalProbe"], tuple[OperationalState, str]]
-LogSink = Callable[["OperationalStatus"], bool]
 
 
 class OperationalProbe(BaseModel):
@@ -32,7 +31,7 @@ class OperationalProbe(BaseModel):
 
     service_id: str = Field(pattern=r"^[a-z][a-z0-9-]{1,63}$")
     capability: str = Field(pattern=r"^[a-z][a-z0-9._-]{1,63}$")
-    kind: Literal["http_json", "http_reachability", "tcp_reachability", "openbao"]
+    kind: Literal["http_json", "http_reachability", "tcp_reachability", "openbao", "postgresql"]
     target: str = Field(min_length=3, max_length=512)
     runbook_id: str = Field(pattern=r"^[a-z][a-z0-9.-]{1,127}$")
     action_ref: str = Field(pattern=r"^[a-z][a-z0-9_-]{1,127}$")
@@ -89,7 +88,6 @@ class OperationalHealthService:
         *,
         manifest: OperationalManifest,
         probe: ProbeFunction | None = None,
-        log_sink: LogSink | None = None,
         interval_seconds: float = 5.0,
         freshness_sla_seconds: float | None = None,
     ) -> None:
@@ -100,7 +98,6 @@ class OperationalHealthService:
             raise ValueError("operational service ids must be unique")
         self._manifest = manifest
         self._probe = probe or probe_operational_target
-        self._log_sink = log_sink or (lambda _status: True)
         self._interval_seconds = interval_seconds
         self._freshness_sla_seconds = (
             freshness_sla_seconds
@@ -114,7 +111,6 @@ class OperationalHealthService:
         self._thread: threading.Thread | None = None
         self._statuses: dict[str, OperationalStatus] = {}
         self._events: deque[OperationalStatus] = deque(maxlen=200)
-        self._log_push_success = True
         self._last_refresh_completed_at: datetime | None = None
         self._last_refresh_monotonic: float | None = None
         self._worker_failed = False
@@ -175,14 +171,6 @@ class OperationalHealthService:
             self._last_refresh_completed_at = observed_at
             self._last_refresh_monotonic = time.monotonic()
             self._worker_failed = False
-        if changed:
-            batch_success = True
-            for status in changed:
-                try:
-                    batch_success = self._log_sink(status) and batch_success
-                except Exception:  # pragma: no cover - defensive sink isolation
-                    batch_success = False
-            self._log_push_success = batch_success
         return self.snapshot()
 
     def recent_events(self) -> tuple[OperationalStatus, ...]:
@@ -257,10 +245,6 @@ class OperationalHealthService:
             lines.append(f"roehub_operational_service_state{{{rendered}}} 1")
         lines.extend(
             [
-                "# HELP roehub_operational_log_push_success "
-                "Whether the last bounded log push succeeded.",
-                "# TYPE roehub_operational_log_push_success gauge",
-                f"roehub_operational_log_push_success {1 if self._log_push_success else 0}",
                 "# HELP roehub_operational_snapshot_fresh Whether the latest refresh is fresh.",
                 "# TYPE roehub_operational_snapshot_fresh gauge",
                 f"roehub_operational_snapshot_fresh {1 if self.readiness()[0] else 0}",
@@ -271,7 +255,9 @@ class OperationalHealthService:
                 "",
             ]
         )
-        return "\n".join(lines)
+        from apps.monitoring.postgres_observer import metrics_text
+
+        return "\n".join(lines) + metrics_text()
 
     def _run(self) -> None:
         while not self._stop.wait(self._interval_seconds):
@@ -295,6 +281,14 @@ class OperationalHealthService:
 
 def probe_operational_target(spec: OperationalProbe) -> tuple[OperationalState, str]:
     try:
+        if spec.kind == "postgresql":
+            from apps.monitoring.postgres_observer import sample
+
+            return (
+                ("ready", "probe.postgresql_ready")
+                if sample()
+                else ("degraded", "probe.postgresql_unavailable")
+            )
         if spec.kind == "tcp_reachability":
             host, port_text = spec.target.rsplit(":", 1)
             with socket.create_connection((host, int(port_text)), timeout=spec.timeout_seconds):
@@ -347,48 +341,6 @@ def _json_health_state(body: bytes) -> tuple[OperationalState, str]:
     if ready is False:
         return "degraded", "probe.domain_degraded"
     return "unknown", "probe.domain_unknown"
-
-
-def build_loki_log_sink(*, url: str, profile: str) -> LogSink:
-    endpoint = url.rstrip("/") + "/loki/api/v1/push"
-
-    def push(status: OperationalStatus) -> bool:
-        line = json.dumps(
-            {
-                "action_ref": status.action_ref,
-                "detail_code": status.detail_code,
-                "event": "operational_state_transition",
-                "service": status.service_id,
-                "state": status.state,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        payload = {
-            "streams": [
-                {
-                    "stream": {
-                        "profile": profile,
-                        "service": status.service_id,
-                        "source": "roehub-operational-health",
-                    },
-                    "values": [[str(time.time_ns()), line]],
-                }
-            ]
-        }
-        request = urllib.request.Request(
-            endpoint,
-            data=json.dumps(payload, separators=(",", ":")).encode(),
-            method="POST",
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=2.0) as response:  # noqa: S310
-                return 200 <= response.status < 300
-        except (OSError, urllib.error.URLError):
-            return False
-
-    return push
 
 
 def create_operational_health_app(*, service: OperationalHealthService) -> FastAPI:
@@ -452,19 +404,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=9300)
     parser.add_argument("--interval-seconds", type=float, default=5.0)
     parser.add_argument("--freshness-sla-seconds", type=float, default=15.0)
-    parser.add_argument("--loki-url", default="")
     args = parser.parse_args(argv)
     manifest = load_operational_manifest(args.manifest)
-    sink = (
-        build_loki_log_sink(url=args.loki_url, profile=manifest.profile)
-        if args.loki_url
-        else None
-    )
     service = OperationalHealthService(
         manifest=manifest,
         interval_seconds=args.interval_seconds,
         freshness_sla_seconds=args.freshness_sla_seconds,
-        log_sink=sink,
     )
     uvicorn.run(
         create_operational_health_app(service=service),

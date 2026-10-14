@@ -1,0 +1,65 @@
+{
+  "status": "candidate-only; active prompt/ledger untouched by S07 executor",
+  "original_entry_inputs": [
+    {
+      "path": "../../../../tests/real_infra/market_data",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../tests/real_infra/backtest",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../apps/migrations/verify_storage_runtime.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../tools/release/verify_greenfield_lifecycle.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../apps/platform-web/package.json",
+      "producer_stage": null
+    },
+    {
+      "path": "implementation-plan.md",
+      "producer_stage": null
+    },
+    {
+      "path": "reports/S07.md",
+      "producer_stage": "S07"
+    }
+  ],
+  "proposed_entry_inputs": [
+    {
+      "path": "../../../../tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../tests/real_infra/backtest/test_artifact_dispatch.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../apps/migrations/verify_storage_runtime.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../tools/release/verify_greenfield_lifecycle.py",
+      "producer_stage": null
+    },
+    {
+      "path": "../../../../apps/platform-web/package.json",
+      "producer_stage": null
+    },
+    {
+      "path": "implementation-plan.md",
+      "producer_stage": null
+    },
+    {
+      "path": "reports/S07.md",
+      "producer_stage": "S07"
+    }
+  ],
+  "preserved": "Full tests context routes, expected_touches, acceptance criteria, current claim/history, S01-S06 contracts and receipt bindings",
+  "updater_capability": "No amendment action. ledger_update.py stays byte-identical; orchestration owner is preparing lock/CAS/fsync metadata migration through existing helpers."
+}

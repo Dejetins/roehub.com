@@ -7,34 +7,15 @@ from apps.api.wiring.modules.identity import build_identity_api_module, build_id
 from trading.contexts.identity.adapters.outbound.security.current_user import (
     RoehubSessionCurrentUser,
 )
-from trading.platform.secrets import OpenBaoSecretResolver, SecretValue
 
 _DEV_ONLY_EXCHANGE_KEYS_KEK_B64 = "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE="
 _PROD_TEST_EXCHANGE_KEYS_KEK_B64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 
 
-def test_oidc_partial_configuration_requires_provider_id() -> None:
-    environ = _oidc_env()
-    del environ["IDENTITY_OIDC_PROVIDER_ID"]
-
-    with pytest.raises(ValueError, match="IDENTITY_OIDC_PROVIDER_ID"):
-        build_identity_router(environ=environ)
 
 
-def test_oidc_partial_configuration_requires_client_credential() -> None:
-    environ = _oidc_env()
-    del environ["IDENTITY_OIDC_CLIENT_SECRET_REF"]
-
-    with pytest.raises(ValueError, match="IDENTITY_OIDC_CLIENT_SECRET_REF"):
-        build_identity_router(environ=environ)
 
 
-def test_oidc_timeout_budgets_can_tighten_but_not_expand() -> None:
-    environ = _oidc_env()
-    environ["IDENTITY_OIDC_OVERALL_TIMEOUT_SECONDS"] = "15.01"
-
-    with pytest.raises(ValueError, match="overall_timeout_seconds"):
-        build_identity_router(environ=environ)
 
 
 def test_identity_wiring_fail_fast_override_requires_exchange_keys_kek_b64() -> None:
@@ -52,37 +33,6 @@ def test_identity_wiring_fail_fast_override_requires_exchange_keys_kek_b64() -> 
         build_identity_router(environ=environ)
 
 
-def test_identity_wiring_exposes_oidc_and_local_fallback_together(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    environ = _oidc_env()
-    environ.update(
-        {
-            "IDENTITY_FAIL_FAST": "true",
-            "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
-            "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
-            "IDENTITY_EXCHANGE_KEYS_KEK_B64": _DEV_ONLY_EXCHANGE_KEYS_KEK_B64,
-            "IDENTITY_LOCAL_RP_ID": "localhost",
-            "IDENTITY_LOCAL_RP_NAME": "Roehub",
-            "IDENTITY_LOCAL_ORIGIN": "http://localhost:8000",
-        }
-    )
-    monkeypatch.setattr(
-        OpenBaoSecretResolver,
-        "resolve",
-        lambda *_args, **_kwargs: SecretValue(_text="fixture-value", version=1),
-    )
-
-    paths = {
-        route.path
-        for route in build_identity_router(environ=environ).routes
-        if isinstance(route, APIRoute)
-    }
-
-    assert "/auth/oidc/login" in paths
-    assert "/auth/oidc/callback" in paths
-    assert "/auth/oidc/link" in paths
-    assert "/auth/local/passkey/options" in paths
 
 
 def test_identity_wiring_fail_fast_in_prod_requires_session_idle_ttl() -> None:
@@ -158,16 +108,6 @@ def test_identity_wiring_dev_defaults_expose_only_local_auth() -> None:
     assert "/auth/current-user" in paths
 
 
-def test_identity_wiring_prod_local_auth_does_not_require_oidc() -> None:
-    paths = {
-        route.path
-        for route in build_identity_router(environ=_prod_env()).routes
-        if isinstance(route, APIRoute)
-    }
-
-    assert "/auth/local/status" in paths
-    assert "/auth/oidc/login" not in paths
-    assert "/auth/current-user" in paths
 
 
 def test_identity_wiring_prod_allows_explicit_http_localhost() -> None:
@@ -200,20 +140,6 @@ def test_identity_wiring_uses_roehub_session_current_user_resolver() -> None:
     assert module.current_user_dependency._cookie_name == "roehub_session_id"
 
 
-def _oidc_env() -> dict[str, str]:
-    return {
-        "ROEHUB_ENV": "dev",
-        "IDENTITY_OIDC_PROVIDER_ID": "fixture",
-        "IDENTITY_OIDC_DISPLAY_NAME": "Fixture Identity",
-        "IDENTITY_OIDC_ISSUER": "http://localhost:9010",
-        "IDENTITY_OIDC_CLIENT_ID": "roehub-browser",
-        "IDENTITY_OIDC_CLIENT_SECRET_REF": ("openbao://kv/roehub/oidc/fixture#client_secret"),
-        "IDENTITY_OIDC_REDIRECT_URI": "http://localhost:8000/api/auth/oidc/callback",
-        "IDENTITY_OIDC_ALLOW_INSECURE_HTTP": "true",
-        "OPENBAO_ADDR": "http://127.0.0.1:8200",
-        "ROEHUB_IDENTITY_OPENBAO_TOKEN_FILE": "/tmp/roehub-test-openbao-identity",
-        "ROEHUB_OPENBAO_ROOT": "kv/roehub",
-    }
 
 
 def _prod_env() -> dict[str, str]:

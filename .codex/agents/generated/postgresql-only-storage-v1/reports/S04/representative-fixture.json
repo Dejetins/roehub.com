@@ -1,0 +1,18 @@
+{
+  "rows": 3195417,
+  "instruments": 50,
+  "first": "2024-01-01 00:00:00+00:00",
+  "last": "2025-12-31 23:59:00+00:00",
+  "reference_rows": 10002,
+  "settings": {
+    "autovacuum": "on",
+    "fsync": "on",
+    "maintenance_work_mem": "65536",
+    "max_connections": "48",
+    "server_version": "16.15 (Debian 16.15-1.pgdg13+2)",
+    "shared_buffers": "32768",
+    "synchronous_commit": "on",
+    "work_mem": "4096"
+  },
+  "seed_sha256": "2e051a2067878319d6f1225a6c36527920d33a57e0672e55cd8fce6d2a4299c7"
+}

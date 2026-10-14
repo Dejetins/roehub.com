@@ -274,9 +274,9 @@ def _app(
     )
 
 
-def test_ws_worker_publishes_closed_candle_to_live_feed() -> None:
+def test_ws_worker_defers_publication_until_durable_write() -> None:
     """
-    Ensure worker calls live candle publisher for each WS closed candle.
+    Enqueue alone must not publish an uncommitted closed candle.
     """
     insert_buffer = _InsertBufferStub()
     rest_queue = _RestFillQueueStub()
@@ -292,7 +292,7 @@ def test_ws_worker_publishes_closed_candle_to_live_feed() -> None:
     asyncio.run(app._on_closed_candle(_row()))
 
     assert len(insert_buffer.rows) == 1
-    assert len(publisher.calls) == 1
+    assert len(publisher.calls) == 0
     assert len(rest_queue.tasks) == 0
 
 
@@ -315,7 +315,7 @@ def test_ws_worker_keeps_processing_when_live_publish_fails() -> None:
     asyncio.run(app._on_closed_candle(_row()))
 
     assert len(insert_buffer.rows) == 1
-    assert len(publisher.calls) == 1
+    assert len(publisher.calls) == 0
     assert len(rest_queue.tasks) == 1
     assert rest_queue.tasks[0] is gap_task
 

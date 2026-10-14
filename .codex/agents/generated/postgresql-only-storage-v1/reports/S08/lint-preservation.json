@@ -1,0 +1,203 @@
+[
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/ledger_update.py",
+    "entry_sha256": "dbae4cb40c4b69572bd275e2350fa1af79489b1d7a7df4fe3654d40429130550",
+    "current_sha256": "dbae4cb40c4b69572bd275e2350fa1af79489b1d7a7df4fe3654d40429130550",
+    "codes": [
+      "E501"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/audit_sources.py",
+    "entry_sha256": "b6759ca5ad26b9e21908ebc5c84605a70fa0f2ce0cc7cfb526d3cd9ddfce58ef",
+    "current_sha256": "b6759ca5ad26b9e21908ebc5c84605a70fa0f2ce0cc7cfb526d3cd9ddfce58ef",
+    "codes": [
+      "E501",
+      "E701",
+      "E702",
+      "E741",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/verify_s01.py",
+    "entry_sha256": "1a6382be9f4e961ef3cb3b8d4d7f3bc2f8bb96ee2bb43dad8110c3b4af3e5e83",
+    "current_sha256": "1a6382be9f4e961ef3cb3b8d4d7f3bc2f8bb96ee2bb43dad8110c3b4af3e5e83",
+    "codes": [
+      "E501",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query_probe.py",
+    "entry_sha256": "2e051a2067878319d6f1225a6c36527920d33a57e0672e55cd8fce6d2a4299c7",
+    "current_sha256": "2e051a2067878319d6f1225a6c36527920d33a57e0672e55cd8fce6d2a4299c7",
+    "codes": [
+      "E402",
+      "E501",
+      "E701",
+      "E702",
+      "E741",
+      "F401",
+      "I001"
+    ],
+    "unused_bindings": [
+      {
+        "line": 5,
+        "message": "`resource` imported but unused"
+      }
+    ]
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_async_cancellation.py",
+    "entry_sha256": "70da3e5812d7a11d90234954597c77b9b5128fd5b282148cd5a70794ebd97102",
+    "current_sha256": "70da3e5812d7a11d90234954597c77b9b5128fd5b282148cd5a70794ebd97102",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_budget.py",
+    "entry_sha256": "cef9b1f73ef89c28f37bdb9aa5a531c97232a5d4bca1c8ce64e7fdbadc1919e2",
+    "current_sha256": "cef9b1f73ef89c28f37bdb9aa5a531c97232a5d4bca1c8ce64e7fdbadc1919e2",
+    "codes": [
+      "E402",
+      "E501",
+      "E701",
+      "E702",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_maintenance.py",
+    "entry_sha256": "723edbbda58eda7393ef817057c2caef806abeb0de9b73b8204b7f891fbc59a3",
+    "current_sha256": "723edbbda58eda7393ef817057c2caef806abeb0de9b73b8204b7f891fbc59a3",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_native.py",
+    "entry_sha256": "03f87bd9f08d1d77b4597fb6d00dc40f21c1b6a4aa02da338613ccb7e4ba8e29",
+    "current_sha256": "03f87bd9f08d1d77b4597fb6d00dc40f21c1b6a4aa02da338613ccb7e4ba8e29",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "F401",
+      "I001"
+    ],
+    "unused_bindings": [
+      {
+        "line": 2,
+        "message": "`uuid` imported but unused"
+      }
+    ]
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_native_cli.py",
+    "entry_sha256": "e33ee216296cbc9065366fa0a931fa736ad3dcc50e4bb1a275a59975661c22ff",
+    "current_sha256": "e33ee216296cbc9065366fa0a931fa736ad3dcc50e4bb1a275a59975661c22ff",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_operator_recovery.py",
+    "entry_sha256": "c703b0003d89b7a460b6c6df08c2deaae3a4462900a615f612fb37c7aef6412b",
+    "current_sha256": "c703b0003d89b7a460b6c6df08c2deaae3a4462900a615f612fb37c7aef6412b",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "F401",
+      "F841",
+      "I001"
+    ],
+    "unused_bindings": [
+      {
+        "line": 2,
+        "message": "`os` imported but unused"
+      },
+      {
+        "line": 12,
+        "message": "Local variable `sock` is assigned to but never used"
+      }
+    ]
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_run.py",
+    "entry_sha256": "00a120271fd4ef36ffd4f0cc976ee1989661c36c9df474b6bd7f66fdf1b62919",
+    "current_sha256": "00a120271fd4ef36ffd4f0cc976ee1989661c36c9df474b6bd7f66fdf1b62919",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_transport.py",
+    "entry_sha256": "e6d1c2706e9441a4a9c7c318a6d4838d50e5eddd6530f7e3837440def4b48f77",
+    "current_sha256": "e6d1c2706e9441a4a9c7c318a6d4838d50e5eddd6530f7e3837440def4b48f77",
+    "codes": [
+      "E501",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_transport_negative.py",
+    "entry_sha256": "fe84e7db8f3bc0c200889bbce2cc738d87843b1f1900dcf09d4e6e1cfe2e57a5",
+    "current_sha256": "fe84e7db8f3bc0c200889bbce2cc738d87843b1f1900dcf09d4e6e1cfe2e57a5",
+    "codes": [
+      "E401",
+      "E501",
+      "E701",
+      "E702",
+      "I001"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/repair_pending_entry_inputs.py",
+    "entry_sha256": "1e97ed2caac8c2d82284abf6899d2a3a767bf1f0810d6f4376efc8681a6bdc8e",
+    "current_sha256": "1e97ed2caac8c2d82284abf6899d2a3a767bf1f0810d6f4376efc8681a6bdc8e",
+    "codes": [
+      "E501"
+    ],
+    "unused_bindings": []
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/test_ledger_update.py",
+    "entry_sha256": "b6f469f65b2b96af8f53cd37b95cc0b6c00d741f274740da6afc265c7157caf1",
+    "current_sha256": "b6f469f65b2b96af8f53cd37b95cc0b6c00d741f274740da6afc265c7157caf1",
+    "codes": [
+      "E501",
+      "I001"
+    ],
+    "unused_bindings": []
+  }
+]

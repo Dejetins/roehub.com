@@ -8,20 +8,12 @@ from uuid import UUID
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
 RlLiveTickerMode = Literal["monitor_only", "paper", "testnet", "live"]
-RlLiveEntitlementSource = Literal["paid_level", "override", "fail_closed"]
+RlLiveEntitlementSource = Literal["self_host", "override", "fail_closed"]
 
 RL_LIVE_TICKER_READY = "rl_live_ticker_entitlement_ready"
 RL_LIVE_TICKER_NOT_COUNTED = "rl_live_ticker_not_counted_for_mode"
-RL_LIVE_TICKER_BASE_FAIL_CLOSED = "rl_live_ticker_paid_level_base_fail_closed"
-RL_LIVE_TICKER_UNKNOWN_FAIL_CLOSED = "rl_live_ticker_paid_level_unknown_fail_closed"
 RL_LIVE_TICKER_QUOTA_EXCEEDED = "rl_live_ticker_quota_exceeded"
 
-_PAID_LEVEL_LIMITS = {
-    "free": ("Free", 1),
-    "pro": ("Pro", 5),
-    "ultra": ("Premium", 20),
-    "base": ("internal/base", 0),
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,36 +158,17 @@ def resolve_rl_live_ticker_limit(
             raise ValueError("override_live_slots_allowed must be >= 0")
         return RlLiveTickerLimit(
             paid_level=normalized_paid_level,
-            product_label="Enterprise",
+            product_label="Self-hosted",
             live_slots_allowed=override_live_slots_allowed,
             entitlement_source="override",
             fail_closed_reason=None,
         )
 
-    if normalized_paid_level == "base":
-        return RlLiveTickerLimit(
-            paid_level=normalized_paid_level,
-            product_label="internal/base",
-            live_slots_allowed=0,
-            entitlement_source="fail_closed",
-            fail_closed_reason=RL_LIVE_TICKER_BASE_FAIL_CLOSED,
-        )
-
-    configured = _PAID_LEVEL_LIMITS.get(normalized_paid_level)
-    if configured is None:
-        return RlLiveTickerLimit(
-            paid_level=normalized_paid_level or "unknown",
-            product_label="unknown",
-            live_slots_allowed=0,
-            entitlement_source="fail_closed",
-            fail_closed_reason=RL_LIVE_TICKER_UNKNOWN_FAIL_CLOSED,
-        )
-    product_label, live_slots_allowed = configured
     return RlLiveTickerLimit(
         paid_level=normalized_paid_level,
-        product_label=product_label,
-        live_slots_allowed=live_slots_allowed,
-        entitlement_source="paid_level",
+        product_label="Self-hosted",
+        live_slots_allowed=5,
+        entitlement_source="self_host",
         fail_closed_reason=None,
     )
 

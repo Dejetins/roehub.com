@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from contextlib import AbstractContextManager, AsyncExitStack, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,10 +12,7 @@ from uuid import UUID, uuid4
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 from psycopg.conninfo import make_conninfo
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from apps.worker.market_data_ws.wiring.io_process import MarketDataIoProcess, classify_io_error
 from apps.worker.market_data_ws.wiring.persistent_writer import PersistentRawWriterProcess
 from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresGateway
@@ -40,22 +38,23 @@ from trading.contexts.market_data.adapters.outbound.messaging.redis import (
     RedisLiveCandlePublisherHooks,
     RedisStreamsLiveCandlePublisher,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseRawKlineWriter,
-    ThreadLocalClickHouseConnectGateway,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
-    ClickHouseHistoryCoverageReader,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
     AsyncPostgresStreamRecoveryStore,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
     PostgresHistoryBoundsRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_coverage_reader import (  # noqa: E501
+    PostgresHistoryCoverageReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
     PostgresStreamRecoveryStore,
@@ -82,7 +81,6 @@ from trading.contexts.market_data.application.services.history_stream_gate impor
 )
 from trading.contexts.market_data.application.services.stored_candle_signal import (
     StoredCandleSignalWriter,
-    notify_stored_candles,
 )
 from trading.platform.time.system_clock import SystemClock
 from trading.shared_kernel.primitives import InstrumentId, MarketId
@@ -434,7 +432,7 @@ class MarketDataWsApp:
         *,
         config: MarketDataRuntimeConfig,
         instrument_reader: EnabledInstrumentReader,
-        index_reader: ClickHouseCanonicalCandleIndexReader,
+        index_reader: PostgresCanonicalCandleIndexReader,
         insert_buffer: AsyncRawInsertBuffer,
         rest_fill_queue: AsyncRestFillQueue,
         live_candle_publisher: LiveCandlePublisher,
@@ -491,6 +489,9 @@ class MarketDataWsApp:
         self._prepare_history = prepare_history
         self._publish_connections = publish_connections
         self._connections: dict[tuple[int, str], bool] = {}
+        self._connection_transitions: deque[dict[tuple[int, str], bool]] = deque()
+        self._reported_connections: dict[tuple[int, str], bool] = {}
+        self._connection_changed = asyncio.Event()
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._subscription_refresh_seconds = subscription_refresh_seconds
@@ -542,36 +543,67 @@ class MarketDataWsApp:
         if self._publish_connections is None and self._async_publish_connections is None:
             return
         while not stop_event.is_set():
+            self._connection_changed.clear()
+            transition = self._connection_transitions[0] if self._connection_transitions else None
+            snapshot = (
+                {**self._reported_connections, **transition}
+                if transition
+                else dict(self._connections)
+            )
+            published = False
             try:
                 if self._async_publish_connections is not None:
-                    publication = asyncio.create_task(
-                        self._async_publish_connections(dict(self._connections)))
+                    publication = asyncio.create_task(self._async_publish_connections(snapshot))
                 else:
                     assert self._publish_connections is not None
                     publication = asyncio.create_task(
-                        asyncio.to_thread(self._publish_connections, dict(self._connections)))
+                        asyncio.to_thread(self._publish_connections, snapshot)
+                    )
                 try:
                     await asyncio.shield(publication)
+                    published = True
+                    self._reported_connections = snapshot
+                    if transition is not None:
+                        self._connection_transitions.popleft()
                 except asyncio.CancelledError:
                     await publication  # Finish before releasing the collector session.
                     raise
             except Exception:
                 # Expired observations become unknown; never retain a false healthy state.
                 log.error("stream connection status publication failed")
+            if self._connection_transitions:
+                # Retry failed publication on the next heartbeat, never busy-loop.
+                if published:
+                    continue
+            if stop_event.is_set():
+                break
             try:
-                await asyncio.wait_for(stop_event.wait(), timeout=5)
+                await asyncio.wait_for(self._connection_changed.wait(), timeout=5)
             except TimeoutError:
                 pass
 
+    def _record_connection(self, plan: WorkerConnectionPlan, connected: bool) -> None:
+        changes = {
+            (plan.market.market_id.value, symbol): connected
+            for symbol in plan.symbols
+            if self._connections.get((plan.market.market_id.value, symbol)) != connected
+        }
+        self._connections.update(changes)
+        if changes:
+            if len(self._connection_transitions) >= 256:
+                # Fail visibly instead of silently dropping events during a PG outage.
+                self._ingestion_failure = RuntimeError("stream_event_buffer_capacity_exceeded")
+                return
+            self._connection_transitions.append(changes)
+            self._connection_changed.set()
+
     def _connection_state(self, plan: WorkerConnectionPlan, connected: int) -> None:
         self._metrics.ws_connection_state(connected)
-        for symbol in plan.symbols:
-            self._connections[(plan.market.market_id.value, symbol)] = bool(connected)
+        self._record_connection(plan, bool(connected))
 
     def _connection_error(self, plan: WorkerConnectionPlan) -> None:
         self._metrics.ws_errors_total.inc()
-        for symbol in plan.symbols:
-            self._connections[(plan.market.market_id.value, symbol)] = False
+        self._record_connection(plan, False)
 
     async def _run(self, stop_event: asyncio.Event) -> None:
         """
@@ -613,48 +645,70 @@ class MarketDataWsApp:
                 try:
                     if self._read_desired is not None:
                         assert self._prepare_history is not None
-                        requested = set(await _control_read_until_stopped(
-                            self._read_desired(), stop_event))
+                        requested = set(
+                            await _control_read_until_stopped(self._read_desired(), stop_event)
+                        )
                         removed = admitted - requested
                         admitted.intersection_update(requested)
                         if removed:
                             for instrument in removed:
-                                log.info("stream_disabled market_id=%s symbol=%s",
-                                         instrument.market_id.value, str(instrument.symbol))
+                                log.info(
+                                    "stream_disabled market_id=%s symbol=%s",
+                                    instrument.market_id.value,
+                                    str(instrument.symbol),
+                                )
                             # Apply disable before any unrelated history/storage check.
-                            kept = {self._plan_key(p): p for p in self._build_connection_plans(
-                                sorted(admitted, key=lambda i: (i.market_id.value, str(i.symbol))))}
+                            kept = {
+                                self._plan_key(p): p
+                                for p in self._build_connection_plans(
+                                    sorted(
+                                        admitted, key=lambda i: (i.market_id.value, str(i.symbol))
+                                    )
+                                )
+                            }
                             await self._replace_subscription_tasks(
-                                ws_tasks=ws_tasks, plans=kept, stop_event=stop_event)
-                            ws_tasks = {key: asyncio.create_task(self._run_plan(plan, stop_event))
-                                        for key, plan in kept.items()}
+                                ws_tasks=ws_tasks, plans=kept, stop_event=stop_event
+                            )
+                            ws_tasks = {
+                                key: asyncio.create_task(self._run_plan(plan, stop_event))
+                                for key, plan in kept.items()
+                            }
                         pending = requested - admitted
                         ready, repairs = (), ()
                         if pending and asyncio.get_running_loop().time() >= next_preparation_at:
                             ready, repairs = await _control_read_until_stopped(
-                                self._prepare_history(tuple(pending)), stop_event)
+                                self._prepare_history(tuple(pending)), stop_event
+                            )
                             # Intent may change while storage checks are in flight.
-                            requested = set(await _control_read_until_stopped(
-                                self._read_desired(), stop_event))
+                            requested = set(
+                                await _control_read_until_stopped(self._read_desired(), stop_event)
+                            )
                             admitted.intersection_update(requested)
                             ready = tuple(i for i in ready if i in requested)
                             repairs = tuple(r for r in repairs if r.instrument_id in requested)
                             readiness_failures = 0
                             next_preparation_at = 0.0
                         for instrument in ready:
-                            log.info("stream_history_ready market_id=%s symbol=%s",
-                                     instrument.market_id.value, str(instrument.symbol))
+                            log.info(
+                                "stream_history_ready market_id=%s symbol=%s",
+                                instrument.market_id.value,
+                                str(instrument.symbol),
+                            )
                         admitted.update(ready)
-                        instruments = tuple(sorted(admitted, key=lambda i: (
-                            i.market_id.value, str(i.symbol))))
+                        instruments = tuple(
+                            sorted(admitted, key=lambda i: (i.market_id.value, str(i.symbol)))
+                        )
                         for repair in repairs:
                             if await self._rest_fill_queue.enqueue(repair):
-                                log.info("stream_preparing market_id=%s symbol=%s",
-                                         repair.instrument_id.market_id.value,
-                                         str(repair.instrument_id.symbol))
+                                log.info(
+                                    "stream_preparing market_id=%s symbol=%s",
+                                    repair.instrument_id.market_id.value,
+                                    str(repair.instrument_id.symbol),
+                                )
                     else:
                         instruments = await asyncio.to_thread(
-                            self._instrument_reader.list_enabled_tradable)
+                            self._instrument_reader.list_enabled_tradable
+                        )
                 except asyncio.CancelledError:
                     if stop_event.is_set():
                         break
@@ -670,7 +724,8 @@ class MarketDataWsApp:
                     try:
                         await asyncio.wait_for(
                             stop_event.wait(),
-                            timeout=min(delay, self._subscription_refresh_seconds))
+                            timeout=min(delay, self._subscription_refresh_seconds),
+                        )
                     except TimeoutError:
                         pass
                     continue
@@ -873,7 +928,7 @@ class MarketDataWsApp:
 
         Side effects:
         - Enqueues row into insert buffer.
-        - Attempts best-effort publish into live Redis feed.
+        - Live Redis publication belongs to the committed writer callback.
         - Schedules gap-based rest fill task when minute sequence has gaps.
         """
         try:
@@ -890,14 +945,6 @@ class MarketDataWsApp:
             if classify_io_error(exc) is None:
                 self._ingestion_failure = exc
             raise
-
-        try:
-            self._live_candle_publisher.publish_1m_closed(row)
-        except Exception:  # noqa: BLE001
-            log.exception(
-                "live candle publish raised unexpectedly and will be ignored for instrument_key=%s",
-                row.meta.instrument_key,
-            )
 
         task = self._gap_tracker.observe(row)
         if task is not None:
@@ -948,31 +995,27 @@ def build_market_data_ws_app(
 
     Parameters:
     - config_path: path to `market_data.yaml`.
-    - environ: environment mapping with ClickHouse settings.
+    - environ: environment mapping with PostgreSQL settings.
     - metrics_port: Prometheus HTTP port.
 
     Returns:
     - Ready-to-run worker app instance.
 
     Assumptions/Invariants:
-    - ClickHouse credentials are available in environment mapping.
+    - PostgreSQL credentials are available in environment mapping.
 
     Errors/Exceptions:
     - Propagates config parsing and infrastructure wiring errors.
 
     Side effects:
-    - Creates ClickHouse client and Prometheus metric objects.
+    - Creates PostgreSQL client and Prometheus metric objects.
     """
     config = load_market_data_runtime_config(Path(config_path))
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
-    gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
+    gateway = market_gateway(environ, workload="stream")
 
-    raw_writer = ClickHouseRawKlineWriter(gateway=gateway, database=clickhouse_settings.database)
-    index_reader = ClickHouseCanonicalCandleIndexReader(
+    raw_writer = PostgresRawKlineWriter(gateway=gateway)
+    index_reader = PostgresCanonicalCandleIndexReader(
         gateway=gateway,
-        database=clickhouse_settings.database,
     )
     recovery_store = PostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
     async_recovery = AsyncPostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
@@ -984,9 +1027,7 @@ def build_market_data_ws_app(
             origins=PostgresHistoryBoundsRepository(
                 gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
             ),
-            coverage=ClickHouseHistoryCoverageReader(
-                gateway=gateway, database=clickhouse_settings.database
-            ),
+            coverage=PostgresHistoryCoverageReader(gateway=gateway),
         ),
     )
     metrics = MarketDataWsMetrics()
@@ -1039,16 +1080,23 @@ def build_market_data_ws_app(
     live_writer = PersistentRawWriterProcess(environ=environ)
 
     async def observed_live_write(rows) -> None:
-        await live_writer.write(rows)
-        if stored_candle_observer is not None:
-            await asyncio.to_thread(notify_stored_candles, rows, stored_candle_observer)
+        from trading.contexts.market_data.application.services.stored_candle_signal import (
+            write_then_publish,
+        )
+
+        await write_then_publish(
+            rows, live_writer.write, live_candle_publisher.publish_1m_closed, stored_candle_observer
+        )
 
     async def defer_received(entry) -> None:
         await rest_queue.enqueue(entry.task)
 
     insert_buffer = AsyncRawInsertBuffer(
-        writer=(raw_writer if stored_candle_observer is None else
-                StoredCandleSignalWriter(raw_writer, stored_candle_observer)),
+        writer=(
+            raw_writer
+            if stored_candle_observer is None
+            else StoredCandleSignalWriter(raw_writer, stored_candle_observer)
+        ),
         async_writer=observed_live_write,
         on_deferred=defer_received,
         async_store=async_recovery,
@@ -1141,7 +1189,7 @@ def _effective_instrument_reader(
             dsn=make_conninfo(
                 dsn, connect_timeout=2, options="-c statement_timeout=2000 -c lock_timeout=1000"
             )
-        )
+        ),
     )
 
 

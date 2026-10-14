@@ -1,0 +1,205 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests/baea0c76-6278-4805-8862-03902fcdd1ba?variant=job_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f14e8]:
+  - link "Skip to content" [ref=f14e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f14e10]:
+    - generic [ref=f14e11]: RoeHub
+    - navigation "Language" [ref=f14e12]:
+      - link "Русский" [ref=f14e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests%2Fbaea0c76-6278-4805-8862-03902fcdd1ba%3Fvariant%3Djob_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+      - link "English" [ref=f14e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests%2Fbaea0c76-6278-4805-8862-03902fcdd1ba%3Fvariant%3Djob_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+  - complementary [ref=f14e15]:
+    - navigation "Navigation" [ref=f14e16]:
+      - link "Overview" [ref=f14e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f14e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f14e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f14e29]:
+        - text: Data
+        - generic [ref=f14e34]: Unavailable
+      - link "Settings" [ref=f14e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f14e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f14e43]:
+    - generic [ref=f14e44]:
+      - heading "Backtests" [level=1] [ref=f14e45]
+      - generic [ref=f14e47]:
+        - button "Hide history" [expanded] [ref=f14e48] [cursor=pointer]
+        - region [ref=f14e49]:
+          - generic [ref=f14e50]:
+            - heading "Jobs" [level=2] [ref=f14e51]
+            - generic "Jobs on this page" [ref=f14e52]: "5"
+            - link "New backtest" [ref=f14e53] [cursor=pointer]:
+              - /url: /backtests/new
+            - generic [ref=f14e55]:
+              - button "Refresh" [ref=f14e56] [cursor=pointer]
+              - button "Filters" [ref=f14e63] [cursor=pointer]
+          - tablist "Jobs" [ref=f14e66]:
+            - tab "New backtest" [ref=f14e67] [cursor=pointer]
+            - tab "History" [selected] [ref=f14e68] [cursor=pointer]
+          - tabpanel "History" [ref=f14e69]:
+            - paragraph [ref=f14e70]: All states · All risk modes
+            - status [ref=f14e71]: Last read · Oct 14, 2026, 9:09 AM UTC
+            - region "Job history table" [ref=f14e72]:
+              - table [ref=f14e73]:
+                - caption [ref=f14e74]: Jobs on this page
+                - rowgroup [ref=f14e75]:
+                  - row [ref=f14e76]:
+                    - columnheader "Backtest" [ref=f14e77]
+                    - columnheader "State" [ref=f14e78]
+                - rowgroup [ref=f14e79]:
+                  - row [ref=f14e80]:
+                    - cell "S10-r1 live futures PostgreSQL 0GUSDT · futures · 1h" [ref=f14e81]:
+                      - link "S10-r1 live futures PostgreSQL" [ref=f14e82] [cursor=pointer]:
+                        - /url: /backtests/baea0c76-6278-4805-8862-03902fcdd1ba
+                      - generic [ref=f14e83]: 0GUSDT · futures · 1h
+                    - cell "Completed" [ref=f14e84]
+                  - row [ref=f14e85]:
+                    - cell "S10 PG-only retained history proof ACTUSDT · spot · 15m" [ref=f14e86]:
+                      - link "S10 PG-only retained history proof" [ref=f14e87] [cursor=pointer]:
+                        - /url: /backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f
+                      - generic [ref=f14e88]: ACTUSDT · spot · 15m
+                    - cell "Completed" [ref=f14e89]
+                  - row [ref=f14e90]:
+                    - cell "Binance historical · BTCUSDT · EMA 5–50 BTCUSDT · spot · 15m" [ref=f14e91]:
+                      - link "Binance historical · BTCUSDT · EMA 5–50" [ref=f14e92] [cursor=pointer]:
+                        - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c
+                      - generic [ref=f14e93]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f14e94]
+                  - row [ref=f14e95]:
+                    - cell "Demo EMA · TP/SL BTCUSDT · spot · 15m" [ref=f14e96]:
+                      - link "Demo EMA · TP/SL" [ref=f14e97] [cursor=pointer]:
+                        - /url: /backtests/e9d85b78-58ff-495f-8b0b-2b8e5ac64b8a
+                      - generic [ref=f14e98]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f14e99]
+                  - row [ref=f14e100]:
+                    - cell "Demo EMA · baseline BTCUSDT · spot · 15m" [ref=f14e101]:
+                      - link "Demo EMA · baseline" [ref=f14e102] [cursor=pointer]:
+                        - /url: /backtests/2c252ee4-aa0a-4f1c-b560-7482d7122cdd
+                      - generic [ref=f14e103]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f14e104]
+            - navigation "Job pages" [ref=f14e105]:
+              - generic [ref=f14e106]:
+                - text: Rows per page
+                - combobox "Page size (1–250)" [ref=f14e107]:
+                  - option "5"
+                  - option "10"
+                  - option "25"
+                  - option "50" [selected]
+                  - option "100"
+                  - option "250"
+              - button "First page" [disabled] [ref=f14e108]
+              - button "Next page" [disabled] [ref=f14e112]
+            - paragraph [ref=f14e115]: Newest first. Risk filtering applies within each server page; an empty page can still have a next page.
+            - group [ref=f14e116]:
+              - generic "Search, instrument and date filters" [ref=f14e117] [cursor=pointer]
+        - region "Backtest detail" [ref=f14e118]:
+          - generic [ref=f14e119]:
+            - heading "S10-r1 live futures PostgreSQL" [level=2] [ref=f14e121]
+            - generic [ref=f14e122]:
+              - status [ref=f14e123]: Completed
+              - generic [ref=f14e124]:
+                - heading "Ranked variants" [level=3] [ref=f14e126]
+                - region "Ranked variants" [ref=f14e127]:
+                  - table [ref=f14e128]:
+                    - rowgroup [ref=f14e129]:
+                      - row [ref=f14e130] [cursor=pointer]:
+                        - columnheader "Selected variant" [ref=f14e131]
+                        - columnheader [ref=f14e132]:
+                          - button "Return · % ↓" [ref=f14e133]
+                        - columnheader [ref=f14e134]:
+                          - button "Maximum drawdown · %" [ref=f14e135]
+                        - columnheader [ref=f14e136]:
+                          - button "Profit factor" [ref=f14e137]
+                        - columnheader [ref=f14e138]:
+                          - button "Win rate · %" [ref=f14e139]
+                        - columnheader [ref=f14e140]:
+                          - button "Trades" [ref=f14e141]
+                    - rowgroup [ref=f14e142]:
+                      - row [ref=f14e143] [cursor=pointer]:
+                        - 'cell "EMA 10 #1 · TP —% · SL —%" [ref=f14e144]':
+                          - link "EMA 10" [ref=f14e145]:
+                            - /url: /backtests/baea0c76-6278-4805-8862-03902fcdd1ba?variant=job_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+                          - generic [ref=f14e146]: "#1 · TP —% · SL —%"
+                        - cell "-3.13" [ref=f14e147]
+                        - cell "3.13" [ref=f14e148]
+                        - cell "0" [ref=f14e149]
+                        - cell "0" [ref=f14e150]
+                        - cell "3" [ref=f14e151]
+                - region "Selected variant" [ref=f14e152]:
+                  - heading "Selected variant · 1" [level=3] [ref=f14e154]
+                  - generic [ref=f14e155]:
+                    - generic [ref=f14e156]:
+                      - term [ref=f14e157]: Return · %
+                      - definition [ref=f14e158]: "-3.1"
+                    - generic [ref=f14e159]:
+                      - term [ref=f14e160]: Maximum drawdown · %
+                      - definition [ref=f14e161]: "3.1"
+                    - generic [ref=f14e162]:
+                      - term [ref=f14e163]: Profit factor
+                      - definition [ref=f14e164]: "0"
+                    - generic [ref=f14e165]:
+                      - term [ref=f14e166]: Win rate · %
+                      - definition [ref=f14e167]: "0"
+                    - generic [ref=f14e168]:
+                      - term [ref=f14e169]: Trades
+                      - definition [ref=f14e170]: "3"
+                  - tablist "Results" [ref=f14e171]:
+                    - tab "Overview" [ref=f14e172] [cursor=pointer]
+                    - tab "Metrics" [ref=f14e173] [cursor=pointer]
+                    - tab "Trades" [ref=f14e174] [cursor=pointer]
+                    - tab "Monthly statistics" [active] [selected] [ref=f14e175] [cursor=pointer]
+                  - tabpanel "Monthly statistics" [ref=f14e281]:
+                    - generic [ref=f14e219]:
+                      - paragraph [ref=f14e282]: "Monthly P&L: % of opening monthly balance / quote currency. Closed trades, net of costs."
+                      - region "Monthly statistics" [ref=f14e283]:
+                        - table [ref=f14e284]:
+                          - rowgroup [ref=f14e285]:
+                            - row [ref=f14e286]:
+                              - columnheader "Year" [ref=f14e287]
+                              - columnheader "Jan" [ref=f14e288]
+                              - columnheader "Feb" [ref=f14e289]
+                              - columnheader "Mar" [ref=f14e290]
+                              - columnheader "Apr" [ref=f14e291]
+                              - columnheader "May" [ref=f14e292]
+                              - columnheader "Jun" [ref=f14e293]
+                              - columnheader "Jul" [ref=f14e294]
+                              - columnheader "Aug" [ref=f14e295]
+                              - columnheader "Sep" [ref=f14e296]
+                              - columnheader "Oct" [ref=f14e297]
+                              - columnheader "Nov" [ref=f14e298]
+                              - columnheader "Dec" [ref=f14e299]
+                          - rowgroup [ref=f14e300]:
+                            - row [ref=f14e301]:
+                              - rowheader "2026" [ref=f14e302]
+                              - cell "—" [ref=f14e303]
+                              - cell "—" [ref=f14e304]
+                              - cell "—" [ref=f14e305]
+                              - cell "—" [ref=f14e306]
+                              - cell "—" [ref=f14e307]
+                              - cell "—" [ref=f14e308]
+                              - cell "—" [ref=f14e309]
+                              - cell "—" [ref=f14e310]
+                              - cell "—" [ref=f14e311]
+                              - cell "-3.1% -312.7" [ref=f14e312]:
+                                - strong [ref=f14e313]: "-3.1%"
+                                - generic [ref=f14e314]: "-312.7"
+                              - cell "—" [ref=f14e315]
+                              - cell "—" [ref=f14e316]
+                  - button "Refresh results" [ref=f14e209] [cursor=pointer]
+                  - group [ref=f14e212]:
+                    - generic "Save strategy / export" [ref=f14e213] [cursor=pointer]
+              - group [ref=f14e214]:
+                - generic "Job information" [ref=f14e215] [cursor=pointer]
+  - contentinfo [ref=f14e216]:
+    - text: Artifact-backed backtests
+    - generic [ref=f14e217]: Library snapshots · live selected job
+```

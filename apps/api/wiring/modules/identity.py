@@ -15,27 +15,23 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter
 
-from apps.api.monitoring import PrometheusOidcProviderMetrics
 from apps.api.routes import build_identity_router as build_identity_api_router
 from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
 )
 from trading.contexts.identity.adapters.outbound import (
     AesGcmEnvelopeExchangeKeysSecretCipher,
-    HttpOidcAuthenticationProvider,
     InMemoryAccountSettingsRepository,
     InMemoryIdentityExchangeKeysRepository,
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
     InMemoryLocalAuthRepository,
-    InMemoryOidcIdentityRepository,
     InMemoryOrganizationRepository,
     PostgresAccountSettingsRepository,
     PostgresIdentityExchangeKeysRepository,
     PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
     PostgresLocalAuthRepository,
-    PostgresOidcIdentityRepository,
     PostgresOrganizationRepository,
     PsycopgIdentityPostgresGateway,
     RoehubSessionCurrentUser,
@@ -46,7 +42,6 @@ from trading.contexts.identity.application import (
     ExchangeKeysRepository,
     IdentityClock,
     LocalAuthRepository,
-    OidcIdentityRepository,
     OrganizationRepository,
     SessionRepository,
     UserRepository,
@@ -56,16 +51,9 @@ from trading.contexts.identity.application.use_cases import (
     DeleteExchangeKeyUseCase,
     ListExchangeKeysUseCase,
     LocalAuthService,
-    OidcAuthenticationService,
     OrganizationAccessService,
 )
-from trading.platform.secrets import (
-    OpenBaoSecretResolver,
-    SecretKind,
-    SecretReference,
-    SecretReferenceError,
-    SecureTokenFile,
-)
+from trading.platform.secrets import SecureTokenFile
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _IDENTITY_FAIL_FAST_KEY = "IDENTITY_FAIL_FAST"
@@ -79,19 +67,6 @@ _IDENTITY_LOCAL_RP_ID_KEY = "IDENTITY_LOCAL_RP_ID"
 _IDENTITY_LOCAL_RP_NAME_KEY = "IDENTITY_LOCAL_RP_NAME"
 _IDENTITY_LOCAL_ORIGIN_KEY = "IDENTITY_LOCAL_ORIGIN"
 _IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST_KEY = "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST"
-_OIDC_PROVIDER_ID_KEY = "IDENTITY_OIDC_PROVIDER_ID"
-_OIDC_DISPLAY_NAME_KEY = "IDENTITY_OIDC_DISPLAY_NAME"
-_OIDC_ISSUER_KEY = "IDENTITY_OIDC_ISSUER"
-_OIDC_CLIENT_ID_KEY = "IDENTITY_OIDC_CLIENT_ID"
-_OIDC_CLIENT_REFERENCE_KEY = "IDENTITY_OIDC_CLIENT_SECRET_REF"
-_OIDC_REDIRECT_URI_KEY = "IDENTITY_OIDC_REDIRECT_URI"
-_OIDC_CONNECT_TIMEOUT_KEY = "IDENTITY_OIDC_CONNECT_TIMEOUT_SECONDS"
-_OIDC_RESPONSE_TIMEOUT_KEY = "IDENTITY_OIDC_RESPONSE_TIMEOUT_SECONDS"
-_OIDC_OVERALL_TIMEOUT_KEY = "IDENTITY_OIDC_OVERALL_TIMEOUT_SECONDS"
-_OIDC_ALLOW_INSECURE_HTTP_KEY = "IDENTITY_OIDC_ALLOW_INSECURE_HTTP"
-_OPENBAO_ADDRESS_KEY = "OPENBAO_ADDR"
-_OPENBAO_CREDENTIAL_PATH_KEY = "ROEHUB_IDENTITY_OPENBAO_TOKEN_FILE"
-_OPENBAO_ROOT_KEY = "ROEHUB_OPENBAO_ROOT"
 _DEFAULT_DEV_IDENTITY_EXCHANGE_KEYS_KEK_B64 = "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE="
 _DEFAULT_IDENTITY_SESSION_COOKIE_NAME = "roehub_session_id"
 _DEFAULT_IDENTITY_SESSION_IDLE_TTL_SECONDS = 1800
@@ -120,20 +95,6 @@ class IdentityRuntimeSettings:
 
     env_name: str
     fail_fast: bool
-    oidc_enabled: bool
-    oidc_provider_id: str
-    oidc_display_name: str
-    oidc_issuer: str
-    oidc_client_id: str
-    oidc_client_reference: str
-    oidc_redirect_uri: str
-    oidc_connect_timeout_seconds: float
-    oidc_response_timeout_seconds: float
-    oidc_overall_timeout_seconds: float
-    oidc_allow_insecure_http: bool
-    openbao_address: str
-    openbao_credential_path: str
-    openbao_root: str
     identity_session_cookie_name: str
     identity_session_idle_ttl_seconds: int
     identity_session_absolute_ttl_seconds: int
@@ -164,38 +125,6 @@ class IdentityRuntimeSettings:
                 f"IdentityRuntimeSettings.env_name must be one of {_ALLOWED_ENVS}, "
                 f"got {self.env_name!r}"
             )
-        if self.oidc_enabled:
-            required_oidc_values = (
-                self.oidc_provider_id,
-                self.oidc_display_name,
-                self.oidc_issuer,
-                self.oidc_client_id,
-                self.oidc_client_reference,
-                self.openbao_address,
-                self.openbao_credential_path,
-                self.openbao_root,
-                self.oidc_redirect_uri,
-            )
-            if not all(required_oidc_values):
-                raise ValueError("Enabled OIDC provider settings must be non-empty")
-            if self.env_name == "prod" and self.oidc_allow_insecure_http:
-                raise ValueError("OIDC insecure HTTP is forbidden in prod")
-            for value, maximum, name in (
-                (self.oidc_connect_timeout_seconds, 3.0, "connect_timeout_seconds"),
-                (self.oidc_response_timeout_seconds, 10.0, "response_timeout_seconds"),
-                (self.oidc_overall_timeout_seconds, 15.0, "overall_timeout_seconds"),
-            ):
-                if value <= 0 or value > maximum:
-                    raise ValueError(f"OIDC {name} must be in (0, {maximum}]")
-            try:
-                SecretReference.parse(
-                    self.oidc_client_reference,
-                    expected_root=self.openbao_root,
-                    expected_kind=SecretKind.OIDC,
-                )
-                SecureTokenFile(Path(self.openbao_credential_path))
-            except (SecretReferenceError, ValueError) as error:
-                raise ValueError("OIDC OpenBao reference configuration is invalid") from error
         if not self.identity_session_cookie_name:
             raise ValueError(
                 "IdentityRuntimeSettings.identity_session_cookie_name must be non-empty"
@@ -285,7 +214,6 @@ class _IdentityPersistenceBundle:
     session_repository: SessionRepository
     organization_repository: OrganizationRepository
     local_auth_repository: LocalAuthRepository
-    oidc_identity_repository: OidcIdentityRepository
 
 
 def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
@@ -370,38 +298,6 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
         session_idle_ttl_seconds=settings.identity_session_idle_ttl_seconds,
         session_absolute_ttl_seconds=settings.identity_session_absolute_ttl_seconds,
     )
-    oidc_authentication_service: OidcAuthenticationService | None = None
-    if settings.oidc_enabled:
-        oidc_credential_resolver = OpenBaoSecretResolver(
-            address=settings.openbao_address,
-            token_source=SecureTokenFile(Path(settings.openbao_credential_path)),
-            secret_root=settings.openbao_root,
-        )
-        provider = HttpOidcAuthenticationProvider(
-            provider_id=settings.oidc_provider_id,
-            display_name=settings.oidc_display_name,
-            issuer=settings.oidc_issuer,
-            client_id=settings.oidc_client_id,
-            client_credential_source=lambda: oidc_credential_resolver.resolve(
-                settings.oidc_client_reference,
-                expected_kind=SecretKind.OIDC,
-            ).reveal_text(),
-            redirect_uri=settings.oidc_redirect_uri,
-            connect_timeout_seconds=settings.oidc_connect_timeout_seconds,
-            response_timeout_seconds=settings.oidc_response_timeout_seconds,
-            overall_timeout_seconds=settings.oidc_overall_timeout_seconds,
-            allow_insecure_http=settings.oidc_allow_insecure_http,
-            metrics=PrometheusOidcProviderMetrics(),
-        )
-        oidc_authentication_service = OidcAuthenticationService(
-            provider=provider,
-            repository=persistence.oidc_identity_repository,
-            session_repository=persistence.session_repository,
-            clock=clock,
-            session_idle_ttl_seconds=settings.identity_session_idle_ttl_seconds,
-            session_absolute_ttl_seconds=settings.identity_session_absolute_ttl_seconds,
-        )
-
     current_user_port = RoehubSessionCurrentUser(
         session_repository=persistence.session_repository,
         user_repository=persistence.user_repository,
@@ -430,7 +326,6 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
             delete_exchange_key_use_case=delete_exchange_key_use_case,
             organization_access_service=organization_access_service,
             local_auth_service=local_auth_service,
-            oidc_authentication_service=oidc_authentication_service,
         ),
         current_user_dependency=current_user_dependency,
         organization_repository=persistence.organization_repository,
@@ -463,7 +358,6 @@ def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _Identi
             session_repository=PostgresIdentitySessionRepository(gateway=gateway),
             organization_repository=PostgresOrganizationRepository(dsn=settings.postgres_dsn),
             local_auth_repository=PostgresLocalAuthRepository(dsn=settings.postgres_dsn),
-            oidc_identity_repository=PostgresOidcIdentityRepository(dsn=settings.postgres_dsn),
         )
     if settings.env_name == "prod":
         raise ValueError(
@@ -479,10 +373,6 @@ def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _Identi
         session_repository=session_repository,
         organization_repository=organization_repository,
         local_auth_repository=InMemoryLocalAuthRepository(
-            user_repository=user_repository,
-            organization_repository=organization_repository,
-        ),
-        oidc_identity_repository=InMemoryOidcIdentityRepository(
             user_repository=user_repository,
             organization_repository=organization_repository,
         ),
@@ -507,33 +397,6 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
     env_name = _resolve_env_name(environ=environ)
     fail_fast = _resolve_fail_fast(environ=environ, env_name=env_name)
 
-    oidc_provider_id = environ.get(_OIDC_PROVIDER_ID_KEY, "").strip().lower()
-    oidc_display_name = environ.get(_OIDC_DISPLAY_NAME_KEY, "").strip()
-    oidc_issuer = environ.get(_OIDC_ISSUER_KEY, "").strip().rstrip("/")
-    oidc_client_id = environ.get(_OIDC_CLIENT_ID_KEY, "").strip()
-    oidc_client_reference = environ.get(_OIDC_CLIENT_REFERENCE_KEY, "").strip()
-    openbao_address = environ.get(_OPENBAO_ADDRESS_KEY, "").strip()
-    openbao_credential_path = environ.get(_OPENBAO_CREDENTIAL_PATH_KEY, "").strip()
-    openbao_root = environ.get(_OPENBAO_ROOT_KEY, "").strip()
-    oidc_redirect_uri = environ.get(_OIDC_REDIRECT_URI_KEY, "").strip()
-    oidc_connect_timeout_seconds = _read_optional_positive_float(
-        raw_value=environ.get(_OIDC_CONNECT_TIMEOUT_KEY, "").strip(),
-        key=_OIDC_CONNECT_TIMEOUT_KEY,
-    )
-    oidc_response_timeout_seconds = _read_optional_positive_float(
-        raw_value=environ.get(_OIDC_RESPONSE_TIMEOUT_KEY, "").strip(),
-        key=_OIDC_RESPONSE_TIMEOUT_KEY,
-    )
-    oidc_overall_timeout_seconds = _read_optional_positive_float(
-        raw_value=environ.get(_OIDC_OVERALL_TIMEOUT_KEY, "").strip(),
-        key=_OIDC_OVERALL_TIMEOUT_KEY,
-    )
-    raw_allow_insecure = environ.get(_OIDC_ALLOW_INSECURE_HTTP_KEY, "").strip()
-    oidc_allow_insecure_http = (
-        _parse_bool(raw_value=raw_allow_insecure, key=_OIDC_ALLOW_INSECURE_HTTP_KEY)
-        if raw_allow_insecure
-        else False
-    )
     identity_session_cookie_name = environ.get(_IDENTITY_SESSION_COOKIE_NAME_KEY, "").strip()
     identity_session_idle_ttl_seconds = _read_optional_positive_int(
         raw_value=environ.get(_IDENTITY_SESSION_IDLE_TTL_SECONDS_KEY, "").strip(),
@@ -558,23 +421,6 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
         else False
     )
     identity_exchange_keys_kek_b64 = _resolve_identity_exchange_keys_kek(environ=environ)
-
-    explicit_oidc_settings = {
-        _OIDC_PROVIDER_ID_KEY: oidc_provider_id,
-        _OIDC_DISPLAY_NAME_KEY: oidc_display_name,
-        _OIDC_ISSUER_KEY: oidc_issuer,
-        _OIDC_CLIENT_ID_KEY: oidc_client_id,
-        _OIDC_CLIENT_REFERENCE_KEY: oidc_client_reference,
-        _OPENBAO_ADDRESS_KEY: openbao_address,
-        _OPENBAO_CREDENTIAL_PATH_KEY: openbao_credential_path,
-        _OPENBAO_ROOT_KEY: openbao_root,
-        _OIDC_REDIRECT_URI_KEY: oidc_redirect_uri,
-    }
-    oidc_enabled = any(explicit_oidc_settings.values())
-    if oidc_enabled:
-        for setting_name, setting_value in explicit_oidc_settings.items():
-            if not setting_value:
-                raise ValueError(f"{setting_name} must be set when OIDC is enabled")
 
     if fail_fast:
         if identity_session_idle_ttl_seconds is None:
@@ -633,20 +479,6 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
     return IdentityRuntimeSettings(
         env_name=env_name,
         fail_fast=fail_fast,
-        oidc_enabled=oidc_enabled,
-        oidc_provider_id=oidc_provider_id,
-        oidc_display_name=oidc_display_name,
-        oidc_issuer=oidc_issuer,
-        oidc_client_id=oidc_client_id,
-        oidc_client_reference=oidc_client_reference,
-        oidc_redirect_uri=oidc_redirect_uri,
-        oidc_connect_timeout_seconds=oidc_connect_timeout_seconds or 3.0,
-        oidc_response_timeout_seconds=oidc_response_timeout_seconds or 10.0,
-        oidc_overall_timeout_seconds=oidc_overall_timeout_seconds or 15.0,
-        oidc_allow_insecure_http=oidc_allow_insecure_http,
-        openbao_address=openbao_address,
-        openbao_credential_path=openbao_credential_path,
-        openbao_root=openbao_root,
         identity_session_cookie_name=effective_identity_session_cookie_name,
         identity_session_idle_ttl_seconds=effective_identity_session_idle_ttl_seconds,
         identity_session_absolute_ttl_seconds=effective_identity_session_absolute_ttl_seconds,

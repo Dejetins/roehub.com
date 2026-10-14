@@ -1,0 +1,8 @@
+{
+  "owned_product_files": 92,
+  "owned_deleted": [],
+  "immutable_prior_evidence_and_applied_sql_checked": 111,
+  "immutable_mismatches": [],
+  "stage_scope": "S05 only; no commit/push/branch/worktree/stash/cutover",
+  "foreign_changes": "Baseline dirty content preserved; ownership applies to S05 deltas, not full git diff"
+}

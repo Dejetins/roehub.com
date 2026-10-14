@@ -1,4 +1,4 @@
-schema: io.roehub.installation/v1alpha1
+schema: io.roehub.installation/v2alpha1
 installation_id: roehub-local
 domain: localhost
 architecture: linux/arm64
@@ -22,13 +22,6 @@ stores:
     port: 5432
     database: roehub
     credentials_ref: openbao://kv/roehub/storage/postgresql#credentials
-    tls: false
-  clickhouse:
-    mode: embedded
-    host: clickhouse
-    port: 8123
-    database: roehub
-    credentials_ref: openbao://kv/roehub/storage/clickhouse#credentials
     tls: false
   redis:
     mode: embedded
@@ -56,8 +49,6 @@ proxy:
   mode: embedded
   trusted_proxies: []
 update_checks:
-  enabled: false
-oidc:
   enabled: false
 openbao:
   mode: embedded

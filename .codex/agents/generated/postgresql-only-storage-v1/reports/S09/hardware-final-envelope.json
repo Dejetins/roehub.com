@@ -1,0 +1,60 @@
+{
+  "captured_utc": 1791948405.7589078,
+  "host_platform": "macOS-26.7-arm64-arm-64bit-Mach-O",
+  "containers": {
+    "roehub-s09-pg": {
+      "image": "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+      "cpus": 2.0,
+      "memory_bytes": 4294967296,
+      "swap_bytes": 4294967296,
+      "shm_bytes": 536870912,
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "roehub-s09-data",
+          "destination": "/var/lib/postgresql/data"
+        }
+      ],
+      "server_args": [
+        "postgres",
+        "-c",
+        "max_connections=48",
+        "-c",
+        "shared_buffers=256MB",
+        "-c",
+        "work_mem=4MB",
+        "-c",
+        "checkpoint_timeout=5min",
+        "-c",
+        "log_checkpoints=on",
+        "-c",
+        "log_autovacuum_min_duration=0"
+      ]
+    },
+    "roehub-s09-client": {
+      "image": "sha256:d89af4ff16ba9b7637b52cb39dcef22104eb661f2deb47bcfe5c38e1ff2abbd4",
+      "cpus": 4.0,
+      "memory_bytes": 6442450944,
+      "swap_bytes": 6442450944,
+      "shm_bytes": 67108864,
+      "mounts": [
+        {
+          "type": "bind",
+          "name": null,
+          "destination": "/workspace"
+        },
+        {
+          "type": "volume",
+          "name": "roehub-s09-registry",
+          "destination": "/run/roehub-pg-budget"
+        },
+        {
+          "type": "volume",
+          "name": "514d7597211ef0188037840788395bd4a6be5d29b1db57409e08db354bb21811",
+          "destination": "/var/lib/postgresql/data"
+        }
+      ],
+      "server_args": null
+    }
+  }
+}

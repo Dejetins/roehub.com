@@ -1,0 +1,622 @@
+{
+  "generated_at": "2026-10-13T16:37:11.175440+00:00",
+  "complete": true,
+  "run_count": 12,
+  "snapshot_rows": 15130115,
+  "profiles": {
+    "normal": {
+      "pg": {
+        "repetitions": 3,
+        "lanes": {
+          "stream": {
+            "completed": 180,
+            "median_ms": 6.156270508654416,
+            "max_ms": 18.98341695778072,
+            "scheduled_median_ms": 9.203978988807648,
+            "scheduled_max_ms": 20.995624945499003,
+            "per_run_p95_ms": [
+              10.886099381605156,
+              12.949344416847453,
+              13.786972599336874
+            ]
+          },
+          "backfill": {
+            "completed": 90,
+            "median_ms": 21.25437493668869,
+            "max_ms": 38.342750049196184,
+            "scheduled_median_ms": 23.843332950491458,
+            "scheduled_max_ms": 41.113583953119814,
+            "per_run_p95_ms": [
+              31.438189261825755,
+              33.235532947583124,
+              33.51863753632642
+            ]
+          },
+          "latest": {
+            "completed": 180,
+            "median_ms": 1.4736875309608877,
+            "max_ms": 51.20450002141297,
+            "scheduled_median_ms": 4.8428334994241595,
+            "scheduled_max_ms": 55.99729192908853,
+            "per_run_p95_ms": [
+              3.8978330616373564,
+              4.445845750160512,
+              6.985762261319904
+            ]
+          },
+          "catalog": {
+            "completed": 90,
+            "median_ms": 2.326417015865445,
+            "max_ms": 8.277582935988903,
+            "scheduled_median_ms": 5.865874991286546,
+            "scheduled_max_ms": 12.739832978695631,
+            "per_run_p95_ms": [
+              6.074023392284288,
+              6.62554219015874,
+              5.6731961958575985
+            ]
+          },
+          "gap": {
+            "completed": 90,
+            "median_ms": 2.4791459436528385,
+            "max_ms": 8.842833922244608,
+            "scheduled_median_ms": 5.42991649126634,
+            "scheduled_max_ms": 13.483625021763146,
+            "per_run_p95_ms": [
+              5.35767295514233,
+              7.9821536550298315,
+              6.038026767782863
+            ]
+          },
+          "artifact": {
+            "completed": 18,
+            "median_ms": 679.4767710380256,
+            "max_ms": 821.5225000167266,
+            "scheduled_median_ms": 682.3199165519327,
+            "scheduled_max_ms": 822.2277910681441,
+            "per_run_p95_ms": [
+              751.4848337741569,
+              787.6437605300453,
+              719.3361349636689
+            ]
+          },
+          "hot_latest": {
+            "completed": 180,
+            "median_ms": 1.010270498227328,
+            "max_ms": 50.32545793801546,
+            "scheduled_median_ms": 4.303416528273374,
+            "scheduled_max_ms": 54.202624945901334,
+            "per_run_p95_ms": [
+              3.0516368453390887,
+              2.5397774705197635,
+              2.7126648521516397
+            ]
+          }
+        },
+        "errors": [],
+        "sampled_peak_working_set_mib": [
+          338.52734375,
+          342.3359375,
+          338.5234375
+        ],
+        "sampled_peak_total_mib": [
+          1235.796875,
+          1870.10546875,
+          1259.42578125
+        ],
+        "client_peak_mib": [
+          1365.078125,
+          1373.375,
+          1236.46875
+        ],
+        "cpu_seconds": [
+          3.552618,
+          3.41527,
+          3.474749
+        ],
+        "workload_wall_seconds": [
+          59.009367874939926,
+          59.00795879098587,
+          59.00888129102532
+        ],
+        "server_volume_gib": [
+          7.2803587624803185,
+          7.249298074282706,
+          7.202317685820162
+        ]
+      },
+      "ch": {
+        "repetitions": 3,
+        "lanes": {
+          "stream": {
+            "completed": 180,
+            "median_ms": 46.7826874810271,
+            "max_ms": 71.81720901280642,
+            "scheduled_median_ms": 49.46339555317536,
+            "scheduled_max_ms": 75.27287502307445,
+            "per_run_p95_ms": [
+              63.55520242941566,
+              63.820033648516976,
+              61.481314001139246
+            ]
+          },
+          "backfill": {
+            "completed": 90,
+            "median_ms": 64.40729147288948,
+            "max_ms": 96.80037491489202,
+            "scheduled_median_ms": 67.33749998966232,
+            "scheduled_max_ms": 99.66012497898191,
+            "per_run_p95_ms": [
+              81.34490851662122,
+              79.87505596247502,
+              77.94501876924186
+            ]
+          },
+          "latest": {
+            "completed": 180,
+            "median_ms": 21.559666958637536,
+            "max_ms": 42.724540922790766,
+            "scheduled_median_ms": 24.502832966390997,
+            "scheduled_max_ms": 44.943165965378284,
+            "per_run_p95_ms": [
+              32.644452439853914,
+              32.46407912811264,
+              35.06454231683165
+            ]
+          },
+          "catalog": {
+            "completed": 90,
+            "median_ms": 3.8338955491781235,
+            "max_ms": 11.39970903750509,
+            "scheduled_median_ms": 6.755499518476427,
+            "scheduled_max_ms": 13.67262494750321,
+            "per_run_p95_ms": [
+              8.727009757421907,
+              7.196308864513407,
+              8.72869985178113
+            ]
+          },
+          "gap": {
+            "completed": 90,
+            "median_ms": 140.68068750202656,
+            "max_ms": 492.1844999771565,
+            "scheduled_median_ms": 143.43095902586356,
+            "scheduled_max_ms": 495.82912493497133,
+            "per_run_p95_ms": [
+              487.245547916973,
+              482.26389149203897,
+              474.9407481285743
+            ]
+          },
+          "artifact": {
+            "completed": 18,
+            "median_ms": 442.7319169626571,
+            "max_ms": 628.3731670118868,
+            "scheduled_median_ms": 445.4635204747319,
+            "scheduled_max_ms": 631.795542081818,
+            "per_run_p95_ms": [
+              476.8545519618783,
+              589.3606460012961,
+              494.5646037813276
+            ]
+          },
+          "hot_latest": {
+            "completed": 180,
+            "median_ms": 10.632520541548729,
+            "max_ms": 30.316707910969853,
+            "scheduled_median_ms": 13.42960400506854,
+            "scheduled_max_ms": 32.173457904718816,
+            "per_run_p95_ms": [
+              20.02033604658208,
+              18.875384825514622,
+              21.4511607948225
+            ]
+          }
+        },
+        "errors": [],
+        "sampled_peak_working_set_mib": [
+          1305.39453125,
+          1418.0,
+          1639.90234375
+        ],
+        "sampled_peak_total_mib": [
+          1583.734375,
+          1832.73828125,
+          1950.140625
+        ],
+        "client_peak_mib": [
+          1016.875,
+          1102.796875,
+          1098.828125
+        ],
+        "cpu_seconds": [
+          16.444343,
+          16.537037,
+          16.274827
+        ],
+        "workload_wall_seconds": [
+          59.043450583005324,
+          59.03887654200662,
+          59.03797579102684
+        ],
+        "server_volume_gib": [
+          1.2548221498727798,
+          1.336255168542266,
+          1.3153274469077587
+        ]
+      }
+    },
+    "stress": {
+      "pg": {
+        "repetitions": 3,
+        "lanes": {
+          "stream": {
+            "completed": 180,
+            "median_ms": 11.479854001663625,
+            "max_ms": 58.04379202891141,
+            "scheduled_median_ms": 14.331854006741196,
+            "scheduled_max_ms": 62.800167012028396,
+            "per_run_p95_ms": [
+              22.37258927780202,
+              20.45675240806304,
+              20.608873275341463
+            ]
+          },
+          "backfill": {
+            "completed": 90,
+            "median_ms": 26.61020844243467,
+            "max_ms": 56.25433300156146,
+            "scheduled_median_ms": 28.779562504496425,
+            "scheduled_max_ms": 57.270374963991344,
+            "per_run_p95_ms": [
+              36.1927603604272,
+              52.735747717088074,
+              33.64103749045171
+            ]
+          },
+          "latest": {
+            "completed": 180,
+            "median_ms": 1.9536670297384262,
+            "max_ms": 29.413999989628792,
+            "scheduled_median_ms": 5.317103990819305,
+            "scheduled_max_ms": 33.490416943095624,
+            "per_run_p95_ms": [
+              7.790411030873645,
+              6.849756225710734,
+              7.750643504550679
+            ]
+          },
+          "catalog": {
+            "completed": 90,
+            "median_ms": 4.157707968261093,
+            "max_ms": 22.117416956461966,
+            "scheduled_median_ms": 7.426582975313067,
+            "scheduled_max_ms": 23.716541938483715,
+            "per_run_p95_ms": [
+              10.283376858569682,
+              12.095487501937892,
+              11.423025291878721
+            ]
+          },
+          "gap": {
+            "completed": 90,
+            "median_ms": 5.032687506172806,
+            "max_ms": 20.08370799012482,
+            "scheduled_median_ms": 7.91204150300473,
+            "scheduled_max_ms": 22.655708016827703,
+            "per_run_p95_ms": [
+              12.337712309090412,
+              14.721670502331095,
+              14.14895426132716
+            ]
+          },
+          "artifact": {
+            "completed": 18,
+            "median_ms": 4253.05814598687,
+            "max_ms": 5663.490624981932,
+            "scheduled_median_ms": 4256.689021014608,
+            "scheduled_max_ms": 5667.396166943945,
+            "per_run_p95_ms": [
+              5494.691520987544,
+              4833.586052031023,
+              5394.411916058743
+            ]
+          },
+          "hot_latest": {
+            "completed": 180,
+            "median_ms": 1.4036460197530687,
+            "max_ms": 31.39262495096773,
+            "scheduled_median_ms": 4.476812551729381,
+            "scheduled_max_ms": 35.433624987490475,
+            "per_run_p95_ms": [
+              7.23545171204023,
+              4.500824317801741,
+              3.558052104199302
+            ]
+          },
+          "artifact_parallel": {
+            "completed": 18,
+            "median_ms": 4258.608749485575,
+            "max_ms": 5658.9395420160145,
+            "scheduled_median_ms": 4261.789457988925,
+            "scheduled_max_ms": 5662.782000028528,
+            "per_run_p95_ms": [
+              5488.815271033673,
+              4781.833520741202,
+              5382.689343794482
+            ]
+          },
+          "latest_parallel": {
+            "completed": 360,
+            "median_ms": 1.852520916145295,
+            "max_ms": 107.90591698605567,
+            "scheduled_median_ms": 5.3922084625810385,
+            "scheduled_max_ms": 108.0178749980405,
+            "per_run_p95_ms": [
+              6.797437899513167,
+              6.733981182333081,
+              7.777194050140677
+            ]
+          }
+        },
+        "errors": [],
+        "sampled_peak_working_set_mib": [
+          368.22265625,
+          384.48828125,
+          380.93359375
+        ],
+        "sampled_peak_total_mib": [
+          2068.43359375,
+          1983.640625,
+          2276.5859375
+        ],
+        "client_peak_mib": [
+          4566.796875,
+          5040.4375,
+          4642.078125
+        ],
+        "cpu_seconds": [
+          23.375703,
+          22.849011,
+          23.781577
+        ],
+        "workload_wall_seconds": [
+          59.506061292020604,
+          59.50218870805111,
+          59.504973832983524
+        ],
+        "server_volume_gib": [
+          7.2682203957811,
+          7.236836877651513,
+          7.1901793191209435
+        ]
+      },
+      "ch": {
+        "repetitions": 3,
+        "lanes": {
+          "stream": {
+            "completed": 180,
+            "median_ms": 50.78287504147738,
+            "max_ms": 201.67016598861665,
+            "scheduled_median_ms": 53.358145989477634,
+            "scheduled_max_ms": 203.2096249749884,
+            "per_run_p95_ms": [
+              118.07142110774294,
+              107.81448964844456,
+              86.5808437112717
+            ]
+          },
+          "backfill": {
+            "completed": 90,
+            "median_ms": 72.77302048169076,
+            "max_ms": 257.63470807578415,
+            "scheduled_median_ms": 76.19866647291929,
+            "scheduled_max_ms": 258.82075005210936,
+            "per_run_p95_ms": [
+              194.72499149851495,
+              164.68695017974824,
+              180.8223503001499
+            ]
+          },
+          "latest": {
+            "completed": 180,
+            "median_ms": 23.85785401565954,
+            "max_ms": 196.07041706331074,
+            "scheduled_median_ms": 26.554854528512806,
+            "scheduled_max_ms": 197.615584009327,
+            "per_run_p95_ms": [
+              87.49739557970312,
+              66.75285173696466,
+              59.2338979011401
+            ]
+          },
+          "catalog": {
+            "completed": 90,
+            "median_ms": 5.1124789752066135,
+            "max_ms": 68.2888749288395,
+            "scheduled_median_ms": 8.39452096261084,
+            "scheduled_max_ms": 71.47983298636973,
+            "per_run_p95_ms": [
+              8.564368792576714,
+              13.277017074869939,
+              49.655968719162026
+            ]
+          },
+          "gap": {
+            "completed": 90,
+            "median_ms": 142.3043124959804,
+            "max_ms": 945.4949999926612,
+            "scheduled_median_ms": 144.9375210213475,
+            "scheduled_max_ms": 950.3099999856204,
+            "per_run_p95_ms": [
+              819.5110087282955,
+              795.3574357612524,
+              787.7703086123802
+            ]
+          },
+          "artifact": {
+            "completed": 18,
+            "median_ms": 3529.150208516512,
+            "max_ms": 5040.7590420218185,
+            "scheduled_median_ms": 3532.5082920026034,
+            "scheduled_max_ms": 5043.32495899871,
+            "per_run_p95_ms": [
+              4883.735812763916,
+              4800.618020526599,
+              4234.233979281271
+            ]
+          },
+          "hot_latest": {
+            "completed": 180,
+            "median_ms": 13.29679146874696,
+            "max_ms": 101.80945799220353,
+            "scheduled_median_ms": 15.729166509117931,
+            "scheduled_max_ms": 101.85974999330938,
+            "per_run_p95_ms": [
+              31.685785460285825,
+              57.44585174834355,
+              48.415805900003754
+            ]
+          },
+          "artifact_parallel": {
+            "completed": 18,
+            "median_ms": 3560.4768545017578,
+            "max_ms": 5017.121291020885,
+            "scheduled_median_ms": 3563.817354501225,
+            "scheduled_max_ms": 5019.694000016898,
+            "per_run_p95_ms": [
+              4867.893968272256,
+              4793.994271225529,
+              4253.952531522373
+            ]
+          },
+          "latest_parallel": {
+            "completed": 360,
+            "median_ms": 22.77414593845606,
+            "max_ms": 199.3553340435028,
+            "scheduled_median_ms": 25.63439548248425,
+            "scheduled_max_ms": 200.89558395557106,
+            "per_run_p95_ms": [
+              86.69555208762176,
+              67.39949635812081,
+              59.59861248265952
+            ]
+          }
+        },
+        "errors": [],
+        "sampled_peak_working_set_mib": [
+          2452.421875,
+          2443.203125,
+          2564.90625
+        ],
+        "sampled_peak_total_mib": [
+          2841.65625,
+          2815.078125,
+          2901.94921875
+        ],
+        "client_peak_mib": [
+          3799.28125,
+          3741.390625,
+          3412.546875
+        ],
+        "cpu_seconds": [
+          38.811253,
+          37.272419,
+          37.119367
+        ],
+        "workload_wall_seconds": [
+          59.52421149995644,
+          59.52212124993093,
+          59.52658291708212
+        ],
+        "server_volume_gib": [
+          1.269630535505712,
+          1.2799674291163683,
+          1.3580132704228163
+        ]
+      }
+    }
+  },
+  "parity": {
+    "normal-1": "all static read results, replay candle hashes and coverage match",
+    "normal-2": "all static read results, replay candle hashes and coverage match",
+    "normal-3": "all static read results, replay candle hashes and coverage match",
+    "stress-1": "all static read results, replay candle hashes and coverage match",
+    "stress-2": "all static read results, replay candle hashes and coverage match",
+    "stress-3": "all static read results, replay candle hashes and coverage match"
+  },
+  "contract": {
+    "scope": "Storage prototype only; complete real canonical snapshot before 2026-10-12, normalized raw mirror retains full observations; not a whole-app migration.",
+    "comparison": "PG native monthly partitioning, PK + batched COPY/upsert + transactional daily bitsets; CH current daily MergeTree architecture + real first_gap adapter.",
+    "resources": {
+      "cpu_each": 2,
+      "container_memory_bytes": 4294967296,
+      "ch_server_memory_bytes": 3221225472,
+      "ch_default_query_memory_bytes": 1610612736,
+      "pg_shared_buffers_bytes": 268435456,
+      "pg_work_mem_bytes": 4194304
+    },
+    "durability": "PG fsync/synchronous_commit/full_page_writes enabled; CH synchronous insertion plus fsync_after_insert/fsync_part_directory enabled on raw/canonical/stats replica tables. No source changes.",
+    "metrics": [
+      "end-to-end service p50/p95/p99",
+      "scheduled latency including backlog",
+      "completed/failed work",
+      "cgroup anon/file/total memory and CPU time",
+      "on-disk tables/indexes and server volume",
+      "result parity"
+    ],
+    "repetitions": 3,
+    "cache": "identical warmup, sequential engines with alternating run order; host OS caches not dropped; no cold disk claim",
+    "acceptance": "not assessed; owner latency/memory thresholds not specified",
+    "replay": "Real observed candle values; isolated REPLAY symbols and Jan-2030 timestamps; 5-row stream bursts, 1000-row history batches. Backfill rate is offered load, not exchange throughput.",
+    "source_state": "Immutable monthly FINAL exports; query failures at 128MiB retained; copied source data unchanged during tests.",
+    "duration_seconds": 60,
+    "normal_lanes": {
+      "stream": "5 rows / second",
+      "backfill": "1000 rows / 2 seconds",
+      "latest": "1/s",
+      "hot_latest": "1/s concurrent on replay stream",
+      "catalog": "1/2s",
+      "first_gap": "1/2s",
+      "artifact": "1-year read every10s"
+    },
+    "stress": "100 stream rows/s, extra latest reader2/s, 2 full-instrument-history readers every10s; same backfill.",
+    "validation": "All17snapshotcolumns exact Arrow equality outside timed runs; replay counts/checksums bothengines; gap/out-of-order correctness separate.",
+    "client": "Each lane in an independent spawned host process; binary psycopg result cursors and clickhouse-connect; identical NumPy materialization and hash. Sample aggregate RSS of parent+lane processes separately.",
+    "known_limits": [
+      "Not a whole-application HTTP test or complete production adapter migration.",
+      "Normalized raw mirror preserves canonical observation fields, not every provider-specific raw field or prior duplicate versions.",
+      "Compressed-time replay, not provider throughput or a maximum-capacity search.",
+      "Sampled cgroup memory peaks at1s; clientRSS separately; no forced cold OS cache.",
+      "CHfsync configuration is more conservative than the installed baseline.",
+      "Rare operation p99 has few samples; report n/max and variation."
+    ]
+  },
+  "completed_operations": 4068,
+  "interval_overruns": 0,
+  "harness_sha256": "b33c4a0564719aca8f29f3b5b32d299be099514db88ea3eda82cf0a2bb0ef1fb",
+  "relation_bytes": {
+    "pg": 6741893120,
+    "ch": 1209083060
+  },
+  "snapshot_validation": {
+    "pg": 15130115,
+    "ch": 15130115
+  },
+  "correctness": {
+    "pg": {
+      "full_latest_row_equal": true,
+      "duplicate_and_stale_version": true,
+      "gap_and_source_absence": true,
+      "actual_count_excludes_source_absence": true,
+      "raw_observations_retained": 4
+    },
+    "ch": {
+      "full_latest_row_equal": true,
+      "duplicate_and_stale_version": true,
+      "gap_and_source_absence": true,
+      "actual_count_excludes_source_absence": true,
+      "raw_observations_retained": 4
+    }
+  }
+}

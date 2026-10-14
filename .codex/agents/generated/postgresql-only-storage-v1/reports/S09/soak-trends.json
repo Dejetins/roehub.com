@@ -1,0 +1,70 @@
+{
+  "pg": [
+    {
+      "quarter": 1,
+      "samples": 179,
+      "memory_median_bytes": 335859712,
+      "memory_max_bytes": 649035776
+    },
+    {
+      "quarter": 2,
+      "samples": 179,
+      "memory_median_bytes": 313966592,
+      "memory_max_bytes": 453210112
+    },
+    {
+      "quarter": 3,
+      "samples": 179,
+      "memory_median_bytes": 320671744,
+      "memory_max_bytes": 459980800
+    },
+    {
+      "quarter": 4,
+      "samples": 179,
+      "memory_median_bytes": 328585216,
+      "memory_max_bytes": 468135936
+    }
+  ],
+  "server": [
+    {
+      "quarter": 1,
+      "samples": 177,
+      "memory_median_bytes": 2471972864,
+      "memory_max_bytes": 2624307200
+    },
+    {
+      "quarter": 2,
+      "samples": 176,
+      "memory_median_bytes": 2544592896.0,
+      "memory_max_bytes": 2657275904
+    },
+    {
+      "quarter": 3,
+      "samples": 176,
+      "memory_median_bytes": 2546210816.0,
+      "memory_max_bytes": 2667700224
+    },
+    {
+      "quarter": 4,
+      "samples": 177,
+      "memory_median_bytes": 2533908480,
+      "memory_max_bytes": 2673020928
+    }
+  ],
+  "relation_growth_bytes": {
+    "identity_sessions": 32768,
+    "market_data_work_events": 507904,
+    "raw_binance_klines_1m": 548495360,
+    "market_data_work_requests": 442368,
+    "candle_coverage_days": 1032192,
+    "canonical_candles_1m": 1047502848,
+    "identity_local_auth_rate_limits": 16384,
+    "market_data_stream_recovery": 16384,
+    "market_data_stream_events": 876544
+  },
+  "relation_growth_total_bytes": 1598922752,
+  "wal_bytes_first_last": [
+    "419430400",
+    "419430400"
+  ]
+}

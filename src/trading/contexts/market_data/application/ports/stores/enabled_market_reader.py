@@ -13,7 +13,7 @@ class EnabledMarketReader(Protocol):
       - docs/architecture/market_data/market-data-reference-api-v1.md
     Related:
       - src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py
-      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+      - src/trading/contexts/market_data/adapters/outbound/persistence/postgres/
         enabled_market_reader.py
       - apps/api/routes/market_data_reference.py
     """

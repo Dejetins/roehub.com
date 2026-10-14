@@ -363,7 +363,7 @@ class PublishBacktestArtifactsV2UseCase:
             FileNotFoundError: If a strict artifact path required by shared services is missing.
             OSError: If build writes or atomic pointer switch fail.
         Side Effects:
-            Reads ClickHouse bounds, writes inactive-slot artifacts, validates the slot, and
+            Reads PostgreSQL bounds, writes inactive-slot artifacts, validates the slot, and
             atomically switches `current.yaml` on success.
         Docs:
           - docs/architecture/backtest/README.md
@@ -550,14 +550,14 @@ def _resolve_build_time_range_v2(
     Resolve the source envelope used for the actual inactive-slot build.
 
     Args:
-        requested_time_range: Full canonical ClickHouse bounds for the target symbol.
+        requested_time_range: Full canonical PostgreSQL bounds for the target symbol.
         publish_mode: Resolved bootstrap/incremental/full-rebuild mode.
         precheck: Publish precheck carrying the active pointer, when present.
         slot_publisher: Publisher dependency exposing the artifact loader.
     Returns:
         TimeRange: Build range that preserves tail semantics for incremental publishes.
     Assumptions:
-        Incremental publish is a tail refresh. If ClickHouse later exposes older canonical rows
+        Incremental publish is a tail refresh. If PostgreSQL later exposes older canonical rows
         than the already-published artifact start, that is a separate head backfill/full-rebuild
         operation and must not silently disable prefix reuse.
     Raises:

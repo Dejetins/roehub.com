@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "0GUSDT",
+    "pointer": {
+      "schema_version": 1,
+      "active_slot": "slot_a",
+      "slot_generation": 1,
+      "asof_date": "2026-10-11",
+      "manifest_sha256": "74d24228c2c2f6a3bd4e75a82c024298c661b2aff6b759428643341fc1edbec7",
+      "published_at_utc": "2026-10-14T07:49:23Z"
+    },
+    "verified_manifest_path": ".local_artifacts/overview-preview-sep26/artifacts/backtest/v2/binance/spot/0GUSDT/slot_a/manifest.yaml"
+  },
+  {
+    "symbol": "AAPLBUSDT",
+    "pointer": {
+      "schema_version": 1,
+      "active_slot": "slot_b",
+      "slot_generation": 2,
+      "asof_date": "2026-10-11",
+      "manifest_sha256": "d5514c1697ddcf204206323fa82cfd7625b9603978d9dc8175432e2d535f4a57",
+      "published_at_utc": "2026-10-14T07:50:38Z"
+    },
+    "verified_manifest_path": ".local_artifacts/overview-preview-sep26/artifacts/backtest/v2/binance/spot/AAPLBUSDT/slot_b/manifest.yaml"
+  },
+  {
+    "symbol": "AAVEUSDT",
+    "pointer": {
+      "schema_version": 1,
+      "active_slot": "slot_a",
+      "slot_generation": 1,
+      "asof_date": "2026-10-11",
+      "manifest_sha256": "b30721579c9cf233fec52a36a2c948ef9d4b0d68b1f86e17badaa240c6bd4fd0",
+      "published_at_utc": "2026-10-14T07:50:00Z"
+    },
+    "verified_manifest_path": ".local_artifacts/overview-preview-sep26/artifacts/backtest/v2/binance/spot/AAVEUSDT/slot_a/manifest.yaml"
+  },
+  {
+    "symbol": "ACTUSDT",
+    "pointer": {
+      "schema_version": 1,
+      "active_slot": "slot_a",
+      "slot_generation": 1,
+      "asof_date": "2026-10-11",
+      "manifest_sha256": "595f30d8393a595b03258a56d066710131c60751c28001ea505015ea057ec83c",
+      "published_at_utc": "2026-10-14T07:47:03Z"
+    },
+    "verified_manifest_path": ".local_artifacts/overview-preview-sep26/artifacts/backtest/v2/binance/spot/ACTUSDT/slot_a/manifest.yaml"
+  }
+]

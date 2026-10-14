@@ -210,7 +210,7 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
       await expect(page.locator('#selected-strategy-heading')).toHaveText(preservedStrategy.name);
     }
     writeFileSync(resolve(evidence, 'integrated-journey.json'), JSON.stringify({
-      boundary: 'Real production API/auth/worker, disposable PostgreSQL/ClickHouse and synthetic production artifacts; no mocked response',
+      boundary: 'Real production API/auth/worker, disposable PostgreSQL and synthetic production artifacts; no mocked response',
       jobId: job.job_id, variant, strategyId, preflight: 200, create: 201, createPosts, savePosts,
       workerStates, jobReads, terminal: preservedJob.state, csvRows: 1, liveReadiness: readiness.compatibility_state,
       save: 201, duplicate:200, sameStrategy:true, controlledSourceNotFound:process.env.ROEHUB_PROOF_STRATEGIES === 'true', bodyless: true, starts, axe: 0,

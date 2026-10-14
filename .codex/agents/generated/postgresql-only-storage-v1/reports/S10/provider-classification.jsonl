@@ -1,0 +1,4 @@
+{"provider": "binance_spot", "http_status": 451, "classification": "response_indicates_location_policy", "transport": "http_response_received", "raw_response_saved": false}
+{"provider": "binance_futures", "http_status": 451, "classification": "response_indicates_location_policy", "transport": "http_response_received", "raw_response_saved": false}
+{"provider": "bybit_spot", "http_status": 403, "classification": "response_indicates_location_policy", "transport": "http_response_received", "raw_response_saved": false}
+{"provider": "bybit_futures", "http_status": 403, "classification": "response_indicates_location_policy", "transport": "http_response_received", "raw_response_saved": false}

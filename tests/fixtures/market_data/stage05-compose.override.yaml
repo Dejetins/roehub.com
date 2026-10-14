@@ -8,9 +8,6 @@ services:
   backtest-job-runner:
     image: roehub-dev/runtime:market-data-stage05
     pull_policy: never
-  clickhouse-exporter:
-    image: roehub-dev/runtime:market-data-stage05
-    pull_policy: never
   domain-cli:
     image: roehub-dev/runtime:market-data-stage05
     pull_policy: never
@@ -36,9 +33,6 @@ services:
     image: roehub-dev/runtime:market-data-stage05
     pull_policy: never
   operational-health:
-    image: roehub-dev/runtime:market-data-stage05
-    pull_policy: never
-  plugin-gateway:
     image: roehub-dev/runtime:market-data-stage05
     pull_policy: never
   storage-migrations:

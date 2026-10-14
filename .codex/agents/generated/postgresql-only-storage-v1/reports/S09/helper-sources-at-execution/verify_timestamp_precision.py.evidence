@@ -1,0 +1,13 @@
+"""Companion exact precision check for parity attempt3 started before review fix."""
+import json
+from tools.qa.postgres_production_soak import DSN, OUT
+from trading.platform.postgres_budget import connect
+with connect(DSN, budget_class='admin') as c:
+    row = c.execute("""SELECT count(*),
+      count(*) FILTER (WHERE ts_open<>date_trunc('milliseconds',ts_open)),
+      count(*) FILTER (WHERE ts_close<>date_trunc('milliseconds',ts_close)),
+      count(*) FILTER (WHERE ingested_at<>date_trunc('milliseconds',ingested_at))
+      FROM market_data.canonical_candles_1m WHERE ts_open<'2026-10-12'""").fetchone()
+assert row == (15130115,0,0,0), row
+(OUT/'timestamp-precision.json').write_text(json.dumps({'rows':row[0],'nonrepresentable_ms':dict(zip(['ts_open','ts_close','ingested_at'],row[1:])), 'direct_database_check':True},indent=2))
+print(row)

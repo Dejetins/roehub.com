@@ -325,11 +325,11 @@ def test_create_rejects_free_request_above_tier_top_n() -> None:
     assert exc_info.value.code == "backtest.request_too_expensive"
     details = exc_info.value.details
     assert isinstance(details, dict)
-    assert details["paid_level"] == "free"
+    assert "paid_level" not in details
     assert details["limit_scope"] == "full_jobs.top_n"
 
 
-def test_create_rejects_free_active_quota_with_retry_details() -> None:
+def test_create_rejects_self_host_active_quota_with_retry_details() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000000313")
     repository = _CreateRepository()
     trigger = _Trigger()
@@ -340,7 +340,7 @@ def test_create_rejects_free_active_quota_with_retry_details() -> None:
     )
     request = _request()
     request["top_n"] = 20
-    for index in range(2):
+    for index in range(20):
         use_case.create(
             user_id=user_id,
             paid_level=PaidLevel.free(),
@@ -359,7 +359,7 @@ def test_create_rejects_free_active_quota_with_retry_details() -> None:
     assert exc_info.value.code == "backtest.rate_limited"
     details = exc_info.value.details
     assert isinstance(details, dict)
-    assert details["paid_level"] == "free"
+    assert "paid_level" not in details
     assert details["limit_scope"] == "full_jobs.active"
     assert details["retry_after_seconds"] == 60
 

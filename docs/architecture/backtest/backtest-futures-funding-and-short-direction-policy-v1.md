@@ -1,4 +1,14 @@
 ---
+
+## Consumer wiring — S05, 2026-10-14
+
+Canonical/funding export читает PostgreSQL. Перед pointer switch проверяются generation/content/funding revisions под shared generation lock; ready receipt сохраняется в той же control transaction. Изменение source во время compute запрещает публикацию. Для PG выполняется full rebuild без недоказанного prefix reuse. Native NPY/mmap/scoring semantics сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
 doc_id: backtest-futures-funding-and-short-direction-policy-v1
 title: Backtest Futures Funding And Short Direction Policy v1
 status: draft-ready-for-implementation
@@ -10,6 +20,13 @@ source_plan: external pasted Markdown, not saved in repository
 ---
 
 # Backtest Futures Funding And Short Direction Policy v1
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Переносятся funding universe, оба provider raw и canonical funding. Сохраняются interval/source/nullability и существующий artifact output; новые parity/drills выполняются на disposable PG, без восстановления исторического host route.
+
 
 ## Статус и короткий вывод
 
@@ -28,65 +45,15 @@ prod env contract репозитория.
 ## Mac Studio runtime evidence contract
 
 Runtime acceptance for this plan is target-host evidence, not Codex-session
-loopback evidence. Whenever a stage requires ClickHouse, API, web, scheduler
+loopback evidence. Whenever a stage requires PostgreSQL, API, web, scheduler
 metrics, Prometheus, browser or benchmark runtime proof, the default target is
 `ssh macstudio` unless the stage explicitly says it is local-only development
 evidence.
 
-Required host/path contract:
-
-- SSH alias: `macstudio`.
-- Remote git checkout: `/Users/daniildegtyarev/Projects/roehub.com`.
-- Runtime tree: `/opt/roehub/app`.
-- Run remote git commands only with
-  `git -C /Users/daniildegtyarev/Projects/roehub.com ...`; do not run git
-  commands in `/opt/roehub/app`.
-- `127.0.0.1` in runtime smoke commands means Mac Studio loopback after SSH,
-  not the local Codex host.
-- SSH commands with SQL, JSON or multiline payloads must use quoted heredoc or
-  stdin. Do not use fragile nested inline shell quotes.
-- Mac Studio may not have `rg` or `clickhouse` CLI. Runtime probes should use
-  portable `grep`, `python`, and ClickHouse HTTP stdin when needed.
-
-Canonical target-host probes for Stage `01`:
-
-```bash
-ssh macstudio 'zsh -s' <<'REMOTE'
-set -e
-git -C /Users/daniildegtyarev/Projects/roehub.com rev-parse --short HEAD
-curl -fsS --max-time 5 http://127.0.0.1:8123/ping
-printf 'SELECT 1 FORMAT TabSeparated\n' \
-  | curl -fsS --max-time 5 --data-binary @- 'http://127.0.0.1:8123/'
-curl -fsS --max-time 5 http://127.0.0.1:9202/metrics \
-  | grep -E '^scheduler_funding_catchup_'
-REMOTE
-```
-
-If the Stage branch is not delivered to the Mac Studio checkout/runtime yet,
-the target-host probe may prove baseline service availability, but it cannot
-prove Stage acceptance. Record that as "not deployed to target runtime yet"
-rather than "service unavailable".
-
-Главные исправления к базовому плану:
-
-- Bybit external API category для USDT perpetual futures должен быть `linear`,
-  не `futures`; внутренний Roehub `market_type=futures` мапится в `linear`.
-- Runtime preflight сейчас знает `long_only` и `long_short_reversal`; standalone
-  `short` пока не является реальным backtest direction mode и должен быть
-  добавлен явно.
-- `StrategySpecV1` сейчас не хранит direction; short launch нельзя считать
-  полностью проведенным до решения, где direction живет в strategy/run/launch
-  metadata.
-- Funding не должен заменять `total_return_pct`; для futures jobs добавляется
-  net-of-funding family of metrics. Эффективная сортировка futures funding jobs
-  по умолчанию становится `total_return_pct_net_of_funding`, при этом gross
-  `total_return_pct` сохраняется как отдельный показатель.
-- Funding history не должен быть ручным-only процессом: текущий
-  `market-data-scheduler` обязан автоматически догонять funding для всех
-  exchange-discovered tradable futures pairs Binance и Bybit, а не только для
-  whitelist/`ENABLED` инструментов.
-- Старые spot jobs с short-enabled semantics остаются читаемыми и неизменными,
-  но новые short/long-short backtests и launches разрешены только для futures.
+Historical target-host commands are retired. No deployment/installation target is
+configured by this document. Select a disposable PostgreSQL target for tests;
+installed cutover requires the current S10 target/reset manifest. Prior measurements
+remain archived evidence and do not authorize host access.
 
 ## Проверенный baseline
 
@@ -193,108 +160,25 @@ Target modules:
 - `src/trading/contexts/market_data/application/ports/stores/funding_rate_coverage_reader.py`
 - `src/trading/contexts/market_data/application/use_cases/backfill_funding_rates.py`
 - `src/trading/contexts/market_data/adapters/outbound/clients/funding_rate_history_source.py`
-- `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py`
+- `src/trading/contexts/market_data/adapters/outbound/persistence/postgres/funding_rate_store.py`
 - `apps/cli/commands/funding_rate_catchup.py`
 - `apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py`
 - `src/trading/contexts/market_data/adapters/outbound/config/runtime_config.py`
 - `configs/{dev,test,prod}/market_data.yaml`
 
-### 2. ClickHouse schema
+### 2. PostgreSQL schema
 
-Implementation should add an idempotent migration, preferably
-`migrations/clickhouse/funding_rates_ddl.sql`, following the existing
-`market_data` style and `market_id UInt16` contract.
-
-Logical target schema:
-
-```sql
-CREATE TABLE IF NOT EXISTS market_data.ref_futures_funding_instruments
-(
-    market_id UInt16,
-    symbol LowCardinality(String),
-    instrument_key String,
-    external_category LowCardinality(String), -- binance:futures or bybit:linear semantics
-    exchange_status LowCardinality(String),
-    is_tradable UInt8,
-    settle_coin LowCardinality(Nullable(String)),
-    funding_interval_minutes Nullable(UInt16),
-    funding_interval_source LowCardinality(String),
-    upper_funding_rate Nullable(Float64),
-    lower_funding_rate Nullable(Float64),
-    updated_at DateTime64(3, 'UTC') DEFAULT now64(3)
-)
-ENGINE = ReplacingMergeTree(updated_at)
-ORDER BY (market_id, symbol);
-
-CREATE TABLE IF NOT EXISTS market_data.raw_binance_funding_rates
-(
-    market_id UInt16,
-    symbol LowCardinality(String),
-    instrument_key String,
-    funding_time DateTime64(3, 'UTC'),
-    funding_time_ms UInt64,
-    funding_rate Float64,
-    mark_price Nullable(Float64),
-    funding_interval_minutes Nullable(UInt16),
-    funding_interval_source LowCardinality(String),
-    adjusted_cap Nullable(Float64),
-    adjusted_floor Nullable(Float64),
-    source LowCardinality(String) DEFAULT 'rest',
-    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3),
-    ingest_id Nullable(UUID)
-)
-ENGINE = ReplacingMergeTree(ingested_at)
-PARTITION BY toYYYYMM(funding_time)
-ORDER BY (market_id, symbol, funding_time);
-
-CREATE TABLE IF NOT EXISTS market_data.raw_bybit_funding_rates
-(
-    market_id UInt16,
-    symbol LowCardinality(String),
-    instrument_key String,
-    external_category LowCardinality(String), -- v1: linear
-    settle_coin LowCardinality(Nullable(String)),
-    funding_time DateTime64(3, 'UTC'),
-    funding_time_ms UInt64,
-    funding_rate Float64,
-    mark_price Nullable(Float64),
-    funding_interval_minutes Nullable(UInt16),
-    funding_interval_source LowCardinality(String),
-    upper_funding_rate Nullable(Float64),
-    lower_funding_rate Nullable(Float64),
-    source LowCardinality(String) DEFAULT 'rest',
-    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3),
-    ingest_id Nullable(UUID)
-)
-ENGINE = ReplacingMergeTree(ingested_at)
-PARTITION BY toYYYYMM(funding_time)
-ORDER BY (market_id, symbol, funding_time);
-
-CREATE TABLE IF NOT EXISTS market_data.canonical_funding_rates
-(
-    market_id UInt16,
-    symbol LowCardinality(String),
-    instrument_key String,
-    funding_time DateTime64(3, 'UTC'),
-    funding_time_ms UInt64,
-    funding_rate Float64,
-    mark_price Nullable(Float64),
-    funding_interval_minutes Nullable(UInt16),
-    funding_interval_source LowCardinality(String),
-    data_quality UInt8,
-    source LowCardinality(String),
-    ingested_at DateTime64(3, 'UTC'),
-    ingest_id Nullable(UUID)
-)
-ENGINE = ReplacingMergeTree(ingested_at)
-PARTITION BY toYYYYMM(funding_time)
-ORDER BY (market_id, symbol, funding_time);
-```
-
-Materialized views may populate `canonical_funding_rates` from both raw tables,
-but they are optional if the repository pattern favors explicit store writes.
-The key requirement is one canonical read path for artifact publishing and
-coverage checks.
+The current PostgreSQL manifest owns the schema (`0036` and subsequent append-only
+migrations); applied migration bytes must not be edited. Tables:
+`ref_futures_funding_instruments`, `raw_binance_funding_rates`,
+`raw_bybit_funding_rates`, `canonical_funding_rates` in `market_data`.
+Raw observations and canonical winners commit atomically with `funding_revision`.
+Canonical primary key is `(market_id, symbol, funding_time)`; monthly UTC partitions,
+`timestamptz` at millisecond precision, double precision and explicit nullable provider
+fields preserve provider semantics. Replays use version-aware upsert with stable ties.
+Reads use one current row and deterministic funding-time order. Funding gaps,
+degraded status and interval metadata remain explicit. Detailed field inventory and
+NULL policy are in the [PostgreSQL contract](../market_data/market-data-real-adapters-postgresql-parquet-v1.md).
 
 ### 3. Funding catch-up и automatic scheduler mode
 
@@ -413,7 +297,7 @@ Required metrics on `market-data-scheduler`:
 | `scheduler_funding_catchup_degraded_instruments` | Gauge | `exchange`, `market_type` | Count of symbols with partial or stale coverage. |
 
 Cardinality rule: do not use `symbol` as a Prometheus label for funding
-freshness. Per-symbol diagnostics belong in structured logs and ClickHouse
+freshness. Per-symbol diagnostics belong in structured logs and PostgreSQL
 queries; Prometheus carries exchange/market aggregate status.
 
 Required alert/runbook artifacts:
@@ -453,7 +337,7 @@ Service calls, retry and idempotency:
 | --- | --- | --- | --- | --- | --- |
 | `market-data-scheduler` `funding_rate_catchup` | Binance `/fapi/v1/exchangeInfo`, required `GET /fapi/v1/fundingInfo`, `GET /fapi/v1/fundingRate` | none, public market-data | Use per-market `rest.timeout_s`, `rest.retries`, exponential backoff and provider rate-limit waits from `market_data.yaml`. | Funding universe dedupes by `(market_id, symbol)`; funding events dedupe by `(market_id, symbol, funding_time_ms, source)`; unknown response/write state is repaired by rerunning the same closed window because writes are idempotent. | Per-symbol failure increments failed metrics, logs summarized provider status, continues other symbols. Global `fundingInfo` failure degrades/fails Binance readiness rather than silently using 8h for all symbols. |
 | `market-data-scheduler` `funding_rate_catchup` | Bybit `/v5/market/instruments-info?category=linear` and `GET /v5/market/funding/history` | none, public market-data | Same timeout/backoff; Bybit calls must use `category=linear` for v1 and bounded `startTime+endTime` windows. | Same universe/event dedupe; never call Bybit with only `startTime`; rerun bounded windows after unknown state. | Per-symbol failure increments failed metrics, logs summarized `retCode`, continues other symbols. |
-| Funding use case | ClickHouse raw/canonical funding store | ClickHouse env config; do not print secrets | Bounded insert batches; retry only through idempotent rerun path, not blind infinite loops. | `ReplacingMergeTree(ingested_at)` plus stable `(market_id, symbol, funding_time)` ordering makes window replays safe. | Store errors mark instrument failed for this cycle and raise scheduler job error if systemic. |
+| Funding use case | PostgreSQL raw/canonical funding store | PostgreSQL env config; do not print secrets | Bounded insert batches; retry only through idempotent rerun path, not blind infinite loops. | Version-aware transactional upsert on `(market_id, symbol, funding_time)` makes window replays idempotent. | Store errors mark instrument failed for this cycle and raise scheduler job error if systemic. |
 | Prometheus | `market-data-scheduler` `/metrics` on `9202` | local scrape only | scrape interval from Prometheus config | metrics are observational only; no side effects | Down scrape is handled by existing `up{job="market-data-scheduler"}` plus funding-specific stale alerts. |
 
 ### 5. Funding artifact family
@@ -644,7 +528,7 @@ Direction storage decision for v1:
 | Direction enum | `compatible-change` for tolerant clients, possible `breaking-change` for strict clients | Adds standalone `short` and rejects old spot short-like submissions. |
 | Strategy launch API | `breaking-change` intentional | `paper + spot + short-like` changes from allowed/paper-only to rejected. |
 | Browser CJM | `breaking-change` intentional | Existing spot short-like path becomes rerun-only. |
-| ClickHouse schema | `compatible-change` | New funding tables/MVs. |
+| PostgreSQL schema | `compatible-change` | New funding tables/MVs. |
 | Funding instrument universe | `compatible-change` | Adds dedicated all-futures funding universe; must not silently convert all exchange symbols into `ENABLED` candle ingestion instruments. |
 | Market-data scheduler config | `compatible-change` | Adds optional `scheduler.jobs.funding_rate_catchup`; production config should enable it explicitly. |
 | Prometheus metrics | `compatible-change` | Adds scheduler funding series; avoid symbol labels to control cardinality. |
@@ -661,7 +545,7 @@ The generated prompt pack implements this order:
 | Stage | Name | Outcome |
 | --- | --- | --- |
 | `00` | Review baseline and freeze contract | Re-read plan, code boundaries, docs, API facts; record exact file manifest and stage ledger entry before code. |
-| `01` | Funding storage, automatic catch-up and observability | ClickHouse funding schema, dedicated all-futures funding universe, sources, writer, manual CLI, `market-data-scheduler` automatic all-futures catch-up, Prometheus metrics, alerts, runbook and real-boundary proof. |
+| `01` | Funding storage, automatic catch-up and observability | PostgreSQL funding schema, dedicated all-futures funding universe, sources, writer, manual CLI, `market-data-scheduler` automatic all-futures catch-up, Prometheus metrics, alerts, runbook and real-boundary proof. |
 | `02` | Funding artifact family and coverage | Publish/load funding arrays from automatically maintained `canonical_funding_rates`, manifest hash, coverage reader, artifact tests. |
 | `03` | Preflight/runtime defaults funding readiness | Normalize funding request, direction compatibility, readiness metadata. |
 | `04` | No-risk funding adjustment | Compute net-of-funding candidate-pool metrics for no-risk variants. |
@@ -679,7 +563,7 @@ touching shared contracts:
 - `uv run pyright <touched targets>`;
 - `uv run pytest -q <focused tests>`;
 - `python -m tools.docs.generate_docs_index --check` when docs changed;
-- `ssh macstudio 'zsh -s'` target-host probes for ClickHouse, API/web,
+- `ssh macstudio 'zsh -s'` target-host probes for PostgreSQL, API/web,
   scheduler metrics and Prometheus runtime evidence; `127.0.0.1` means Mac
   Studio loopback, not local Codex loopback;
 - `curl -fsS http://127.0.0.1:9202/metrics | grep -E '^scheduler_funding_catchup_'`
@@ -710,7 +594,7 @@ Funding correctness fixtures must cover:
 | Funding stays manual-only and silently goes stale | High | Stage `01` must extend `market-data-scheduler` for all exchange-discovered tradable futures instruments and expose freshness metrics/alerts. |
 | Funding universe accidentally expands candle ingestion to every exchange futures symbol | High | Use dedicated funding universe table/reader; do not mark all exchange futures as `ENABLED` in existing whitelist-driven `ref_instruments`. |
 | Funding interval metadata is silently missing | High | Bybit `fundingInterval` is required per symbol; Binance `fundingInfo` is required globally, with explicit `binance_standard_8h_no_adjustment_row` only for symbols absent from the adjusted-only response. Missing metadata increments degraded metrics and blocks readiness claims. |
-| Prometheus per-symbol funding labels explode cardinality | Medium | Metrics aggregate by exchange/market/status; per-symbol details stay in logs/ClickHouse. |
+| Prometheus per-symbol funding labels explode cardinality | Medium | Metrics aggregate by exchange/market/status; per-symbol details stay in logs/PostgreSQL. |
 | Strategy direction not stored where live code consumes it | High | Stage `07` must trace direction from backtest snapshot to run/launch metadata and live readiness. |
 | Funding degraded warnings hidden in UI | Medium | Preflight, result summary and launch modal all expose warning codes. |
 | Provider rate limits slow all-symbol catch-up | Medium | Bounded windows, checkpointing, dry-run, backoff and resumable idempotent writes. |

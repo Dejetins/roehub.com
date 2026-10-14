@@ -702,7 +702,7 @@ def test_live_strategy_profile_allows_paper_and_recent_auth_live_with_ready_conn
     assert live.json()["readiness_status"] == "ready"
 
 
-def test_live_strategy_profile_blocks_second_free_rl_live_ticker() -> None:
+def test_live_strategy_profile_allows_second_self_host_rl_live_ticker() -> None:
     client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
     headers = {
         "x-user-id": "00000000-0000-0000-0000-000000001434",
@@ -750,8 +750,7 @@ def test_live_strategy_profile_blocks_second_free_rl_live_ticker() -> None:
     )
     assert second_live.status_code == 200
     assert second_live.json()["mode"] == "live"
-    assert second_live.json()["readiness_status"] == "blocked"
-    assert second_live.json()["readiness_reason"] == "rl_live_ticker_quota_exceeded"
+    assert second_live.json()["readiness_status"] == "ready"
 
 
 def test_live_strategy_profile_does_not_count_paper_and_releases_stopped_slot() -> None:
@@ -834,7 +833,7 @@ def test_live_strategy_profile_does_not_count_paper_and_releases_stopped_slot() 
     assert first_live.json()["readiness_status"] == "ready"
 
 
-def test_live_strategy_profile_blocks_base_paid_level_fail_closed() -> None:
+def test_live_strategy_profile_ignores_legacy_base_paid_level() -> None:
     client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
     headers = {
         "x-user-id": "00000000-0000-0000-0000-000000001436",
@@ -860,8 +859,7 @@ def test_live_strategy_profile_blocks_base_paid_level_fail_closed() -> None:
         headers=headers,
     )
     assert live.status_code == 200
-    assert live.json()["readiness_status"] == "blocked"
-    assert live.json()["readiness_reason"] == "rl_live_ticker_paid_level_base_fail_closed"
+    assert live.json()["readiness_status"] == "ready"
 
 
 def test_launch_from_backtest_variant_creates_profile_and_run_config() -> None:

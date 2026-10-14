@@ -23,7 +23,7 @@ groups:
         annotations:
           summary: Strategy producer iteration errors increased
           description: The supervised producer loop observed one or more failed iterations.
-          escalation: Keep allowlists narrow, inspect Postgres/Redis/ClickHouse dependency readiness, and do not enable broader strategy production.
+          escalation: Keep allowlists narrow, inspect PostgreSQL/Redis dependency readiness, and do not enable broader strategy production.
           runbook: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions
           action: Query /health/ready and logs, then compare strategy_producer_last_success_unixtime with dependency health.
 

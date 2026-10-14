@@ -1,0 +1,35 @@
+"""Protect the real installation from destructive prototype setup/reset."""
+import json
+import unittest
+from unittest.mock import patch
+
+from tools.qa.postgres_storage_prototype import guard, run
+
+
+class TargetSafetyTest(unittest.TestCase):
+    def test_foreign_volume_is_rejected_even_with_label_and_port(self):
+        info = [{'Config': {'Labels': {'roehub.storage-comparison': '20261013'}},
+                 'NetworkSettings': {'Ports': {'5432/tcp': [
+                     {'HostIp': '127.0.0.1', 'HostPort': '36543'}]}},
+                 'Mounts': [{'Type': 'volume', 'Name': 'roehub-navigator-pg'}]}]
+        with patch('subprocess.check_output', return_value=json.dumps(info).encode()):
+            with self.assertRaises(AssertionError):
+                guard('pg')
+
+    def test_public_port_is_rejected(self):
+        info = [{'Config': {'Labels': {'roehub.storage-comparison': '20261013'}},
+                 'NetworkSettings': {'Ports': {'5432/tcp': [
+                     {'HostIp': '0.0.0.0', 'HostPort': '36543'}]}}, 'Mounts': []}]
+        with patch('subprocess.check_output', return_value=json.dumps(info).encode()):
+            with self.assertRaises(AssertionError):
+                guard('pg')
+
+    def test_replay_cannot_escape_prepared_month(self):
+        with patch('subprocess.check_output') as docker:
+            with self.assertRaises(ValueError):
+                run('pg', 'invalid', 76)
+            docker.assert_not_called()
+
+
+if __name__ == '__main__':
+    unittest.main()

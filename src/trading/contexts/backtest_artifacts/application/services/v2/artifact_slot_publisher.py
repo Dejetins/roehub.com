@@ -6,11 +6,12 @@ import fcntl
 import json
 import os
 import shutil
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, ContextManager
 from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.ports import BacktestJobRepository
@@ -138,6 +139,9 @@ class BacktestArtifactSlotPublisherV2:
     job_repository: BacktestJobRepository
     now_provider: NowProviderV2 = _default_now_provider_v2
     recover_declared_inventory: bool = False
+    source_fence: Any = None
+    source_guard: Callable[[], ContextManager] = nullcontext
+    on_publication: Callable[[ArtifactPublishResultV2], None] | None = None
 
     def precheck_publish(self, coordinates: ArtifactCoordinatesV2) -> ArtifactPublishPrecheckV2:
         """
@@ -323,7 +327,23 @@ class BacktestArtifactSlotPublisherV2:
                         writer.parent_incarnation,
                     ):
                         raise ValueError("publication source owner mismatch")
-                with self.job_repository.transaction():
+                try:
+                    recovery_pointer = self.artifact_loader.load_current_pointer(coordinates)
+                except FileNotFoundError:
+                    recovery_pointer = None
+                # Unpublished candidates may always be discarded under exact dead-owner
+                # ownership. A newer canonical revision must not strand their reservation.
+                active_build = (
+                    payload["operation"] == "build"
+                    and recovery_pointer is not None
+                    and recovery_pointer.active_slot == writer.slot
+                )
+                revision_guard = (
+                    self.source_fence.guard(coordinates, payload.get("source_identity"))
+                    if self.source_fence and active_build
+                    else nullcontext()
+                )
+                with revision_guard, self.job_repository.transaction():
                     if self.job_repository.owns_artifact_writer(writer=writer):
                         self.job_repository.quarantine_artifact_writer(writer=writer)
                         path = self.artifact_loader.resolve_slot_manifest_path(
@@ -375,13 +395,18 @@ class BacktestArtifactSlotPublisherV2:
                                 # belong to the legacy full publisher. Validate every declared
                                 # payload using its recorded inventory, never the new plan.
                                 from .contracts import ArtifactSignalValidationSpecV2
+
                                 recovery_spec = ArtifactSlotValidationSpecV2(
                                     price_timeframes=tuple(p.timeframe for p in manifest.prices),
                                     mapping_timeframes=tuple(
-                                        p.timeframe for p in manifest.mappings),
-                                    signal_artifacts=tuple(ArtifactSignalValidationSpecV2(
-                                        timeframe=p.timeframe, indicator_id=p.indicator_id)
-                                        for p in manifest.signals.manifests),
+                                        p.timeframe for p in manifest.mappings
+                                    ),
+                                    signal_artifacts=tuple(
+                                        ArtifactSignalValidationSpecV2(
+                                            timeframe=p.timeframe, indicator_id=p.indicator_id
+                                        )
+                                        for p in manifest.signals.manifests
+                                    ),
                                     require_hit_times_manifest=(manifest.hit_times is not None),
                                 )
                             validation = BacktestArtifactManifestValidatorV2(
@@ -442,6 +467,15 @@ class BacktestArtifactSlotPublisherV2:
         """Build privately under durable coordinate ownership and pin incremental source reads."""
         self._ensure_precheck_ready(precheck)
         coordinates = precheck.coordinates
+        source_identity = (
+            self.source_fence.capture(coordinates, frozen_end=request.time_range.end.value)
+            if self.source_fence
+            else None
+        )
+        if self.source_fence is not None:
+            # Existing file manifests do not bind a PG generation/revision tuple.
+            # Never reuse their prefix after an in-place canonical correction.
+            request = replace(request, force_full_rebuild=True, reuse_source_slot=None)
         token, incarnation = uuid4(), uuid4()
         symbol_root = precheck.current_pointer_path.parent
         record = symbol_root / f".publication-{token}"
@@ -452,6 +486,7 @@ class BacktestArtifactSlotPublisherV2:
         candidate = record / "candidate"
         original_generation = None
         failed = False
+        publication_started = False
         try:
             with self.job_repository.transaction():
                 # Reservation itself locks BOTH rows. Expected physical metadata is
@@ -521,6 +556,7 @@ class BacktestArtifactSlotPublisherV2:
                     {
                         "schema": "artifact-publication-owner/v1",
                         "operation": "build",
+                        "source_identity": source_identity,
                         "bootstrap": precheck.current_pointer is None,
                         "writer": {key: str(value) for key, value in writer.parameters().items()},
                         "source_reader": (
@@ -566,9 +602,15 @@ class BacktestArtifactSlotPublisherV2:
                 expected_asof_date=request.asof_date,
             )
             _fsync_candidate(candidate)
-            with self.job_repository.transaction():
+            revision_guard = (
+                self.source_fence.guard(coordinates, source_identity)
+                if self.source_fence
+                else nullcontext()
+            )
+            with revision_guard, self.source_guard(), self.job_repository.transaction():
                 self.job_repository.verify_artifact_writer(writer=writer)
                 self._revalidate_precheck(precheck=precheck, check_target=True)
+                publication_started = True
                 if target.exists():
                     os.rename(target, record / "previous-target")
                 os.rename(candidate, target)
@@ -580,6 +622,8 @@ class BacktestArtifactSlotPublisherV2:
                     asof_date=request.asof_date,
                     writer=writer,
                 )
+                if self.on_publication is not None:
+                    self.on_publication(published)
                 self.job_repository.complete_artifact_writer(
                     writer=writer,
                     generation=published.published_pointer.slot_generation,
@@ -600,12 +644,18 @@ class BacktestArtifactSlotPublisherV2:
                     coordinates, precheck.inactive_slot, "1m"
                 ),
             ), published
-        except BaseException:
+        except BaseException as error:
             failed = True
             if writer is not None:
                 # Keep both source pin and record if filesystem/DB reconciliation
                 # cannot prove a safe release. Expiration is never reclamation.
                 self.job_repository.quarantine_artifact_writer(writer=writer)
+            if not publication_started and str(error) in (
+                "source_revision_changed",
+                "source_unavailable",
+                "legacy_source_target_invalid",
+            ):
+                raise ArtifactPublicationNotStarted(str(error)) from error
             raise
         finally:
             if lock_fd >= 0:

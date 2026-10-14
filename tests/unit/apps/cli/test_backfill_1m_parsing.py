@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from apps.cli.commands.backfill_1m import IsoUtcTimestampParser, OptionalIntBatchSizeParser
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader
+from apps.cli.wiring.db.postgres import close_market_gateways, market_gateway
 
 
 def test_parse_utc_iso_z_accepts_z_and_is_tz_aware() -> None:
@@ -40,48 +40,17 @@ def test_parse_batch_size_rejects_non_positive() -> None:
         parser.parse("-1")
 
 
-def test_clickhouse_env_loader_defaults() -> None:
-    env = {}
-    s = ClickHouseSettingsLoader(env).load()
-    assert s.host == "localhost"
-    assert s.port == 8123
-    assert s.user == "default"
-    assert s.password == ""
-    assert s.database == "market_data"
-    assert s.secure is False
-    assert s.verify is True
+def test_postgres_gateway_requires_explicit_dsn():
+    with pytest.raises(ValueError, match="STRATEGY_PG_DSN"):
+        market_gateway({})
 
 
-def test_clickhouse_env_loader_parses_values() -> None:
-    env = {
-        "CH_HOST": "ch",
-        "CH_PORT": "8443",
-        "CH_USER": "u",
-        "CH_PASSWORD": "p",
-        "CH_DATABASE": "market_data",
-        "CH_SECURE": "1",
-        "CH_VERIFY": "0",
-    }
-    s = ClickHouseSettingsLoader(env).load()
-    assert s.host == "ch"
-    assert s.port == 8443
-    assert s.user == "u"
-    assert s.password == "p"
-    assert s.secure is True
-    assert s.verify is False
-
-
-def test_clickhouse_env_loader_reads_file_backed_credential(tmp_path) -> None:
-    credential_path = tmp_path / "clickhouse-credential"
-    marker = "fixture-value"
-    credential_path.write_text(f"{marker}\n", encoding="utf-8")
-
-    settings = ClickHouseSettingsLoader(
-        {
-            "CH_HOST": "ch",
-            "CH_DATABASE": "roehub",
-            "ROEHUB_CLICKHOUSE_PASSWORD_FILE": str(credential_path),
-        }
-    ).load()
-
-    assert settings.password == marker
+def test_postgres_gateway_reuses_workload_and_rejects_unknown_class():
+    env = {"STRATEGY_PG_DSN": "host=127.0.0.1 port=1 dbname=fixture user=fixture"}
+    try:
+        assert market_gateway(env, workload="stream") is market_gateway(env, workload="ingestion")
+        assert market_gateway(env, workload="bulk") is not market_gateway(env, workload="stream")
+        with pytest.raises(ValueError, match="workload"):
+            market_gateway(env, workload="unknown")
+    finally:
+        close_market_gateways()

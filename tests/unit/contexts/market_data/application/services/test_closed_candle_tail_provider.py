@@ -199,9 +199,7 @@ class _PostgresAuditGateway:
         if "WHERE correlation_id = %(correlation_id)s" not in query:
             raise AssertionError(f"unexpected query: {query}")
         correlation_id = str(parameters["correlation_id"])
-        return tuple(
-            row for row in self.rows.values() if row["correlation_id"] == correlation_id
-        )
+        return tuple(row for row in self.rows.values() if row["correlation_id"] == correlation_id)
 
     def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
         _ = query
@@ -257,15 +255,15 @@ def _provider(
         policy=ClosedCandleTailRepairPolicy(
             rest_tail_limit_minutes=rest_tail_limit_minutes,
         ),
-        clickhouse_circuit_open_seconds=30.0,
+        canonical_store_circuit_open_seconds=30.0,
         hooks=hooks,
     )
 
 
-def test_provider_falls_back_from_clickhouse_failure_to_rest_and_writes_hot_cache() -> None:
+def test_provider_falls_back_from_canonical_store_failure_to_rest_and_writes_hot_cache() -> None:
     base = datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc)
     hot_cache = _HotCache()
-    canonical_reader = _CanonicalReader(error=RuntimeError("clickhouse unavailable"))
+    canonical_reader = _CanonicalReader(error=RuntimeError("canonical_store unavailable"))
     rest_source = _RestSource((_row(base),))
     audit_repository = _AuditRepository()
     provider = _provider(
@@ -288,7 +286,7 @@ def test_provider_falls_back_from_clickhouse_failure_to_rest_and_writes_hot_cach
     assert [row.source for row in result.candles] == ["rest"]
     assert [(item.source, item.status) for item in result.sources_attempted] == [
         ("redis_hot_cache", "miss"),
-        ("clickhouse", "failed"),
+        ("canonical_store", "failed"),
         ("rest", "succeeded"),
     ]
     assert hot_cache.write_calls == 1
@@ -325,7 +323,7 @@ def test_provider_ignores_source_rows_outside_requested_range() -> None:
     hot_cache.rows[base] = _row(base)
     hot_cache.rows[base + timedelta(minutes=1)] = _row(base + timedelta(minutes=1))
     hot_cache.rows[base + timedelta(minutes=2)] = _row(base + timedelta(minutes=2))
-    canonical_reader = _CanonicalReader(error=RuntimeError("clickhouse should not be called"))
+    canonical_reader = _CanonicalReader(error=RuntimeError("canonical_store should not be called"))
     rest_source = _RestSource(())
     audit_repository = _AuditRepository()
     provider = _provider(
@@ -364,7 +362,7 @@ def test_provider_emits_bounded_repair_metrics_hooks() -> None:
     circuit_states: list[int] = []
     provider = _provider(
         hot_cache=_HotCache(),
-        canonical_reader=_CanonicalReader(error=RuntimeError("clickhouse unavailable")),
+        canonical_reader=_CanonicalReader(error=RuntimeError("canonical_store unavailable")),
         rest_source=_RestSource((_row(base),)),
         audit_repository=_AuditRepository(),
         now=base + timedelta(minutes=5, seconds=30),
@@ -373,7 +371,7 @@ def test_provider_emits_bounded_repair_metrics_hooks() -> None:
             on_repair_latency=lambda source, status, duration: latencies.append(
                 (source, status, duration)
             ),
-            on_clickhouse_circuit_state=circuit_states.append,
+            on_canonical_store_circuit_state=circuit_states.append,
         ),
     )
 
@@ -388,7 +386,7 @@ def test_provider_emits_bounded_repair_metrics_hooks() -> None:
     assert result.continuous is True
     assert attempts == [
         ("redis_hot_cache", "miss"),
-        ("clickhouse", "failed"),
+        ("canonical_store", "failed"),
         ("rest", "succeeded"),
     ]
     assert [(source, status) for source, status, _duration in latencies] == attempts
@@ -400,7 +398,7 @@ def test_provider_returns_sorted_rows_when_sources_restore_out_of_order() -> Non
     base = datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc)
     hot_cache = _HotCache()
     hot_cache.rows[base + timedelta(minutes=2)] = _row(base + timedelta(minutes=2))
-    canonical_reader = _CanonicalReader(error=RuntimeError("clickhouse unavailable"))
+    canonical_reader = _CanonicalReader(error=RuntimeError("canonical_store unavailable"))
     rest_source = _RestSource((_row(base), _row(base + timedelta(minutes=1))))
     audit_repository = _AuditRepository()
     provider = _provider(
@@ -447,12 +445,10 @@ def test_provider_returns_miss_and_audit_when_rest_tail_is_missing() -> None:
     )
 
     assert result.continuous is False
-    assert [str(item) for item in result.missing_ts_opens] == [
-        "2026-06-30T12:00:00.000Z"
-    ]
+    assert [str(item) for item in result.missing_ts_opens] == ["2026-06-30T12:00:00.000Z"]
     assert [(item.source, item.status) for item in result.sources_attempted] == [
         ("redis_hot_cache", "miss"),
-        ("clickhouse", "miss"),
+        ("canonical_store", "miss"),
         ("rest", "miss"),
     ]
     assert audit_repository.records[0].status == "miss"
@@ -525,7 +521,7 @@ def test_provider_records_audit_through_postgres_repository_boundary() -> None:
     audit_repository = PostgresCandleRepairAuditRepository(gateway=gateway)
     provider = _provider(
         hot_cache=_HotCache(),
-        canonical_reader=_CanonicalReader(error=RuntimeError("clickhouse unavailable")),
+        canonical_reader=_CanonicalReader(error=RuntimeError("canonical_store unavailable")),
         rest_source=_RestSource((_row(base),)),
         audit_repository=audit_repository,
         now=base + timedelta(minutes=5),
@@ -538,24 +534,26 @@ def test_provider_records_audit_through_postgres_repository_boundary() -> None:
         end_ts_open=UtcTimestamp(base + timedelta(minutes=1)),
         correlation_id="stage03-postgres-audit-proof",
     )
-    listed = audit_repository.list_for_correlation(
-        correlation_id="stage03-postgres-audit-proof"
-    )
+    listed = audit_repository.list_for_correlation(correlation_id="stage03-postgres-audit-proof")
 
     assert result.continuous is True
     assert len(listed) == 1
     assert listed[0].status == "succeeded"
     assert tuple(attempt.source for attempt in listed[0].sources_attempted) == (
         "redis_hot_cache",
-        "clickhouse",
+        "canonical_store",
         "rest",
     )
     assert gateway.insert_parameters is not None
     assert json.loads(str(gateway.insert_parameters["sources_attempted_json"])) == [
         {"error_code": None, "source": "redis_hot_cache", "status": "miss"},
-        {"error_code": "clickhouse_exception", "source": "clickhouse", "status": "failed"},
+        {
+            "error_code": "canonical_store_exception",
+            "source": "canonical_store",
+            "status": "failed",
+        },
         {"error_code": None, "source": "rest", "status": "succeeded"},
     ]
     joined_queries = "\n".join(gateway.queries)
     assert "canonical_candles" not in joined_queries
-    assert "ClickHouse" not in joined_queries
+    assert "CanonicalStore" not in joined_queries

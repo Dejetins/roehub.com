@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Awaitable, Callable, Iterable, Sequence
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
@@ -37,3 +38,20 @@ def notify_stored_candles(rows: Iterable[CandleWithMeta], notify: Callable[[Inst
             notify(instrument)
         except Exception:
             log.warning("stored candle hint unavailable; bounded reconciliation required")
+
+
+async def write_then_publish(
+    rows: Sequence[CandleWithMeta],
+    write: Callable[[Sequence[CandleWithMeta]], Awaitable[None]],
+    publish: Callable[[CandleWithMeta], None],
+    notify: Callable[[InstrumentId], None] | None = None,
+) -> None:
+    """Only committed rows may reach Redis; failed hints never undo a durable receipt."""
+    await write(rows)
+    for row in rows:
+        try:
+            publish(row)
+        except Exception:
+            log.warning("committed candle publication unavailable; recovery required")
+    if notify is not None:
+        await asyncio.to_thread(notify_stored_candles, rows, notify)

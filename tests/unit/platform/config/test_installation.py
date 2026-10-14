@@ -74,7 +74,6 @@ def test_profile_matrix_is_schema_valid_deterministic_and_golden() -> None:
             "compose.yaml",
             "effective-config.redacted.json",
             "generation-manifest.json",
-            "oidc.json",
             "openbao.json",
             "prometheus.yml",
             "service-config.json",

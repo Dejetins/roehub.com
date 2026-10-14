@@ -20,11 +20,12 @@ class _FakeHttp:
     def __init__(self, responses):  # noqa: ANN001
         """Store response payload queue used by `get_json` calls."""
         self._responses = list(responses)
+        self.calls = []
 
     def get_json(self, *, url, params, timeout_s, retries, backoff_base_s, backoff_max_s, backoff_jitter_s):  # noqa: E501, ANN001
         """Return next queued payload and ignore transport settings."""
         _ = url
-        _ = params
+        self.calls.append((url, params))
         _ = timeout_s
         _ = retries
         _ = backoff_base_s
@@ -120,6 +121,8 @@ def test_metadata_source_parses_binance_exchange_info(tmp_path: Path) -> None:
 
     rows = source.list_for_market(MarketId(1))
 
+    assert isinstance(source.http, _FakeHttp)
+    assert source.http.calls[0][1] == {"showPermissionSets": "false"}
     assert len(rows) == 1
     assert str(rows[0].instrument_id.symbol) == "BTCUSDT"
     assert rows[0].price_step == 0.01

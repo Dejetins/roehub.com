@@ -29,9 +29,9 @@ def test_runbook_generator_is_deterministic_and_indexed() -> None:
 
     outputs = expected_outputs(REPO_ROOT)
     index = json.loads(outputs[INDEX_PATH])
-    assert len(index["runbooks"]) == 9
-    assert len(index["problem_index"]) == 20
-    assert len(index["legacy_unmigrated"]) == 25
+    assert len(index["runbooks"]) == 8
+    assert len(index["problem_index"]) == 18
+    assert len(index["legacy_unmigrated"]) == 24
     assert any(
         entry["path"] == "docs/runbooks/market-data-efficiency-local-activation-20261011.md"
         for entry in index["legacy_unmigrated"]

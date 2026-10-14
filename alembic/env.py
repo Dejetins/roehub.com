@@ -80,6 +80,14 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
+    from sqlalchemy import event
+
+    from trading.platform.postgres_budget import admin_connect
+
+    @event.listens_for(connectable, "do_connect")
+    def counted_connect(dialect, connection_record, args, kwargs):
+        return admin_connect(*args, **kwargs)
+
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

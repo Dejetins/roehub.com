@@ -1,0 +1,19 @@
+# S10-r1 independent production-risk review
+
+Reviewer: `/root/s10_review`, 2026-10-14. Mode: read-only, one independent review; no recursive delegation. Scope: replacement claim, S10-r1 production fixes, additive migration0040, current contract/runbook amendments and installed evidence. Original S10 recovery/reset review remains applicable and immutable. This note was supplied by the reviewer and saved by the executor.
+
+No remaining actionable correctness, security, data-integrity, concurrency or compatibility findings were identified in the reviewed scope. Earlier adoption/cutoff/reporting issues were corrected and rechecked.
+
+Child replies now follow HTTP and PostgreSQL gateway cleanup;18 actual spawned calls completed without adding quarantine, while the disposable crash proof retains unknown-close quarantine. Partition demand and retry classification remain bounded and narrowly distinguish missing storage partitions and verifier contention. The collector retains server advisory-lock fencing; the TCP session change proves dead-client release and healthy-idle exclusion on the tested Linux/direct-PG16 target, without TTL takeover.
+
+Migration0040 and the writer/publication guards preserve global revision identity, generation, funding and correction fences. Real-PG tests cover pure append, correction, late actual/gap, future cutoff, mixed older writer, funding/reset and transactional rollback. The previously skipped explicit disposable restart test subsequently passed on the owned fixed-port fixture.
+
+D4 operational benefit is evidenced, not inferred from an empty cache: ordinary production bounded verification covered the original origins through explicit cutoff09:07UTC; three startup certificates were extended and all five obtained full prefixes. Later appends retained certificates at unchanged generations. Late actual within accepted absence and historical correction invalidate them. Preservation never advances a frontier. The09:18:07 and09:19:17 snapshots retain identical frontier rows while every content revision increases by one with unchanged correction marker and current append attestation. The final snapshot has five fresh connections, no old sessions/recovery, and zero quarantine with active market/control/admin counts4/1/2.
+
+Historical quarantine was not silently discarded: documented stop/recover verified server stop before clearing15 reservations, and counted resume verified the same retained target. This final planned maintenance is separate from the earlier automatic45-second reconnect and ten consecutive all-WS closed minutes08:43–08:52. Mixed REST/WS post-maintenance aggregates are not a replacement all-WS claim.
+
+Current-hash paired writer measurements use the exact S09 writer baseline, matched2CPU/4GiB fixtures and90 samples per variant/size. They establish bounded component cost only; the final writer has not repeated the S09 full mixed-load soak, and no installed SLA or universal speedup is established.
+
+Whole Pyright reports zero errors, Ruff passes, focused real-PG/unit gates and six generated checks pass. Browser evidence shows the accepted client completed job and materialized selected details. This remains an identified local installation with one-shot backtest workers and a temporary accepted-client preview; no remote delivery, resident runner or indefinite provider/leak guarantee is claimed. Canonical stage acceptance/receipt remains the executor's responsibility.
+
+Final document follow-up: The reviewed0040 text was relocated into an additive linked contract; the original adapter contract again matches the S01 receipt and immutable S07 copy byte-for-byte (SHA256 aaae2c08d5eae5c88d1b9be6727507836348634fccb7bded3ad35579872e8091). Entry validation passes; predecessor bindings remain unchanged. Production review verdict is unchanged.

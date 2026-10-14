@@ -253,7 +253,6 @@ class DashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     system_status: Literal["ok", "degraded", "unknown"]
-    account_tier: str
     mode: str
     api_label: str
     latency_ms: int | None

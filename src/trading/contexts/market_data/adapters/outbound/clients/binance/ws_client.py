@@ -12,6 +12,9 @@ from uuid import UUID
 
 import websockets
 
+from trading.contexts.market_data.adapters.outbound.clients.connection_events import (
+    ConnectionEvents,
+)
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import WsReconnectConfig
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.clock.clock import Clock
@@ -145,6 +148,7 @@ class BinanceWsClosedCandleStream:
         """
         delay = self._reconnect.min_delay_s
         first_connect = True
+        events = ConnectionEvents(log, self._market_id.value)
         stream_url = build_binance_combined_stream_url(self._ws_url, self._symbols)
 
         while not stop_event.is_set():
@@ -165,6 +169,7 @@ class BinanceWsClosedCandleStream:
 
                     if self._on_connected is not None:
                         await self._on_connected()
+                    events.connected()
 
                     while not stop_event.is_set():
                         payload = await _recv_or_stop(socket, stop_event)
@@ -183,9 +188,9 @@ class BinanceWsClosedCandleStream:
                             _emit_simple(self._hooks.on_ignored_non_closed)
                         if row is not None:
                             await self._on_closed_candle(row)
-            except Exception:  # noqa: BLE001
+            except Exception as error:  # noqa: BLE001
                 _emit_simple(self._hooks.on_error)
-                log.exception("binance ws stream failed for market_id=%s", self._market_id.value)
+                events.failed(error)
             finally:
                 if connected:
                     _emit_connected(self._hooks.on_connected, 0)

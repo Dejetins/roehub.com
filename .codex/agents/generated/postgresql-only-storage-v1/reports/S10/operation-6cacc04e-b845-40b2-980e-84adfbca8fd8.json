@@ -1,0 +1,12 @@
+{
+  "action": "stop",
+  "services": [
+    "api",
+    "web",
+    "postgres-observer"
+  ],
+  "operation_id": "6cacc04e-b845-40b2-980e-84adfbca8fd8",
+  "returncode": 0,
+  "stdout": "{\"action\": \"stop\", \"active_services\": [], \"detail_code\": \"control_agent.service_rejected\", \"journal_sequence\": 348, \"operation_id\": \"6cacc04e-b845-40b2-980e-84adfbca8fd8\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"failed\"}\n",
+  "stderr": ""
+}

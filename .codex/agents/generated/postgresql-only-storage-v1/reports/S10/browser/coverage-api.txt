@@ -1,0 +1,2 @@
+### Error
+ReferenceError: URLSearchParams is not defined

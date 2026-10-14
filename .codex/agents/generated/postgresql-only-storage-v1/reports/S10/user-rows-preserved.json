@@ -1,0 +1,34 @@
+{
+  "identity_users": {
+    "old_rows": 1,
+    "old_rows_missing": 0,
+    "changed_columns": {
+      "last_login_at": 1
+    },
+    "new_rows": 0
+  },
+  "backtest_artifact_policies": {
+    "old_rows": 3,
+    "old_rows_missing": 0,
+    "changed_columns": {},
+    "new_rows": 5
+  },
+  "backtest_artifact_profiles": {
+    "old_rows": 3,
+    "old_rows_missing": 0,
+    "changed_columns": {},
+    "new_rows": 5
+  },
+  "backtest_jobs": {
+    "old_rows": 3,
+    "old_rows_missing": 0,
+    "changed_columns": {},
+    "new_rows": 1
+  },
+  "strategy_strategies": {
+    "old_rows": 3,
+    "old_rows_missing": 0,
+    "changed_columns": {},
+    "new_rows": 0
+  }
+}

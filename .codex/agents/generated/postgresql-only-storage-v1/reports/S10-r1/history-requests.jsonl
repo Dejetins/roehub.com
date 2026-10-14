@@ -1,0 +1,5 @@
+{"job_id": "e0d9c808-ed42-462a-a58c-edf465650c7e", "market_id": 1, "symbols": ["0GUSDT"], "start_at": "2025-09-22 10:00:00+00:00", "end_at": "2026-10-14 08:14:00+00:00", "state": "queued"}
+{"job_id": "e22d900f-d315-4a90-b370-1419d0293669", "market_id": 1, "symbols": ["AAPLBUSDT"], "start_at": "2026-07-29 12:00:00+00:00", "end_at": "2026-10-14 08:14:00+00:00", "state": "queued"}
+{"job_id": "b16ed406-2279-4b6f-8f96-e8193fb930e7", "market_id": 1, "symbols": ["AAVEUSDT"], "start_at": "2020-10-15 03:00:00+00:00", "end_at": "2026-10-14 08:14:00+00:00", "state": "queued"}
+{"job_id": "74866afe-6100-4946-803a-22ed29753348", "market_id": 1, "symbols": ["ACTUSDT"], "start_at": "2024-11-11 10:00:00+00:00", "end_at": "2026-10-14 08:14:00+00:00", "state": "queued"}
+{"job_id": "08d53510-1442-4403-b7bd-0ae6ae25cb15", "market_id": 2, "symbols": ["0GUSDT"], "start_at": "2025-09-17 15:45:00+00:00", "end_at": "2026-10-14 08:14:00+00:00", "state": "queued"}

@@ -252,7 +252,6 @@ class DashboardSummaryQueryService:
             ),
             footer_status=DashboardFooterStatusResponse(
                 system_status="degraded" if _has_degraded_sources(inventory_sources) else "ok",
-                account_tier=str(principal.paid_level),
                 mode="LIVE",
                 api_label="Roehub API",
                 latency_ms=None,

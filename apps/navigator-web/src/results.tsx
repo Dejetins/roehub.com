@@ -187,7 +187,7 @@ function SaveStrategy({job,variant,subject,now}:{job:string;variant:string;subje
     finally{lock.current=false;setSending(false);}
   }
   return <section className="result-command" aria-label={t('results.save')}><ReadError error={readiness.error}/>{!storage&&<p className="notice">{t('results.storage')}</p>}
-    <Confirm id="save" title={t('results.saveTitle')} help={`${t('results.saveHelp')} ${liveState!=='launchable'?t('results.liveWarning'):''} ${reasons??''}`} source={`${job} · ${variant}`} trigger={t('results.save')} icon={<Save size={16} aria-hidden="true"/>} triggerTitle={t('results.saveHelp')} disabled={!compatible||!!record||sending||!!saved||isRestricted(error)||!!error} onConfirm={()=>void save()}/>
+    <Confirm id="save" title={t('results.saveTitle')} help={`${t('results.saveHelp')} ${liveState!=='launchable'?t('results.liveWarning'):''} ${reasons??''}`} source={`${job} · ${variant}`} trigger={t('results.save')} icon={<Save size={16} aria-hidden="true"/>} triggerTitle={t('results.save')} disabled={!compatible||!!record||sending||!!saved||isRestricted(error)||!!error} onConfirm={()=>void save()}/>
     {sending&&<p role="status">{t('results.saving')}</p>}<ReadError error={error}/>{record&&!sending&&<p role="status" className="notice">{t(record.jobId===job&&record.variant===variant?'results.unresolved':'results.recoveryOther')} <a href="/strategies">{t('results.history')}</a>{record.resultId&&<a href={`/strategies/${record.resultId}`}>{t('results.open')}</a>}</p>}
     {saved&&<p role="status">{t('results.saved')}. {saved.duplicate&&t('results.duplicate')} <a className="button-link" href={savedStrategyHref(saved.strategy.strategy_id, job, variant)}>{t('results.open')}</a></p>}
   </section>;

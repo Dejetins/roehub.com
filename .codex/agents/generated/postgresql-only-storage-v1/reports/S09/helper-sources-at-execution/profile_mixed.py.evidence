@@ -1,0 +1,16 @@
+"""Diagnostic only: retain mixed SQL call timings without query parameters."""
+import json,threading,time
+import psycopg
+from tools.qa import postgres_production_workload as w
+from tools.qa.postgres_production_soak import OUT
+original=psycopg.Connection.execute
+records=[];lock=threading.Lock()
+def execute(self,query,params=None,**kw):
+    started=time.monotonic();cpu=time.thread_time()
+    try:return original(self,query,params,**kw)
+    finally:
+        with lock:records.append({'utc':time.time(),'thread':threading.current_thread().name,
+            'sql':str(query)[:160],'elapsed_s':time.monotonic()-started,'cpu_s':time.thread_time()-cpu})
+psycopg.Connection.execute=execute
+try:w.run('profilemixed1','stress',30);w.verify_replay('profilemixed1')
+finally:(OUT/'profilemixed1-sql.json').write_text(json.dumps(records,indent=2))

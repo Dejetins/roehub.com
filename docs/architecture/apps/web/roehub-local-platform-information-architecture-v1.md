@@ -56,7 +56,7 @@ roles, or redirects; it makes those dependencies explicit.
    React prototype.
 3. The identity domain already defines organization roles `owner`, `admin`,
    `operator`, `trader`, and `viewer`, plus permissions for organization,
-   members, plugins, operations, trading, mainnet approval, and audit.
+   members, operations, trading, mainnet approval, and audit.
 4. `installation_owner` is separate authority, not another organization role.
 5. Administrative APIs use organization permissions and a distinct
    installation-owner check for installation-level operations.
@@ -97,7 +97,7 @@ compact, but the group and route semantics do not change.
 | Overview | `/dashboard` | Portfolio capital, performance, strategy contributions, exchange/instrument allocation, risk and trading activity. |
 | Research | `/data`, `/strategies`, `/backtests`, `/models` | Data selection, strategy creation, experiments, backtests, and models. |
 | Operations | `/live`, `/monitoring`, `/connections` | Runtime observation, safe operational action, service health, and exchange connectivity. |
-| System | `/docs`, `/settings/*`, `/admin/*` | Local documentation, personal preferences, organization administration, resources, extensions, updates, and recovery. |
+| System | `/docs`, `/settings/*`, `/admin/*` | Local documentation, personal preferences, organization administration, resources, updates, and recovery. |
 
 The shell also owns organization context, command search, notifications,
 personal preferences, locale, theme, and session state. These controls do not
@@ -140,7 +140,7 @@ grant capabilities; the server filters every destination and action.
   execution projections without taking ownership away from strategy detail or
   monitoring.
 - `/monitoring` groups services by platform core, data, computation, trading,
-  security, and extensions. A broad unstructured process list is not the main
+  and security. A broad unstructured process list is not the main
   presentation.
 - `/connections` owns exchange and integration readiness, validation, lifecycle,
   and strategy binding. Stored secret material is never revealed.
@@ -150,7 +150,7 @@ grant capabilities; the server filters every destination and action.
 - Personal settings use `/settings/profile`, `/settings/preferences`,
   `/settings/notifications`, and `/settings/security`.
 - Administration uses `/admin`, `/admin/members`, `/admin/resources`,
-  `/admin/extensions`, and `/admin/maintenance`.
+  and `/admin/maintenance`.
 - `/docs` is reserved for installed, version-matched user documentation.
 - `/docs/operator/runbooks/{runbook_id}/` is the canonical role-scoped runbook
   route.
@@ -163,8 +163,8 @@ grant capabilities; the server filters every destination and action.
 
 - health endpoints, the same-origin proxy, and static asset delivery remain
   non-visual contracts;
-- the plugin panel laboratory remains feature-flagged QA-only behavior and is
-  absent from product navigation;
+- the former plugin panel laboratory and extension administration routes were
+  removed on 2026-10-13;
 - framework API documentation is an internal developer surface;
 - the removed `prototypes/roehub-v2/` remains available in Git history at the
   accepted inventory baseline commit and cannot authorize a screen, route,
@@ -260,8 +260,7 @@ not an inference from the current static role permission map.
   `target_not_implemented`.
 
 The machine contract lists the exact delegable capability IDs and required grant
-fields. Existing `admin` permissions remain valid only for the organization and
-plugin operations already implemented; they do not silently satisfy a new
+fields. Existing `admin` permissions remain valid only for the organization operations already implemented; they do not silently satisfy a new
 product capability.
 
 ### Closed operator safe-action set
@@ -287,7 +286,7 @@ even when the actor also has the organization role `operator`.
 
 All other actions deny, including strategy start/restart/manual trade, backtest
 creation/deletion/promotion, model mutation, credential creation/rotation,
-arbitrary service start/stop, installation lifecycle, plugin lifecycle, role
+arbitrary service start/stop, installation lifecycle, role
 grant, and resource-ceiling changes. The current broad
 `operator -> operations.execute` mapping is explicitly insufficient for this
 target and must not be reused without the narrower action policy.

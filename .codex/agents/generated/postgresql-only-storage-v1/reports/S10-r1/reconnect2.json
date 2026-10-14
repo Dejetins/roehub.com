@@ -1,0 +1,20 @@
+{
+  "container": "roehub-local-market-data-ws-1",
+  "id": "cd956e847010465b37e8cae85d2ac46025eaae5acdb7428663d6a7c0ddea4936",
+  "network": "roehub-local-platform",
+  "original_ip": "172.23.0.6",
+  "aliases": [
+    "roehub-local-market-data-ws-1",
+    "market-data-ws"
+  ],
+  "duration_requested_seconds": 45,
+  "scope": "only WS worker network; no host/tunnel/provider/selection changes",
+  "disconnected_at": "2026-10-14T08:40:31.980858+00:00",
+  "reconnected_at": "2026-10-14T08:41:17.101597+00:00",
+  "same_container": true,
+  "restored_ip": "172.23.0.6",
+  "restored_aliases": [
+    "roehub-local-market-data-ws-1",
+    "market-data-ws"
+  ]
+}

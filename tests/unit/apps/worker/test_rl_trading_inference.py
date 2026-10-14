@@ -601,35 +601,18 @@ def test_stage17_load_harness_exercises_quota_counts_without_dispatch_growth(
     summary = json.loads(Path(payload["summary_path"]).read_text(encoding="utf-8"))
 
     assert payload["status"] == "accepted"
-    assert payload["observations"] == 26
+    assert payload["observations"] == 15
     assert summary["quota_scenarios"] == [
         {
-            "label": "free",
-            "observation_count": 1,
-            "observed_tickers": 1,
-            "paid_level": "free",
-            "product_label": "Free",
-            "quota_bypass_observed": False,
-            "requested_live_tickers": 1,
-        },
-        {
-            "label": "pro",
+            "label": label,
             "observation_count": 5,
             "observed_tickers": 5,
-            "paid_level": "pro",
-            "product_label": "Pro",
+            "paid_level": tier,
+            "product_label": "Self-hosted",
             "quota_bypass_observed": False,
             "requested_live_tickers": 5,
-        },
-        {
-            "label": "premium",
-            "observation_count": 20,
-            "observed_tickers": 20,
-            "paid_level": "ultra",
-            "product_label": "Premium",
-            "quota_bypass_observed": False,
-            "requested_live_tickers": 20,
-        },
+        }
+        for label, tier in (("free", "free"), ("pro", "pro"), ("premium", "ultra"))
     ]
     assert summary["redis_execution_streams"]["delta"] == {
         "execution.requests.dlq.v1": 0,

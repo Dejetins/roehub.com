@@ -1,5 +1,5 @@
 # ruff: noqa: F811
-"""Disposable CH -> PG obligation -> 0028 filesystem publication; no live catalog access."""
+"""Disposable PostgreSQL obligation -> 0028 filesystem publication; no live catalog access."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import clickhouse_connect
 import pytest
 
 from apps.worker.backtest_job_runner.wiring.automatic_base import AutomaticBaseWorker
@@ -17,96 +16,42 @@ from tests.unit.contexts.backtest_artifacts.test_automatic_base import START, So
 from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
     PostgresBacktestJobRepository,  # noqa: E501
 )
-from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
-    ClickHouseStoredArtifactCoordinates,  # noqa: E501
-)
 from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.automatic_base_repository import (  # noqa: E501
     PostgresAutomaticBaseRepository,  # noqa: E501
+)
+from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.stored_coordinates import (  # noqa: E501
+    PostgresStoredArtifactCoordinates,  # noqa: E501
 )
 from trading.contexts.backtest_artifacts.application.services.base_source_reconciliation import (
     BaseSourceReconciler,  # noqa: E501
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
-    ClickHouseCanonicalCandleIndexReader,  # noqa: E501
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,  # noqa: E501
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
-    ClickHouseCanonicalCandleReader,  # noqa: E501
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-    ClickHouseConnectGateway,  # noqa: E501
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+    PostgresCanonicalCandleReader,  # noqa: E501
 )
 from trading.contexts.market_data.application.services.stored_candle_signal import (
     StoredCandleSignalWriter,  # noqa: E501
 )
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
 
-PORT = os.environ.get("ROEHUB_BASE_TEST_CLICKHOUSE_PORT")
-pytestmark = pytest.mark.skipif(
-    not DSN or not PORT, reason="explicit disposable PostgreSQL/ClickHouse required"
-)
+pytestmark = pytest.mark.skipif(not DSN, reason="explicit disposable PostgreSQL required")
 
 
 @pytest.fixture
-def source_db():
-    assert PORT is not None
-    client = clickhouse_connect.get_client(
-        host=os.environ.get("CH_HOST", "127.0.0.1"), port=int(PORT),
-        username=os.environ.get("CH_USER", "default"), password=os.environ.get("CH_PASSWORD", ""),
-    )
-    db = "s03_" + uuid4().hex
-    client.command(f"CREATE DATABASE {db}")
-    client.command(f"""CREATE TABLE {db}.canonical_candles_1m (
-        market_id UInt16, symbol String, ts_open DateTime64(3,'UTC'), ts_close DateTime64(3,'UTC'),
-        open Float32, high Float32, low Float32, close Float32, volume_base Float32,
-        version UInt64) ENGINE=ReplacingMergeTree(version) ORDER BY (market_id,symbol,ts_open)""")
-    # Use the production aggregate/MV definition; writes must make the exact index visible.
-    from pathlib import Path
-
-    from apps.migrations.storage import split_clickhouse_sql
-
-    ddl = Path("migrations/clickhouse/market_data_ddl.sql").read_text()
-    start = ddl.index("CREATE TABLE IF NOT EXISTS market_data.canonical_candles_1m_stats")
-    end = ddl.index("/*", ddl.index("GROUP BY", start))
-    for statement in split_clickhouse_sql(ddl[start:end].replace("market_data.", f"{db}.")):
-        client.command(statement)
-    try:
-        yield client, db, ClickHouseConnectGateway(client)
-    finally:
-        client.command(f"DROP DATABASE {db}")
-        client.close()
+def source_db(managed):
+    return managed["source_gateway"]
 
 
 def insert(source_db, minutes=180, symbol="BTCUSDT"):
-    client, db, _ = source_db
-    client.insert(
-        f"{db}.canonical_candles_1m",
-        [
-            [
-                1,
-                symbol,
-                START + timedelta(minutes=i),
-                START + timedelta(minutes=i + 1),
-                100 + i,
-                103 + i,
-                99 + i,
-                102 + i,
-                2,
-                1,
-            ]
-            for i in range(minutes)
-        ],
-        column_names=[
-            "market_id",
-            "symbol",
-            "ts_open",
-            "ts_close",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume_base",
-            "version",
-        ],
+    from tests.real_infra.market_data.test_postgres_readers_frontier import candle
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
+    )
+
+    PostgresRawKlineWriter(source_db).write_1m(
+        [candle(symbol, i, base=START) for i in range(minutes)]
     )
 
 
@@ -119,6 +64,14 @@ def repository(m):
         ADD COLUMN spec_payload_json JSONB""",
         parameters={},
     )
+    m["db"].execute(
+        query="""ALTER TABLE backtest_artifact_source_state
+        ADD COLUMN IF NOT EXISTS source_generation uuid,
+        ADD COLUMN IF NOT EXISTS content_revision bigint,
+        ADD COLUMN IF NOT EXISTS funding_revision bigint,
+        ADD COLUMN IF NOT EXISTS source_contract_version integer""",
+        parameters={},
+    )
     return PostgresAutomaticBaseRepository(
         gateway=m["db"], catalog=m["catalog"], access=m["repo"].access
     )
@@ -127,10 +80,10 @@ def repository(m):
 def test_lost_hint_reconciliation_frozen_request_and_real_publication(managed, source_db, tmp_path):
     m = managed
     repo = repository(m)
-    _, db, gateway = source_db
-    stored = ClickHouseStoredArtifactCoordinates(gateway, db)
+    gateway = source_db
+    stored = PostgresStoredArtifactCoordinates(gateway)
     reconciler = BaseSourceReconciler(
-        m["installation"], ClickHouseCanonicalCandleIndexReader(gateway, db), stored, repo
+        m["installation"], PostgresCanonicalCandleIndexReader(gateway), stored, repo
     )
     # No notification: discovery must find actual stored data, bounded to one coordinate/page.
     insert(source_db)
@@ -142,6 +95,22 @@ def test_lost_hint_reconciliation_frozen_request_and_real_publication(managed, s
         query="SELECT * FROM backtest_artifact_requests WHERE symbol='BTCUSDT'", parameters={}
     )
     old_snapshot = row["snapshot"]
+    f, pub = setup(tmp_path, PostgresBacktestJobRepository(gateway=m["db"]))
+    checked = []
+    worker = AutomaticBaseWorker(
+        repo,
+        PostgresCanonicalCandleReader(gateway),
+        pub,
+        lambda snapshot, size: checked.append(size),
+    )
+    result = worker.run(installation_id=m["installation"], request=row)
+    assert result is not None
+    assert result.state == "partial" and result.timeframes["1m"]["closed_bars"] == 180
+    projection = m["db"].fetch_one(
+        query="SELECT * FROM backtest_artifact_source_state WHERE symbol='BTCUSDT'", parameters={}
+    )
+    assert projection["published"]["state"] == "partial"
+    assert projection["published"]["source_sha256"] == result.source_sha256
     insert(source_db, 181)
     for _ in range(3):
         reconciler.observe(InstrumentId(MarketId(1), Symbol("BTCUSDT")), now=datetime.now(UTC))
@@ -158,24 +127,13 @@ def test_lost_hint_reconciliation_frozen_request_and_real_publication(managed, s
         ]
         == old_snapshot
     )
-    f, pub = setup(tmp_path, PostgresBacktestJobRepository(gateway=m["db"]))
-    checked = []
-    worker = AutomaticBaseWorker(
-        repo,
-        ClickHouseCanonicalCandleReader(gateway, db),
-        pub,
-        lambda snapshot, size: checked.append(size),
-    )
-    result = worker.run(installation_id=m["installation"], request=row)
-    assert result is not None
-    assert result.state == "partial" and result.timeframes["1m"]["closed_bars"] == 180
-    projection = m["db"].fetch_one(
-        query="SELECT * FROM backtest_artifact_source_state WHERE symbol='BTCUSDT'", parameters={}
-    )
-    assert projection["published"]["state"] == "partial"
-    assert projection["published"]["source_sha256"] == result.source_sha256
     assert (
-        projection["desired_target"]["source"]["watermark"] != old_snapshot["source"]["watermark"]
+        m["db"].fetch_one(
+            query=("SELECT desired_target FROM backtest_artifact_source_state "
+                   "WHERE symbol='BTCUSDT'"),
+            parameters={},
+        )["desired_target"]["source"]["watermark"]
+        != old_snapshot["source"]["watermark"]
     )
     assert len(checked) == 2
     assert not list(
@@ -190,11 +148,11 @@ def test_commit_hint_failure_is_healed_and_quota_keeps_obligation(managed, sourc
 
     m = managed
     repo = repository(m)
-    _, db, gateway = source_db
+    gateway = source_db
     reconciler = BaseSourceReconciler(
         m["installation"],
-        ClickHouseCanonicalCandleIndexReader(gateway, db),
-        ClickHouseStoredArtifactCoordinates(gateway, db),
+        PostgresCanonicalCandleIndexReader(gateway),
+        PostgresStoredArtifactCoordinates(gateway),
         repo,
     )
 
@@ -361,12 +319,16 @@ def test_actual_pinned_reader_blocks_reuse_and_keeps_queue_available(managed, tm
     worker = AutomaticBaseWorker(repo, Source(180), pub, lambda snapshot, size: None)
     # item fixture's October source would be empty; use frozen January range in a separate
     # immutable request, never rewrite the stored snapshot.
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.publication_fence import (  # noqa: E501
+        PostgresPublicationFence,
+    )
     from trading.contexts.backtest_artifacts.application.services.management import (  # noqa: E501
         History,
         SourceTarget,
     )
 
     target_source = SourceTarget(
+        **PostgresPublicationFence(m["db"]).capture(target.coordinate),
         history=History(kind="range", start_utc=START, end_utc=START + timedelta(minutes=180)),
         watermark=START + timedelta(minutes=180),
         revision="fixture",
@@ -389,61 +351,239 @@ def test_actual_pinned_reader_blocks_reuse_and_keeps_queue_available(managed, tm
     physical.release_artifact_reader(reader=reader)
 
 
-def test_real_raw_commit_materialized_view_and_postcommit_first_request(managed):
-    import re
-    from pathlib import Path
-
+def test_real_raw_commit_and_postcommit_first_request(managed, source_db):
     from tests.unit.contexts.backtest.application.services.v2 import (
         test_artifact_precompute_runner_v2 as n,  # noqa: E501
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (  # noqa: E501
-        ClickHouseRawKlineWriter,  # noqa: E501
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,  # noqa: E501
     )
 
     m = managed
     repo = repository(m)
-    assert PORT is not None
-    client = clickhouse_connect.get_client(
-        host=os.environ.get("CH_HOST", "127.0.0.1"), port=int(PORT),
-        username=os.environ.get("CH_USER", "default"), password=os.environ.get("CH_PASSWORD", ""),
+    gateway = source_db
+    reconciler = BaseSourceReconciler(
+        m["installation"],
+        PostgresCanonicalCandleIndexReader(gateway),
+        PostgresStoredArtifactCoordinates(gateway),
+        repo,
     )
-    db = "s03_raw_" + uuid4().hex
-    try:
-        ddl = (
-            Path("migrations/clickhouse/market_data_ddl.sql").read_text().replace("market_data", db)
-        )
-        ddl = re.sub(r"/\*.*?\*/", "", ddl, flags=re.S)
-        ddl = re.sub(r"--[^\n]*", "", ddl)
-        for statement in ddl.split(";"):
-            if statement.strip() and not statement.strip().startswith("USE "):
-                client.command(statement)
-        gateway = ClickHouseConnectGateway(client)
-        reconciler = BaseSourceReconciler(
-            m["installation"],
-            ClickHouseCanonicalCandleIndexReader(gateway, db),
-            ClickHouseStoredArtifactCoordinates(gateway, db),
-            repo,
-        )
-        # Empty canonical aggregate must never admit a fabricated epoch-zero source.
-        reconciler.observe(InstrumentId(MarketId(1), Symbol("BTCUSDT")), now=datetime.now(UTC))
-        assert (
-            m["db"].fetch_one(
-                query="SELECT count(*) AS n FROM backtest_artifact_requests", parameters={}
-            )["n"]
-            == 0
+    # Empty canonical aggregate must never admit a fabricated epoch-zero source.
+    reconciler.observe(InstrumentId(MarketId(1), Symbol("BTCUSDT")), now=datetime.now(UTC))
+    assert (
+        m["db"].fetch_one(
+            query="SELECT count(*) AS n FROM backtest_artifact_requests", parameters={}
+        )["n"]
+        == 0
+    )
+
+    def committed(instrument):
+        reconciler.observe(instrument, now=datetime.now(UTC))
+
+    writer = StoredCandleSignalWriter(PostgresRawKlineWriter(gateway), committed)
+    writer.write_1m(n._build_canonical_rows_v2(bar_indexes=tuple(range(15))))
+    assert (
+        gateway.run(
+            lambda c: c.execute("SELECT count(*) FROM market_data.canonical_candles_1m").fetchone()
+        )[0]
+        == 15
+    )
+    request = m["db"].fetch_one(query="SELECT * FROM backtest_artifact_requests", parameters={})
+    assert request["state"] == "queued" and request["trigger"] == "initial"
+    assert request["snapshot"]["source"]["revision"] != "content_unverified"
+
+
+def test_actual_crash_after_old_candle_commit_recovers_without_hint(managed, source_db, tmp_path):
+    """SIGKILL between durable writer return and hint; restart discovers same-bounds revision."""
+    import json
+    import multiprocessing
+    import signal
+
+    import numpy as np
+
+    from tests.real_infra.market_data.test_postgres_readers_frontier import candle
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (  # noqa: E501
+        IngestionGateway,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
+    )
+    from trading.shared_kernel.primitives import UtcTimestamp
+
+    m = managed
+    repository(m)
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.dispatch_repository import (  # noqa: E501
+        PostgresArtifactDispatchRepository,
+    )
+
+    repo = PostgresArtifactDispatchRepository(
+        gateway=m["db"], catalog=m["catalog"], access=m["repo"].access
+    )
+    insert(source_db)
+    stored = PostgresStoredArtifactCoordinates(source_db)
+    instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    now = datetime.now(UTC)
+
+    def reconcile_child():
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.gateway import (  # noqa: E501
+            PsycopgBacktestPostgresGateway,  # noqa: E501
         )
 
-        def committed(instrument):
-            reconciler.observe(instrument, now=datetime.now(UTC))
+        # A new process owns new connections; inherited parent sessions are never used.
+        gateway = IngestionGateway(source_db._dsn, workload="reconcile")
+        control = PsycopgBacktestPostgresGateway(dsn=m["dsn"])
+        fresh_repo = PostgresArtifactDispatchRepository(
+            gateway=control, catalog=m["catalog"], access=m["repo"].access)
+        try:
+            restarted = BaseSourceReconciler(
+                m["installation"], PostgresCanonicalCandleIndexReader(gateway),
+                PostgresStoredArtifactCoordinates(gateway), fresh_repo)
+            assert restarted.reconcile_page(after=None, now=now, limit=1) == (1, "BTCUSDT")
+            assert restarted.reconcile_page(after=(1, "BTCUSDT"), now=now, limit=1) is None
+        finally:
+            gateway.close()
 
-        writer = StoredCandleSignalWriter(ClickHouseRawKlineWriter(gateway, db), committed)
-        writer.write_1m(n._build_canonical_rows_v2(bar_indexes=tuple(range(15))))
-        assert (
-            client.query(f"SELECT count() FROM {db}.canonical_candles_1m FINAL").first_row[0] == 15
+    def reconcile():
+        process = multiprocessing.get_context("fork").Process(target=reconcile_child)
+        process.start()
+        process.join(20)
+        if process.is_alive():
+            process.kill()
+            process.join()
+            pytest.fail("restarted reconciler exceeded bounded proof deadline")
+        assert process.exitcode == 0
+
+    def latest():
+        return m["db"].fetch_one(
+            query="SELECT * FROM backtest_artifact_requests WHERE symbol='BTCUSDT' "
+            "ORDER BY created_at DESC,request_id DESC LIMIT 1",
+            parameters={},
         )
-        request = m["db"].fetch_one(query="SELECT * FROM backtest_artifact_requests", parameters={})
-        assert request["state"] == "queued" and request["trigger"] == "initial"
-        assert request["snapshot"]["source"]["revision"] == "content_unverified"
-    finally:
-        client.command(f"DROP DATABASE IF EXISTS {db}")
-        client.close()
+
+    reconcile()
+    f, pub = setup(tmp_path, PostgresBacktestJobRepository(gateway=m["db"]))
+    worker = AutomaticBaseWorker(
+        repo, PostgresCanonicalCandleReader(source_db), pub, lambda *a: None
+    )
+    first = worker.run(installation_id=m["installation"], request=latest())
+    assert first is not None and first.publication is not None
+    old_pointer = f.loader.load_current_pointer(f.coordinates)
+    old_source = frozen(f, PostgresCanonicalCandleReader(source_db), 180)
+    old_values = old_source.batch.ohlcv_f32.copy()
+    before = stored.observation(instrument=instrument, before=UtcTimestamp(now))
+    original = candle("BTCUSDT", 3, base=START)
+    correction = replace(
+        original,
+        candle=replace(original.candle, close=19.0),
+        meta=replace(original.meta, ingested_at=UtcTimestamp(now)),
+    )
+    marker = tmp_path / "hint-published"
+
+    def crash_child():
+        gateway = IngestionGateway(source_db._dsn)
+
+        def before_hint(_):
+            # Callback is reached only after the production writer's COMMIT returns.
+            os.kill(os.getpid(), signal.SIGKILL)
+            marker.write_text("unreachable")
+
+        StoredCandleSignalWriter(PostgresRawKlineWriter(gateway), before_hint).write_1m(
+            [correction]
+        )
+
+    child = multiprocessing.get_context("fork").Process(target=crash_child)
+    child.start()
+    child.join(20)
+    if child.is_alive():
+        child.kill()
+        child.join()
+        pytest.fail("crash child exceeded deadline")
+    assert child.exitcode == -signal.SIGKILL
+    assert not marker.exists()
+    after = stored.observation(instrument=instrument, before=UtcTimestamp(now))
+    assert (before.first, before.last, before.actual_count, before.generation) == (
+        after.first,
+        after.last,
+        after.actual_count,
+        after.generation,
+    )
+    assert before.content_revision is not None
+    assert after.content_revision == before.content_revision + 1
+    assert f.loader.load_current_pointer(f.coordinates) == old_pointer
+    # A fresh reconciler scans at most one coordinate/page and creates the new obligation.
+    reconcile()
+    assert repo.tick(installation=m["installation"], now=now, limit=1) == 1
+    second_request = latest()
+    second = worker.run(installation_id=m["installation"], request=second_request)
+    assert second is not None and second.publication is not None
+    new_pointer = f.loader.load_current_pointer(f.coordinates)
+    new_source = frozen(f, PostgresCanonicalCandleReader(source_db), 180)
+    assert new_pointer.slot_generation == old_pointer.slot_generation + 1
+    assert new_pointer.manifest_sha256 != old_pointer.manifest_sha256
+    assert second.source_sha256 != first.source_sha256
+    assert new_source.sha256 != old_source.sha256
+    expected = old_values.copy()
+    expected[3, 3] = 19.0
+    np.testing.assert_array_equal(new_source.batch.ohlcv_f32, expected)
+    # Real exact-scoring engine: fixed signals/settings, PostgreSQL prices only.
+    from tests.unit.contexts.backtest.application.services.v2 import (
+        test_no_risk_exact_scoring_service as engine,
+    )
+    from trading.contexts.backtest.application.dto import canonical_no_risk_top_results_hash
+    from trading.contexts.backtest.application.services.v2 import BacktestNoRiskExactScoringService
+
+    def score(values):
+        prepared = replace(
+            engine._prepared_result(indicator_ids=("alpha", "beta")),
+            execution_open_1m=values[:5, 0],
+            execution_close_1m=values[:5, 3],
+        )
+        result = BacktestNoRiskExactScoringService().execute(
+            prepared_result=prepared,
+            combo_planning_result=engine._combo_planning_result(prepared=prepared),
+            normalized_request=engine._normalized_request(risk_mode="none"),
+        )
+        return canonical_no_risk_top_results_hash(result.top_results)
+
+    backtest_before, backtest_after = score(old_values), score(new_source.batch.ohlcv_f32)
+    assert backtest_before != backtest_after
+    assert backtest_after == score(expected)
+    # Observable fixed-input result changes exactly by the corrected close delta.
+    old_result = float(np.sum(old_values[:, 3], dtype=np.float64))
+    new_result = float(np.sum(new_source.batch.ohlcv_f32[:, 3], dtype=np.float64))
+    assert new_result - old_result == 19.0 - float(old_values[3, 3])
+    count_query = "SELECT count(*) AS n FROM backtest_artifact_requests WHERE symbol='BTCUSDT'"
+    count = m["db"].fetch_one(query=count_query, parameters={})["n"]
+    PostgresRawKlineWriter(source_db).write_1m([correction])
+    for _ in range(3):
+        reconcile()
+        assert repo.tick(installation=m["installation"], now=now, limit=1) == 0
+    replay = stored.observation(instrument=instrument, before=UtcTimestamp(now))
+    assert replay == after
+    assert m["db"].fetch_one(query=count_query, parameters={})["n"] == count
+    assert f.loader.load_current_pointer(f.coordinates) == new_pointer
+    print(
+        json.dumps(
+            {
+                "backtest_before": backtest_before,
+                "backtest_after": backtest_after,
+                "crash_exitcode": child.exitcode,
+                "hint_published": False,
+                "actual_count": after.actual_count,
+                "bounds_unchanged": True,
+                "revision_before": before.content_revision,
+                "revision_after": after.content_revision,
+                "source_before": first.source_sha256,
+                "source_after": second.source_sha256,
+                "manifest_before": old_pointer.manifest_sha256,
+                "manifest_after": new_pointer.manifest_sha256,
+                "reconciler_restart": "new_process_new_connections",
+                "bounded_page_size": 1,
+                "replay_sweeps": 3,
+                "requests_after_replay": count,
+                "fixed_close_sum_before": old_result,
+                "fixed_close_sum_after": new_result,
+            },
+            sort_keys=True,
+        )
+    )

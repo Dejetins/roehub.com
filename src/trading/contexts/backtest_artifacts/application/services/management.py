@@ -174,6 +174,9 @@ class Schedule(StrictModel):
 
 
 class SourceTarget(StrictModel):
+    source_generation: UUID
+    content_revision: int = Field(ge=0)
+    funding_revision: int = Field(ge=0)
     history: History
     revision: str = Field(min_length=1, max_length=128)
     watermark: datetime
@@ -182,6 +185,9 @@ class SourceTarget(StrictModel):
 
     @model_validator(mode="after")
     def closed_range(self) -> SourceTarget:
+        parts = (self.source_generation, self.content_revision, self.funding_revision)
+        if any(x is None for x in parts):
+            raise ValueError("incomplete_source_revision")
         if (
             self.history.kind != "range"
             or self.watermark.utcoffset() != timedelta(0)

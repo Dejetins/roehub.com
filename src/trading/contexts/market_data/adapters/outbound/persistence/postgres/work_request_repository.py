@@ -14,6 +14,7 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway im
     BacktestPostgresGateway,
 )
 from trading.contexts.market_data.application.services.work_requests import WorkRequest
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 class ActiveWorkRequestError(ValueError):
@@ -27,9 +28,13 @@ class ActiveWorkRequestError(ValueError):
 class PostgresMarketDataWorkRequestRepository:
     """Durable request inbox; atomic claim, fenced updates, checkpointed pause and recovery."""
 
-    def __init__(self, *, gateway: BacktestPostgresGateway,
-                 execution_dsn: str | None = None,
-                 execution_lock_key: int = 744948345610) -> None:
+    def __init__(
+        self,
+        *,
+        gateway: BacktestPostgresGateway,
+        execution_dsn: str | None = None,
+        execution_lock_key: int = 744948345610,
+    ) -> None:
         self._gateway = gateway
         self._execution_dsn = execution_dsn
         self._execution_lock_key = execution_lock_key
@@ -39,14 +44,15 @@ class PostgresMarketDataWorkRequestRepository:
         """One live coordinator and its bounded worker pool, including stalled I/O.
 
         The yielded check must precede each persistence side effect. A lost lock
-        connection fails closed. Already in-flight ClickHouse inserts can finish;
+        connection fails closed. Already in-flight PostgreSQL inserts can finish;
         the canonical reader and the existing REST fill deduplicate minute keys.
         """
         if self._execution_dsn is None:
             raise RuntimeError("execution coordination DSN is required")
-        with psycopg.connect(self._execution_dsn, autocommit=True) as connection:
-            row = connection.execute("SELECT pg_try_advisory_lock(%s)",
-                                     (self._execution_lock_key,)).fetchone()
+        with budget_connect(self._execution_dsn, autocommit=True) as connection:
+            row = connection.execute(
+                "SELECT pg_try_advisory_lock(%s)", (self._execution_lock_key,)
+            ).fetchone()
             if row is None or not row[0]:
                 yield None
                 return
@@ -64,14 +70,16 @@ class PostgresMarketDataWorkRequestRepository:
             def check() -> None:
                 with check_lock:
                     connection.execute("SELECT 1").fetchone()
+
             try:
                 yield check
             finally:
                 # Every caller drains owned I/O before leaving this context. A lost
                 # session alone never permits a rival to recover our live workers.
                 connection.close()
-                with psycopg.connect(self._execution_dsn, autocommit=True,
-                                     connect_timeout=2) as cleanup:
+                with budget_connect(
+                    self._execution_dsn, autocommit=True, connect_timeout=2
+                ) as cleanup:
                     cleanup.execute(
                         "DELETE FROM market_data_coordinator_owners WHERE lock_key=%s AND token=%s",
                         (self._execution_lock_key, token),
@@ -98,8 +106,12 @@ class PostgresMarketDataWorkRequestRepository:
         return row
 
     def instrument_jobs(
-        self, *, organization_id: UUID, market_ids: list[int],
-        start_at: datetime, end_at: datetime,
+        self,
+        *,
+        organization_id: UUID,
+        market_ids: list[int],
+        start_at: datetime,
+        end_at: datetime,
     ) -> tuple[Mapping[str, Any], ...]:
         """Latest request per instrument overlapping the displayed historical range."""
         return self._gateway.fetch_all(
@@ -119,8 +131,12 @@ class PostgresMarketDataWorkRequestRepository:
                             'retry_wait', 'cancel_requested')) DESC,
                 updated_at DESC, created_at DESC, job_id DESC
             """,
-            parameters={"org": organization_id, "markets": market_ids,
-                        "start": start_at, "end": end_at},
+            parameters={
+                "org": organization_id,
+                "markets": market_ids,
+                "start": start_at,
+                "end": end_at,
+            },
         )
 
     def submit(
@@ -187,7 +203,8 @@ class PostgresMarketDataWorkRequestRepository:
             )
             if existing is None:
                 raise ActiveWorkRequestError(
-                    "queue_full" if error.diag.constraint_name == "market_data_work_queue_full"
+                    "queue_full"
+                    if error.diag.constraint_name == "market_data_work_queue_full"
                     else "duplicate_work"
                 ) from error
             self._assert_same(existing, request)
@@ -235,9 +252,15 @@ class PostgresMarketDataWorkRequestRepository:
             parameters={"org": organization_id, "key": key},
         )
 
-    def submit_batch(self, *, organization_id: UUID, actor_user_id: UUID, key: UUID,
-                     requests: tuple[WorkRequest, ...], now: datetime
-                     ) -> tuple[Mapping[str, Any], ...]:
+    def submit_batch(
+        self,
+        *,
+        organization_id: UUID,
+        actor_user_id: UUID,
+        key: UUID,
+        requests: tuple[WorkRequest, ...],
+        now: datetime,
+    ) -> tuple[Mapping[str, Any], ...]:
         if not 1 <= len(requests) <= 50:
             raise ValueError("select 1 to 50 instruments")
         commands = []
@@ -246,24 +269,34 @@ class PostgresMarketDataWorkRequestRepository:
             if request.kind != "candle_ingestion" or len(request.symbols) != 1:
                 raise ValueError("each queued download must have one instrument")
             assert request.start_at is not None and request.end_at is not None
-            commands.append(dict(
-                id=str(uuid5(key, f"{request.market_id}:{request.symbols[0]}")),
-                market_id=request.market_id, symbol=request.symbols[0], total_units=total,
-                start_at=request.start_at.astimezone(UTC).isoformat(),
-                end_at=request.end_at.astimezone(UTC).isoformat(),
-            ))
+            commands.append(
+                dict(
+                    id=str(uuid5(key, f"{request.market_id}:{request.symbols[0]}")),
+                    market_id=request.market_id,
+                    symbol=request.symbols[0],
+                    total_units=total,
+                    start_at=request.start_at.astimezone(UTC).isoformat(),
+                    end_at=request.end_at.astimezone(UTC).isoformat(),
+                )
+            )
         if len({c["id"] for c in commands}) != len(commands):
             raise ValueError("select distinct instruments")
         try:
             return self._gateway.fetch_all(
                 query="SELECT * FROM market_data_submit_batch(%(org)s,%(actor)s,%(key)s,"
-                      "%(commands)s::jsonb,%(now)s)",
-                parameters=dict(org=organization_id, actor=actor_user_id, key=key,
-                                commands=json.dumps(commands), now=now),
+                "%(commands)s::jsonb,%(now)s)",
+                parameters=dict(
+                    org=organization_id,
+                    actor=actor_user_id,
+                    key=key,
+                    commands=json.dumps(commands),
+                    now=now,
+                ),
             )
         except UniqueViolation as error:
             raise ActiveWorkRequestError(
-                "queue_full" if error.diag.constraint_name == "market_data_work_queue_full"
+                "queue_full"
+                if error.diag.constraint_name == "market_data_work_queue_full"
                 else "duplicate_work"
             ) from error
         except psycopg.errors.InsufficientPrivilege as error:
@@ -386,12 +419,34 @@ class PostgresMarketDataWorkRequestRepository:
             )
         except UniqueViolation as error:
             raise ActiveWorkRequestError(
-                "queue_full" if error.diag.constraint_name == "market_data_work_queue_full"
+                "queue_full"
+                if error.diag.constraint_name == "market_data_work_queue_full"
                 else "duplicate_work"
             ) from error
 
+    def stream_events(
+        self, *, market_id: int | None, symbol: str | None, before: int | None, limit: int
+    ):
+        return self._gateway.fetch_all(
+            query="""SELECT event_id,market_id,symbol,event_type,occurred_at,reason,
+                error_code,attempt,start_at,end_at FROM market_data_stream_events
+                WHERE (%(market)s::int IS NULL OR market_id=%(market)s)
+                AND (%(symbol)s::text IS NULL OR symbol=%(symbol)s)
+                AND (%(before)s::bigint IS NULL OR event_id<%(before)s)
+                AND occurred_at >= now()-INTERVAL '30 days'
+                ORDER BY event_id DESC LIMIT %(limit)s""",
+            parameters=dict(market=market_id, symbol=symbol, before=before, limit=limit),
+        )
+
     def recover(self, *, now: datetime) -> None:
         """Maintenance once under execution(), before any workers are dispatched."""
+        self._gateway.execute(
+            query="""DELETE FROM market_data_stream_events WHERE event_id IN (
+                SELECT event_id FROM market_data_stream_events
+                WHERE occurred_at < %(now)s::timestamptz - INTERVAL '30 days'
+                ORDER BY occurred_at LIMIT 1000)""",
+            parameters={"now": now},
+        )
         self._gateway.execute(
             query="""DELETE FROM market_data_work_events WHERE event_id IN (
                 SELECT event_id FROM market_data_work_events
@@ -520,16 +575,21 @@ class PostgresMarketDataWorkRequestRepository:
             INSERT INTO market_data_storage_cooldown (singleton, next_retry_at, error_code)
             SELECT TRUE, COALESCE(next_retry_at, %(now)s::timestamptz + INTERVAL '15 seconds'),
                    %(error)s FROM deferred
-            WHERE %(error)s IN ('storage_unavailable', 'storage_memory_pressure')
+            WHERE %(error)s IN ('storage_unavailable', 'storage_memory_pressure', 'storage_busy')
             ON CONFLICT (singleton) DO UPDATE SET
                 next_retry_at = GREATEST(market_data_storage_cooldown.next_retry_at,
                                         EXCLUDED.next_retry_at),
                 error_code = EXCLUDED.error_code
             """,
-            parameters=dict(id=job["job_id"], token=job["worker_token"],
-                            error=error_code, phase=job.get("error_phase"),
-                            previous_error=job.get("previous_error_code", job.get("error_code")),
-                            after=retry_after_s, now=now),
+            parameters=dict(
+                id=job["job_id"],
+                token=job["worker_token"],
+                error=error_code,
+                phase=job.get("error_phase"),
+                previous_error=job.get("previous_error_code", job.get("error_code")),
+                after=retry_after_s,
+                now=now,
+            ),
         )
 
     def finish(
@@ -560,13 +620,18 @@ class PostgresMarketDataWorkRequestRepository:
               AND state IN ('running', 'pause_requested', 'cancel_requested')
             """,
             parameters=dict(
-                id=job["job_id"], token=job["worker_token"], state=state, error=error_code,
-                phase=job.get("error_phase"), now=now
+                id=job["job_id"],
+                token=job["worker_token"],
+                state=state,
+                error=error_code,
+                phase=job.get("error_phase"),
+                now=now,
             ),
         )
 
-    def events(self, *, organization_id: UUID, job_id: UUID, before: int | None,
-               limit: int) -> tuple[Mapping[str, Any], ...]:
+    def events(
+        self, *, organization_id: UUID, job_id: UUID, before: int | None, limit: int
+    ) -> tuple[Mapping[str, Any], ...]:
         return self._gateway.fetch_all(
             query="""SELECT event_id,event_type,occurred_at,state,attempt,completed_units,
                             total_units,rows_written,error_code,error_phase,next_retry_at

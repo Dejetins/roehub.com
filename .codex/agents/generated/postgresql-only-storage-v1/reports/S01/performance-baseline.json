@@ -1,0 +1,357 @@
+{
+  "proof": "historical isolated prototype only; no S01 measurements or production acceptance",
+  "files": [
+    {
+      "path": ".local_artifacts/pg-comparison-20261013/summary.json",
+      "sha256": "22450ae5ff99bd4069dd44641545f08fa71c698960e05c07e0d26d198e4f7c36"
+    },
+    {
+      "path": ".local_artifacts/pg-comparison-20261013/measurement-contract.json",
+      "sha256": "6e501cf8dcd50cca5c47dd8dca83d20f663403da54258ba430ddba2e333e9c9c"
+    },
+    {
+      "path": ".local_artifacts/pg-comparison-20261013/snapshot.json",
+      "sha256": "552d38d82ca568012f0787e5571901a46ca14a310a2dff84fda2f896bd0c31af"
+    },
+    {
+      "path": ".local_artifacts/pg-comparison-20261013/measured-harness.py",
+      "sha256": "b33c4a0564719aca8f29f3b5b32d299be099514db88ea3eda82cf0a2bb0ef1fb"
+    },
+    {
+      "path": ".local_artifacts/pg-comparison-20261013/verification.json",
+      "sha256": "c172cb7c234e3f1d09bbe6aaeee03ca8f52db615fe6dda02a4444ca5e2771a0c"
+    }
+  ],
+  "measurement_contract": {
+    "scope": "Storage prototype only; complete real canonical snapshot before 2026-10-12, normalized raw mirror retains full observations; not a whole-app migration.",
+    "comparison": "PG native monthly partitioning, PK + batched COPY/upsert + transactional daily bitsets; CH current daily MergeTree architecture + real first_gap adapter.",
+    "resources": {
+      "cpu_each": 2,
+      "container_memory_bytes": 4294967296,
+      "ch_server_memory_bytes": 3221225472,
+      "ch_default_query_memory_bytes": 1610612736,
+      "pg_shared_buffers_bytes": 268435456,
+      "pg_work_mem_bytes": 4194304
+    },
+    "durability": "PG fsync/synchronous_commit/full_page_writes enabled; CH synchronous insertion plus fsync_after_insert/fsync_part_directory enabled on raw/canonical/stats replica tables. No source changes.",
+    "metrics": [
+      "end-to-end service p50/p95/p99",
+      "scheduled latency including backlog",
+      "completed/failed work",
+      "cgroup anon/file/total memory and CPU time",
+      "on-disk tables/indexes and server volume",
+      "result parity"
+    ],
+    "repetitions": 3,
+    "cache": "identical warmup, sequential engines with alternating run order; host OS caches not dropped; no cold disk claim",
+    "acceptance": "not assessed; owner latency/memory thresholds not specified",
+    "replay": "Real observed candle values; isolated REPLAY symbols and Jan-2030 timestamps; 5-row stream bursts, 1000-row history batches. Backfill rate is offered load, not exchange throughput.",
+    "source_state": "Immutable monthly FINAL exports; query failures at 128MiB retained; copied source data unchanged during tests.",
+    "duration_seconds": 60,
+    "normal_lanes": {
+      "stream": "5 rows / second",
+      "backfill": "1000 rows / 2 seconds",
+      "latest": "1/s",
+      "hot_latest": "1/s concurrent on replay stream",
+      "catalog": "1/2s",
+      "first_gap": "1/2s",
+      "artifact": "1-year read every10s"
+    },
+    "stress": "100 stream rows/s, extra latest reader2/s, 2 full-instrument-history readers every10s; same backfill.",
+    "validation": "All17snapshotcolumns exact Arrow equality outside timed runs; replay counts/checksums bothengines; gap/out-of-order correctness separate.",
+    "client": "Each lane in an independent spawned host process; binary psycopg result cursors and clickhouse-connect; identical NumPy materialization and hash. Sample aggregate RSS of parent+lane processes separately.",
+    "known_limits": [
+      "Not a whole-application HTTP test or complete production adapter migration.",
+      "Normalized raw mirror preserves canonical observation fields, not every provider-specific raw field or prior duplicate versions.",
+      "Compressed-time replay, not provider throughput or a maximum-capacity search.",
+      "Sampled cgroup memory peaks at1s; clientRSS separately; no forced cold OS cache.",
+      "CHfsync configuration is more conservative than the installed baseline.",
+      "Rare operation p99 has few samples; report n/max and variation."
+    ]
+  },
+  "verification": {
+    "retained_runs": 12,
+    "completed_operations": 4068,
+    "errors": 0,
+    "interval_overruns": 0,
+    "parity_pairs": 6,
+    "snapshot_rows_exact_per_engine": 15130115,
+    "snapshot_columns": 17,
+    "unit_tests": {
+      "passed": 3
+    },
+    "ruff": "passed",
+    "pyright": "0 errors, 0 warnings",
+    "report_tables": 5,
+    "report_links": "all local files exist",
+    "review_mode": "independent methodology review plus focused final self-review",
+    "compatibility": "none; isolated prototype only",
+    "runtime": "replicas stopped; installation DBs and collectors healthy and not restarted"
+  },
+  "pg_metrics": {
+    "normal": {
+      "repetitions": 3,
+      "lanes": {
+        "stream": {
+          "completed": 180,
+          "median_ms": 6.156270508654416,
+          "max_ms": 18.98341695778072,
+          "scheduled_median_ms": 9.203978988807648,
+          "scheduled_max_ms": 20.995624945499003,
+          "per_run_p95_ms": [
+            10.886099381605156,
+            12.949344416847453,
+            13.786972599336874
+          ]
+        },
+        "backfill": {
+          "completed": 90,
+          "median_ms": 21.25437493668869,
+          "max_ms": 38.342750049196184,
+          "scheduled_median_ms": 23.843332950491458,
+          "scheduled_max_ms": 41.113583953119814,
+          "per_run_p95_ms": [
+            31.438189261825755,
+            33.235532947583124,
+            33.51863753632642
+          ]
+        },
+        "latest": {
+          "completed": 180,
+          "median_ms": 1.4736875309608877,
+          "max_ms": 51.20450002141297,
+          "scheduled_median_ms": 4.8428334994241595,
+          "scheduled_max_ms": 55.99729192908853,
+          "per_run_p95_ms": [
+            3.8978330616373564,
+            4.445845750160512,
+            6.985762261319904
+          ]
+        },
+        "catalog": {
+          "completed": 90,
+          "median_ms": 2.326417015865445,
+          "max_ms": 8.277582935988903,
+          "scheduled_median_ms": 5.865874991286546,
+          "scheduled_max_ms": 12.739832978695631,
+          "per_run_p95_ms": [
+            6.074023392284288,
+            6.62554219015874,
+            5.6731961958575985
+          ]
+        },
+        "gap": {
+          "completed": 90,
+          "median_ms": 2.4791459436528385,
+          "max_ms": 8.842833922244608,
+          "scheduled_median_ms": 5.42991649126634,
+          "scheduled_max_ms": 13.483625021763146,
+          "per_run_p95_ms": [
+            5.35767295514233,
+            7.9821536550298315,
+            6.038026767782863
+          ]
+        },
+        "artifact": {
+          "completed": 18,
+          "median_ms": 679.4767710380256,
+          "max_ms": 821.5225000167266,
+          "scheduled_median_ms": 682.3199165519327,
+          "scheduled_max_ms": 822.2277910681441,
+          "per_run_p95_ms": [
+            751.4848337741569,
+            787.6437605300453,
+            719.3361349636689
+          ]
+        },
+        "hot_latest": {
+          "completed": 180,
+          "median_ms": 1.010270498227328,
+          "max_ms": 50.32545793801546,
+          "scheduled_median_ms": 4.303416528273374,
+          "scheduled_max_ms": 54.202624945901334,
+          "per_run_p95_ms": [
+            3.0516368453390887,
+            2.5397774705197635,
+            2.7126648521516397
+          ]
+        }
+      },
+      "errors": [],
+      "sampled_peak_working_set_mib": [
+        338.52734375,
+        342.3359375,
+        338.5234375
+      ],
+      "sampled_peak_total_mib": [
+        1235.796875,
+        1870.10546875,
+        1259.42578125
+      ],
+      "client_peak_mib": [
+        1365.078125,
+        1373.375,
+        1236.46875
+      ],
+      "cpu_seconds": [
+        3.552618,
+        3.41527,
+        3.474749
+      ],
+      "workload_wall_seconds": [
+        59.009367874939926,
+        59.00795879098587,
+        59.00888129102532
+      ],
+      "server_volume_gib": [
+        7.2803587624803185,
+        7.249298074282706,
+        7.202317685820162
+      ]
+    },
+    "stress": {
+      "repetitions": 3,
+      "lanes": {
+        "stream": {
+          "completed": 180,
+          "median_ms": 11.479854001663625,
+          "max_ms": 58.04379202891141,
+          "scheduled_median_ms": 14.331854006741196,
+          "scheduled_max_ms": 62.800167012028396,
+          "per_run_p95_ms": [
+            22.37258927780202,
+            20.45675240806304,
+            20.608873275341463
+          ]
+        },
+        "backfill": {
+          "completed": 90,
+          "median_ms": 26.61020844243467,
+          "max_ms": 56.25433300156146,
+          "scheduled_median_ms": 28.779562504496425,
+          "scheduled_max_ms": 57.270374963991344,
+          "per_run_p95_ms": [
+            36.1927603604272,
+            52.735747717088074,
+            33.64103749045171
+          ]
+        },
+        "latest": {
+          "completed": 180,
+          "median_ms": 1.9536670297384262,
+          "max_ms": 29.413999989628792,
+          "scheduled_median_ms": 5.317103990819305,
+          "scheduled_max_ms": 33.490416943095624,
+          "per_run_p95_ms": [
+            7.790411030873645,
+            6.849756225710734,
+            7.750643504550679
+          ]
+        },
+        "catalog": {
+          "completed": 90,
+          "median_ms": 4.157707968261093,
+          "max_ms": 22.117416956461966,
+          "scheduled_median_ms": 7.426582975313067,
+          "scheduled_max_ms": 23.716541938483715,
+          "per_run_p95_ms": [
+            10.283376858569682,
+            12.095487501937892,
+            11.423025291878721
+          ]
+        },
+        "gap": {
+          "completed": 90,
+          "median_ms": 5.032687506172806,
+          "max_ms": 20.08370799012482,
+          "scheduled_median_ms": 7.91204150300473,
+          "scheduled_max_ms": 22.655708016827703,
+          "per_run_p95_ms": [
+            12.337712309090412,
+            14.721670502331095,
+            14.14895426132716
+          ]
+        },
+        "artifact": {
+          "completed": 18,
+          "median_ms": 4253.05814598687,
+          "max_ms": 5663.490624981932,
+          "scheduled_median_ms": 4256.689021014608,
+          "scheduled_max_ms": 5667.396166943945,
+          "per_run_p95_ms": [
+            5494.691520987544,
+            4833.586052031023,
+            5394.411916058743
+          ]
+        },
+        "hot_latest": {
+          "completed": 180,
+          "median_ms": 1.4036460197530687,
+          "max_ms": 31.39262495096773,
+          "scheduled_median_ms": 4.476812551729381,
+          "scheduled_max_ms": 35.433624987490475,
+          "per_run_p95_ms": [
+            7.23545171204023,
+            4.500824317801741,
+            3.558052104199302
+          ]
+        },
+        "artifact_parallel": {
+          "completed": 18,
+          "median_ms": 4258.608749485575,
+          "max_ms": 5658.9395420160145,
+          "scheduled_median_ms": 4261.789457988925,
+          "scheduled_max_ms": 5662.782000028528,
+          "per_run_p95_ms": [
+            5488.815271033673,
+            4781.833520741202,
+            5382.689343794482
+          ]
+        },
+        "latest_parallel": {
+          "completed": 360,
+          "median_ms": 1.852520916145295,
+          "max_ms": 107.90591698605567,
+          "scheduled_median_ms": 5.3922084625810385,
+          "scheduled_max_ms": 108.0178749980405,
+          "per_run_p95_ms": [
+            6.797437899513167,
+            6.733981182333081,
+            7.777194050140677
+          ]
+        }
+      },
+      "errors": [],
+      "sampled_peak_working_set_mib": [
+        368.22265625,
+        384.48828125,
+        380.93359375
+      ],
+      "sampled_peak_total_mib": [
+        2068.43359375,
+        1983.640625,
+        2276.5859375
+      ],
+      "client_peak_mib": [
+        4566.796875,
+        5040.4375,
+        4642.078125
+      ],
+      "cpu_seconds": [
+        23.375703,
+        22.849011,
+        23.781577
+      ],
+      "workload_wall_seconds": [
+        59.506061292020604,
+        59.50218870805111,
+        59.504973832983524
+      ],
+      "server_volume_gib": [
+        7.2682203957811,
+        7.236836877651513,
+        7.1901793191209435
+      ]
+    }
+  }
+}

@@ -19,6 +19,7 @@ from trading.contexts.identity.adapters.outbound.persistence.postgres import (
     PostgresLocalAuthRepository,
 )
 from trading.contexts.identity.application.ports import LocalPasskey
+from trading.platform.postgres_budget import admin_connect as budget_connect
 from trading.shared_kernel.primitives import UserId
 
 
@@ -41,7 +42,7 @@ def run_probe(*, dsn: str, bootstrap_file: Path) -> dict[str, object]:
     account_digest = hasher.hash(secrets.token_urlsafe(24))
     recovery_digest = hasher.hash(secrets.token_urlsafe(24))
     credential_id = secrets.token_urlsafe(24)
-    with psycopg.connect(dsn, autocommit=True) as connection:
+    with budget_connect(dsn, autocommit=True) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -167,7 +168,7 @@ def run_probe(*, dsn: str, bootstrap_file: Path) -> dict[str, object]:
 
     immutable_event = False
     try:
-        with psycopg.connect(dsn, autocommit=True) as connection, connection.cursor() as cursor:
+        with budget_connect(dsn, autocommit=True) as connection, connection.cursor() as cursor:
             cursor.execute("UPDATE identity_local_auth_events SET reason_code = 'changed'")
     except ObjectNotInPrerequisiteState:
         immutable_event = True

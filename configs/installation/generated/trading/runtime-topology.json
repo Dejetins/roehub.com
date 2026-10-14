@@ -2,16 +2,13 @@
   "infrastructure": [
     "postgresql",
     "redis",
-    "openbao",
-    "clickhouse"
+    "openbao"
   ],
   "observability": [
     "operational-health",
     "prometheus",
     "alertmanager",
-    "blackbox",
-    "grafana",
-    "loki"
+    "blackbox"
   ],
   "profile": "trading",
   "roles": [
@@ -27,9 +24,7 @@
         "--port",
         "9300",
         "--interval-seconds",
-        "2",
-        "--loki-url",
-        "http://loki:3100"
+        "2"
       ],
       "component_ids": [
         "app:monitoring"
@@ -67,8 +62,7 @@
       ],
       "depends_on": [
         "postgresql",
-        "redis",
-        "clickhouse"
+        "redis"
       ],
       "entrypoints": [
         "apps/migrations/main.py",
@@ -154,42 +148,6 @@
       "lifecycle": "service",
       "name": "web",
       "network_access": "web_ingress",
-      "profiles": [
-        "base",
-        "trading",
-        "ml"
-      ],
-      "resources": {
-        "cpus": 0.5,
-        "memory_mb": 384
-      }
-    },
-    {
-      "command": [
-        "python",
-        "-m",
-        "apps.plugin_gateway.main.main",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "9209"
-      ],
-      "component_ids": [
-        "app:plugin_gateway"
-      ],
-      "depends_on": [
-        "postgresql",
-        "storage-migrations"
-      ],
-      "entrypoints": [
-        "apps/plugin_gateway/main/app.py",
-        "apps/plugin_gateway/main/main.py"
-      ],
-      "health_path": "/health/ready",
-      "image": "runtime",
-      "internal_port": 9209,
-      "lifecycle": "service",
-      "name": "plugin-gateway",
       "profiles": [
         "base",
         "trading",
@@ -401,7 +359,6 @@
       ],
       "config_mount": "market-data.yaml",
       "depends_on": [
-        "clickhouse",
         "redis",
         "storage-migrations"
       ],
@@ -438,7 +395,6 @@
       ],
       "config_mount": "market-data.yaml",
       "depends_on": [
-        "clickhouse",
         "redis",
         "storage-migrations"
       ],
@@ -475,7 +431,6 @@
       ],
       "config_mount": "backtest-artifacts.yaml",
       "depends_on": [
-        "clickhouse",
         "storage-migrations"
       ],
       "entrypoints": [
@@ -510,7 +465,6 @@
         "worker:backtest_job_runner"
       ],
       "depends_on": [
-        "clickhouse",
         "postgresql",
         "storage-migrations"
       ],
@@ -626,7 +580,6 @@
       ],
       "config_mount": "strategy.yaml",
       "depends_on": [
-        "clickhouse",
         "postgresql",
         "redis",
         "storage-migrations"
@@ -646,45 +599,6 @@
       "resources": {
         "cpus": 1.0,
         "memory_mb": 768
-      }
-    },
-    {
-      "command": [
-        "python",
-        "-m",
-        "apps.monitoring.clickhouse_exporter",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "9116",
-        "--scrape-uri",
-        "http://clickhouse:8123/",
-        "--database",
-        "roehub",
-        "--user",
-        "default"
-      ],
-      "component_ids": [
-        "app:monitoring"
-      ],
-      "depends_on": [
-        "clickhouse"
-      ],
-      "entrypoints": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ],
-      "health_path": "/metrics",
-      "image": "runtime",
-      "internal_port": 9116,
-      "lifecycle": "service",
-      "name": "clickhouse-exporter",
-      "profiles": [
-        "trading",
-        "ml"
-      ],
-      "resources": {
-        "cpus": 0.25,
-        "memory_mb": 256
       }
     },
     {

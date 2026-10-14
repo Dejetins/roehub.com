@@ -297,7 +297,7 @@ def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() ->
     assert response.json()["error"]["details"]["retryable"] is True
 
 
-def test_post_backtest_preflight_applies_tier_request_limits() -> None:
+def test_post_backtest_preflight_ignores_legacy_paid_level() -> None:
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
 
     response = client.post(
@@ -309,11 +309,7 @@ def test_post_backtest_preflight_applies_tier_request_limits() -> None:
         json=_valid_request(),
     )
 
-    assert response.status_code == 422
-    payload = response.json()
-    assert payload["error"]["code"] == "backtest.request_too_expensive"
-    assert payload["error"]["details"]["paid_level"] == "free"
-    assert payload["error"]["details"]["limit_scope"] == "full_jobs.top_n"
+    assert response.status_code == 200
 
 
 def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> None:
@@ -542,7 +538,7 @@ def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
     assert response.json()["error"]["code"] == "backtest.request_too_expensive"
 
 
-def test_post_backtest_job_free_active_quota_returns_429_with_retry_details() -> None:
+def test_post_backtest_job_self_host_active_quota_returns_429_with_retry_details() -> None:
     repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
     headers = {
@@ -556,28 +552,23 @@ def test_post_backtest_job_free_active_quota_returns_429_with_retry_details() ->
         "end": "2026-02-01T00:00:00Z",
     }
 
-    first = client.post(
-        "/backtests/jobs",
-        headers={**headers, "Idempotency-Key": "a"},
-        json=request,
-    )
-    second = client.post(
-        "/backtests/jobs",
-        headers={**headers, "Idempotency-Key": "b"},
-        json=request,
-    )
+    for index in range(20):
+        created = client.post(
+            "/backtests/jobs",
+            headers={**headers, "Idempotency-Key": f"seed-{index}"},
+            json=request,
+        )
+        assert created.status_code == 201
     limited = client.post(
         "/backtests/jobs",
         headers={**headers, "Idempotency-Key": "c"},
         json=request,
     )
 
-    assert first.status_code == 201
-    assert second.status_code == 201
     assert limited.status_code == 429
     payload = limited.json()
     assert payload["error"]["code"] == "backtest.rate_limited"
-    assert payload["error"]["details"]["paid_level"] == "free"
+    assert "paid_level" not in payload["error"]["details"]
     assert payload["error"]["details"]["limit_scope"] == "full_jobs.active"
     assert payload["error"]["details"]["retry_after_seconds"] == 60
 

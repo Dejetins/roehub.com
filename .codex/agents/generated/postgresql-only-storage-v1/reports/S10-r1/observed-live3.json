@@ -1,0 +1,176 @@
+{
+  "observed_at": "2026-10-14T08:27:39.928951+00:00",
+  "budget": {
+    "market": {
+      "active": 3,
+      "quarantined": 2,
+      "limit": 16
+    },
+    "control": {
+      "active": 1,
+      "quarantined": 0,
+      "limit": 24
+    },
+    "admin": {
+      "active": 2,
+      "quarantined": 2,
+      "limit": 8
+    }
+  },
+  "coverage": [
+    [
+      1,
+      "0GUSDT",
+      557187,
+      "2025-09-22 10:00:00+00:00",
+      "2026-10-14 08:26:00+00:00",
+      "b8f5ab1d-c22c-49f6-8365-31fec6f06b83"
+    ],
+    [
+      1,
+      "AAPLBUSDT",
+      110667,
+      "2026-07-29 12:00:00+00:00",
+      "2026-10-14 08:26:00+00:00",
+      "dfab8cc8-2f70-4f18-a97d-ef33f188fa0e"
+    ],
+    [
+      1,
+      "AAVEUSDT",
+      3152482,
+      "2020-10-15 03:00:00+00:00",
+      "2026-10-14 08:26:00+00:00",
+      "00f392b6-327a-4465-9bf7-980d63d5bd8a"
+    ],
+    [
+      1,
+      "ACTUSDT",
+      1010787,
+      "2024-11-11 10:00:00+00:00",
+      "2026-10-14 08:26:00+00:00",
+      "ba4acd53-caa2-46ff-8385-9c9fc2869f04"
+    ],
+    [
+      2,
+      "0GUSDT",
+      564042,
+      "2025-09-17 15:45:00+00:00",
+      "2026-10-14 08:26:00+00:00",
+      "5bada9c0-b4ac-4af3-877a-ff6c51544566"
+    ]
+  ],
+  "connections": [
+    [
+      1,
+      "0GUSDT",
+      true,
+      "2026-10-14 08:27:36.457863+00:00"
+    ],
+    [
+      1,
+      "AAPLBUSDT",
+      true,
+      "2026-10-14 08:27:36.457863+00:00"
+    ],
+    [
+      1,
+      "AAVEUSDT",
+      true,
+      "2026-10-14 08:27:36.457863+00:00"
+    ],
+    [
+      1,
+      "ACTUSDT",
+      true,
+      "2026-10-14 08:27:36.457863+00:00"
+    ],
+    [
+      2,
+      "0GUSDT",
+      true,
+      "2026-10-14 08:27:36.457863+00:00"
+    ]
+  ],
+  "bounds": [
+    [
+      1,
+      "0GUSDT",
+      "ready",
+      "2025-09-22 10:00:00+00:00",
+      null
+    ],
+    [
+      1,
+      "AAPLBUSDT",
+      "ready",
+      "2026-07-29 12:00:00+00:00",
+      null
+    ],
+    [
+      1,
+      "AAVEUSDT",
+      "ready",
+      "2020-10-15 03:00:00+00:00",
+      null
+    ],
+    [
+      1,
+      "ACTUSDT",
+      "ready",
+      "2024-11-11 10:00:00+00:00",
+      null
+    ],
+    [
+      2,
+      "0GUSDT",
+      "ready",
+      "2025-09-17 15:45:00+00:00",
+      null
+    ]
+  ],
+  "funding": [
+    [
+      2,
+      "0GUSDT",
+      3702
+    ]
+  ],
+  "jobs": [
+    [
+      "candle_ingestion",
+      "succeeded",
+      null,
+      5
+    ],
+    [
+      "candle_ingestion",
+      "failed",
+      "storage_generation_reset",
+      31
+    ],
+    [
+      "catalog_refresh",
+      "failed",
+      "storage_generation_reset",
+      6
+    ],
+    [
+      "candle_ingestion",
+      "cancelled",
+      "storage_generation_reset",
+      103
+    ],
+    [
+      "catalog_refresh",
+      "cancelled",
+      "storage_generation_reset",
+      1
+    ],
+    [
+      "catalog_refresh",
+      "failed",
+      "source_or_storage_unavailable",
+      1
+    ]
+  ]
+}

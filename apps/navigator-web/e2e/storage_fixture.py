@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-import psycopg
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,6 +32,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     ArtifactCoordinatesV2,
 )
 from trading.contexts.identity.application.use_cases import OrganizationAccessError
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -305,10 +305,8 @@ def candle_requests():
 sandbox = tempfile.TemporaryDirectory(prefix="s08-storage-")
 root = Path(sandbox.name).resolve() / "root"
 root.mkdir()
-with psycopg.connect(m["dsn"]) as conn:
-    conn.execute(
-        (ROOT / "migrations/postgres/0031_backtest_artifact_storage_v1.sql").read_bytes()
-    )
+with budget_connect(m["dsn"]) as conn:
+    conn.execute((ROOT / "migrations/postgres/0031_backtest_artifact_storage_v1.sql").read_bytes())
 # Keep the S07 fixture activation only for artifact reads; no scheduler exists.
 storage = ArtifactStorageService(
     repository=m["repo"],

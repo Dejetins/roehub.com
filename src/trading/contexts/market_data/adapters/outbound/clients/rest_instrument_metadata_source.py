@@ -109,7 +109,9 @@ class RestInstrumentMetadataSource(InstrumentMetadataSource):
         )
         response = self.http.get_json(
             url=market.rest.base_url.rstrip("/") + path,
-            params={},
+            # Permission sets are unused by this metadata projection and can make
+            # the full spot catalog exceed the bounded HTTP response budget.
+            params={"showPermissionSets": "false"} if market.market_type == "spot" else {},
             timeout_s=market.rest.timeout_s,
             retries=market.rest.retries,
             backoff_base_s=market.rest.backoff.base_s,

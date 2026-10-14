@@ -31,9 +31,7 @@ from tools.release.offline_bundle import verify_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BUNDLE = Path.home() / ".cache/roehub/stage22-offline-release/candidates/roehub-0.1.0"
-DEFAULT_TRUSTED_KEY = (
-    Path.home() / ".cache/roehub/stage22-offline-release/trust/roehub-0.1.0.pub"
-)
+DEFAULT_TRUSTED_KEY = Path.home() / ".cache/roehub/stage22-offline-release/trust/roehub-0.1.0.pub"
 DEFAULT_EVIDENCE = (
     ROOT
     / "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports"
@@ -41,7 +39,7 @@ DEFAULT_EVIDENCE = (
 )
 DEFAULT_SCREENSHOT = DEFAULT_EVIDENCE.with_name("23-greenfield-admin.png")
 PWCLI = Path.home() / ".codex/skills/playwright/scripts/playwright_cli.sh"
-OIDC_FIXTURE = ROOT / "tools/release/greenfield_oidc_fixture.py"
+LOCAL_FIXTURE = ROOT / "tools/release/greenfield_local_fixture.py"
 
 _CORE_IDENTITY_TABLES = (
     "identity_administrative_audit_events",
@@ -110,9 +108,7 @@ def _run(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as error:
-        raise GreenfieldLifecycleError(
-            f"{label} timed out after {timeout:g} seconds"
-        ) from error
+        raise GreenfieldLifecycleError(f"{label} timed out after {timeout:g} seconds") from error
     except (OSError, subprocess.SubprocessError) as error:
         raise GreenfieldLifecycleError(f"{label} could not run") from error
     if result.returncode not in allowed_codes:
@@ -155,9 +151,7 @@ def _offline_tags() -> set[str]:
         timeout=60,
     )
     return {
-        line
-        for line in result.stdout.decode().splitlines()
-        if line.startswith("roehub-offline/")
+        line for line in result.stdout.decode().splitlines() if line.startswith("roehub-offline/")
     }
 
 
@@ -326,7 +320,9 @@ asyncio.run(main())
         if result.returncode == 0:
             status = _json_output(result, label="bounded browser ingress probe")
             if "bootstrap_required" not in status:
-                raise GreenfieldLifecycleError("bounded browser ingress returned invalid auth state")
+                raise GreenfieldLifecycleError(
+                    "bounded browser ingress returned invalid auth state"
+                )
             return {
                 "helper_image": "signed-runtime-image-id",
                 "host_port": 8080,
@@ -386,7 +382,12 @@ def _issue_ticket(installation: Installation, destination: Path) -> None:
         label="roehubctl installation owner ticket",
     )
     _run(
-        ["docker", "cp", f"{_container_id(installation, 'api')}:{container_path}", str(destination)],
+        [
+            "docker",
+            "cp",
+            f"{_container_id(installation, 'api')}:{container_path}",
+            str(destination),
+        ],
         label="bootstrap ticket custody transfer",
         timeout=60,
     )
@@ -418,9 +419,7 @@ def _pw(
     if raw and not output:
         detail = result.stderr.decode(errors="replace").strip()
         detail = re.sub(r"[A-Za-z0-9_-]{32,}", "[redacted]", detail)
-        raise GreenfieldLifecycleError(
-            f"{label} returned no machine result: {detail[-2000:]}"
-        )
+        raise GreenfieldLifecycleError(f"{label} returned no machine result: {detail[-2000:]}")
     return output
 
 
@@ -587,7 +586,10 @@ def _browser_bootstrap(
         timeout=180,
     )
     ticket.unlink(missing_ok=True)
-    if payload.get("authenticated") is not True or payload.get("recovery_values_retained") is not False:
+    if (
+        payload.get("authenticated") is not True
+        or payload.get("recovery_values_retained") is not False
+    ):
         raise GreenfieldLifecycleError("browser owner bootstrap did not complete safely")
     return payload
 
@@ -646,7 +648,7 @@ def _browser_create_boundaries(*, session: str, cwd: Path) -> dict[str, Any]:
     return payload
 
 
-def _provision_oidc_fixture(
+def _provision_local_fixture(
     installation: Installation,
     *,
     fixture_id: str,
@@ -662,12 +664,12 @@ def _provision_oidc_fixture(
             "--fixture-id",
             fixture_id,
         ],
-        label=f"disposable OIDC use-case fixture {fixture_id}",
-        input_bytes=OIDC_FIXTURE.read_bytes(),
+        label=f"disposable local identity fixture {fixture_id}",
+        input_bytes=LOCAL_FIXTURE.read_bytes(),
     )
-    payload = _json_output(result, label=f"disposable OIDC use-case fixture {fixture_id}")
+    payload = _json_output(result, label=f"disposable local identity fixture {fixture_id}")
     if payload.get("provisioned") is not True or payload.get("accepted_invitation_count") != 1:
-        raise GreenfieldLifecycleError("disposable OIDC use-case fixture did not provision")
+        raise GreenfieldLifecycleError("disposable local identity fixture did not provision")
     return payload
 
 
@@ -702,18 +704,6 @@ def _browser_validate_isolation(
       const secondaryIds = secondaryMembers.map(item => item.user_id);
       if (!primaryIds.includes('{user_a}') || primaryIds.includes('{user_b}')) throw new Error('primary membership leakage');
       if (!secondaryIds.includes('{user_b}') || secondaryIds.includes('{user_a}')) throw new Error('secondary membership leakage');
-      const invalid = await request('/api/v1/organizations/{secondary}/plugins/stage23-cross/permissions/{user_a}', {{
-        method: 'PUT', headers: {{'content-type': 'application/json'}}, body: JSON.stringify({{permission: 'read'}})
-      }}, true);
-      if (invalid.ok) throw new Error('cross-organization permission unexpectedly succeeded');
-      for (const [organizationId, userId, pluginId] of [
-        ['{primary}', '{user_a}', 'stage23-primary'],
-        ['{secondary}', '{user_b}', 'stage23-secondary']
-      ]) {{
-        await request(`/api/v1/organizations/${{organizationId}}/plugins/${{pluginId}}/permissions/${{userId}}`, {{
-          method: 'PUT', headers: {{'content-type': 'application/json'}}, body: JSON.stringify({{permission: 'read'}})
-        }});
-      }}
       const adminResponse = await page.goto('http://localhost:8080/admin');
       if (!adminResponse || !adminResponse.ok()) {{
         const alert = (await page.locator('[role="alert"]').allTextContents()).join(' ').slice(0, 300);
@@ -723,7 +713,6 @@ def _browser_validate_isolation(
       await page.locator('[data-admin-presence].is-ready').waitFor({{state: 'attached'}});
       return {{
         admin_visible: true,
-        cross_organization_permission_status: invalid.status,
         primary_member_count: primaryMembers.length,
         secondary_member_count: secondaryMembers.length
       }};
@@ -759,9 +748,7 @@ def _browser_validate_isolation(
     console_errors = _console_error_count(console)
     if console_errors:
         detail = re.sub(r"[A-Za-z0-9_-]{32,}", "[redacted]", console)
-        raise GreenfieldLifecycleError(
-            f"browser console contains error messages: {detail[-2000:]}"
-        )
+        raise GreenfieldLifecycleError(f"browser console contains error messages: {detail[-2000:]}")
     if "/api/v1/organizations" not in requests or "/api/v1/admin/organizations/" not in requests:
         raise GreenfieldLifecycleError("browser network evidence is incomplete")
     payload["console_errors"] = console_errors
@@ -857,53 +844,62 @@ def _seed_storage(installation: Installation, *, organizations: dict[str, Any]) 
     secondary = str(organizations["secondary_organization_id"])
     _compose_exec(
         installation,
-        "clickhouse",
+        "postgresql",
         [
-            "/bin/sh",
+            "psql",
+            "-U",
+            "roehub",
+            "-d",
+            "roehub",
+            "-v",
+            "ON_ERROR_STOP=1",
             "-c",
-            (
-                "clickhouse-client --password \"$(cat /run/roehub-secrets/clickhouse-password)\" "
-                "--multiquery --query \""
-                "CREATE TABLE stage23_timeseries (organization_id UUID, ts DateTime64(3, 'UTC'), value Float64) "
-                "ENGINE=MergeTree ORDER BY (organization_id, ts);"
-                f"INSERT INTO stage23_timeseries VALUES ('{primary}','2026-07-14 10:00:00.000',1.0),"
-                f"('{secondary}','2026-07-14 10:01:00.000',2.0);\""
-            ),
+            "CREATE TABLE stage23_timeseries (organization_id uuid, ts timestamptz, value double precision);"
+            f"INSERT INTO stage23_timeseries VALUES ('{primary}','2026-07-14 10:00:00+00',1.0),"
+            f"('{secondary}','2026-07-14 10:01:00+00',2.0);",
         ],
-        label="ClickHouse representative fixture",
+        label="PostgreSQL representative timeseries fixture",
     )
-    redis = _compose_exec(
-        installation,
-        "redis",
-        [
-            "/bin/sh",
-            "-c",
-            "redis-cli --no-auth-warning -a \"$(cat /run/roehub-secrets/redis-password-server)\" SET stage23:checkpoint checkpoint-0002",
-        ],
-        label="Redis representative checkpoint",
-    ).stdout.decode().strip()
+    redis = (
+        _compose_exec(
+            installation,
+            "redis",
+            [
+                "/bin/sh",
+                "-c",
+                'redis-cli --no-auth-warning -a "$(cat /run/roehub-secrets/redis-password-server)" SET stage23:checkpoint checkpoint-0002',
+            ],
+            label="Redis representative checkpoint",
+        )
+        .stdout.decode()
+        .strip()
+    )
     if redis != "OK":
         raise GreenfieldLifecycleError("Redis representative checkpoint failed")
-    artifact = _compose_exec(
-        installation,
-        "api",
-        [
-            "python",
-            "-c",
-            (
-                "from pathlib import Path; import hashlib; "
-                "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
-                "p.parent.mkdir(parents=True, exist_ok=True); "
-                "p.write_bytes(b'{\"schema\":\"io.roehub.stage23-artifact/v1alpha1\",\"organizations\":2}\\n'); "
-                "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
-            ),
-        ],
-        label="representative artifact fixture",
-    ).stdout.decode().strip()
+    artifact = (
+        _compose_exec(
+            installation,
+            "api",
+            [
+                "python",
+                "-c",
+                (
+                    "from pathlib import Path; import hashlib; "
+                    "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
+                    "p.parent.mkdir(parents=True, exist_ok=True); "
+                    'p.write_bytes(b\'{"schema":"io.roehub.stage23-artifact/v1alpha1","organizations":2}\\n\'); '
+                    "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
+                ),
+            ],
+            label="representative artifact fixture",
+        )
+        .stdout.decode()
+        .strip()
+    )
     openbao = _openbao_metadata(installation)
     return {
         "artifact_digest": artifact,
-        "clickhouse_rows": 2,
+        "postgresql_timeseries_rows": 2,
         "openbao_metadata": openbao,
         "redis_checkpoint": "checkpoint-0002",
     }
@@ -931,51 +927,62 @@ def _openbao_metadata(installation: Installation) -> dict[str, Any]:
     }
 
 
-def _clickhouse_snapshot(installation: Installation) -> bytes:
+def _timeseries_snapshot(installation: Installation) -> bytes:
     return _compose_exec(
         installation,
-        "clickhouse",
+        "postgresql",
         [
-            "/bin/sh",
+            "psql",
+            "-U",
+            "roehub",
+            "-d",
+            "roehub",
+            "-At",
+            "-v",
+            "ON_ERROR_STOP=1",
             "-c",
-            (
-                "clickhouse-client --password \"$(cat /run/roehub-secrets/clickhouse-password)\" "
-                "--query \"SELECT organization_id, ts, value FROM stage23_timeseries "
-                "ORDER BY organization_id, ts FORMAT JSONEachRow\""
-            ),
+            "SELECT organization_id,ts,value FROM stage23_timeseries ORDER BY organization_id,ts",
         ],
-        label="ClickHouse snapshot",
+        label="PostgreSQL timeseries snapshot",
     ).stdout
 
 
 def _redis_checkpoint(installation: Installation) -> str:
-    return _compose_exec(
-        installation,
-        "redis",
-        [
-            "/bin/sh",
-            "-c",
-            "redis-cli --no-auth-warning -a \"$(cat /run/roehub-secrets/redis-password-server)\" GET stage23:checkpoint",
-        ],
-        label="Redis checkpoint read",
-    ).stdout.decode().strip()
+    return (
+        _compose_exec(
+            installation,
+            "redis",
+            [
+                "/bin/sh",
+                "-c",
+                'redis-cli --no-auth-warning -a "$(cat /run/roehub-secrets/redis-password-server)" GET stage23:checkpoint',
+            ],
+            label="Redis checkpoint read",
+        )
+        .stdout.decode()
+        .strip()
+    )
 
 
 def _artifact_digest(installation: Installation) -> str:
-    return _compose_exec(
-        installation,
-        "api",
-        [
-            "python",
-            "-c",
-            (
-                "from pathlib import Path; import hashlib; "
-                "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
-                "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
-            ),
-        ],
-        label="artifact digest read",
-    ).stdout.decode().strip()
+    return (
+        _compose_exec(
+            installation,
+            "api",
+            [
+                "python",
+                "-c",
+                (
+                    "from pathlib import Path; import hashlib; "
+                    "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
+                    "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
+                ),
+            ],
+            label="artifact digest read",
+        )
+        .stdout.decode()
+        .strip()
+    )
 
 
 def _postgres_backup(installation: Installation) -> bytes:
@@ -1016,41 +1023,24 @@ def _restore_postgres(installation: Installation, backup: bytes) -> None:
     )
 
 
-def _restore_clickhouse(installation: Installation, snapshot: bytes) -> None:
-    _compose_exec(
-        installation,
-        "clickhouse",
-        [
-            "/bin/sh",
-            "-c",
-            (
-                "clickhouse-client --password \"$(cat /run/roehub-secrets/clickhouse-password)\" "
-                "--query \"CREATE TABLE stage23_timeseries (organization_id UUID, "
-                "ts DateTime64(3, 'UTC'), value Float64) ENGINE=MergeTree "
-                "ORDER BY (organization_id, ts)\" && "
-                "clickhouse-client --password \"$(cat /run/roehub-secrets/clickhouse-password)\" "
-                "--query \"INSERT INTO stage23_timeseries FORMAT JSONEachRow\""
-            ),
-        ],
-        label="fresh ClickHouse restore",
-        input_bytes=snapshot,
-    )
-
-
 def _restore_redis(installation: Installation, checkpoint: str) -> None:
-    result = _compose_exec(
-        installation,
-        "redis",
-        [
-            "/bin/sh",
-            "-c",
-            (
-                "redis-cli --no-auth-warning -a \"$(cat /run/roehub-secrets/redis-password-server)\" "
-                f"SET stage23:checkpoint {checkpoint}"
-            ),
-        ],
-        label="fresh Redis checkpoint restore",
-    ).stdout.decode().strip()
+    result = (
+        _compose_exec(
+            installation,
+            "redis",
+            [
+                "/bin/sh",
+                "-c",
+                (
+                    'redis-cli --no-auth-warning -a "$(cat /run/roehub-secrets/redis-password-server)" '
+                    f"SET stage23:checkpoint {checkpoint}"
+                ),
+            ],
+            label="fresh Redis checkpoint restore",
+        )
+        .stdout.decode()
+        .strip()
+    )
     if result != "OK":
         raise GreenfieldLifecycleError("fresh Redis checkpoint restore failed")
 
@@ -1060,30 +1050,38 @@ def _restore_artifact(installation: Installation) -> str:
 
 
 def _seed_artifact_only(installation: Installation) -> str:
-    return _compose_exec(
-        installation,
-        "api",
-        [
-            "python",
-            "-c",
-            (
-                "from pathlib import Path; import hashlib; "
-                "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
-                "p.parent.mkdir(parents=True, exist_ok=True); "
-                "p.write_bytes(b'{\"schema\":\"io.roehub.stage23-artifact/v1alpha1\",\"organizations\":2}\\n'); "
-                "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
-            ),
-        ],
-        label="fresh artifact restore",
-    ).stdout.decode().strip()
+    return (
+        _compose_exec(
+            installation,
+            "api",
+            [
+                "python",
+                "-c",
+                (
+                    "from pathlib import Path; import hashlib; "
+                    "p=Path('/var/lib/roehub/artifacts/stage23/representative.json'); "
+                    "p.parent.mkdir(parents=True, exist_ok=True); "
+                    'p.write_bytes(b\'{"schema":"io.roehub.stage23-artifact/v1alpha1","organizations":2}\\n\'); '
+                    "print('sha256:'+hashlib.sha256(p.read_bytes()).hexdigest())"
+                ),
+            ],
+            label="fresh artifact restore",
+        )
+        .stdout.decode()
+        .strip()
+    )
 
 
 def _memory_snapshot(installation: Installation) -> dict[str, Any]:
-    container_ids = _run(
-        [*installation.command(), "ps", "-q"],
-        label="memory container inventory",
-        timeout=60,
-    ).stdout.decode().splitlines()
+    container_ids = (
+        _run(
+            [*installation.command(), "ps", "-q"],
+            label="memory container inventory",
+            timeout=60,
+        )
+        .stdout.decode()
+        .splitlines()
+    )
     if not container_ids:
         raise GreenfieldLifecycleError("memory snapshot has no running containers")
     result = _run(
@@ -1162,8 +1160,8 @@ def verify_greenfield_lifecycle(
     trusted_key = trusted_key.expanduser().resolve()
     if not PWCLI.is_file():
         raise GreenfieldLifecycleError("pinned Playwright CLI wrapper is unavailable")
-    if not OIDC_FIXTURE.is_file():
-        raise GreenfieldLifecycleError("disposable OIDC use-case fixture is unavailable")
+    if not LOCAL_FIXTURE.is_file():
+        raise GreenfieldLifecycleError("disposable local identity fixture is unavailable")
     verification = verify_bundle(bundle=bundle, trusted_public_key=trusted_key)
     if verification.get("signature_verified") is not True:
         raise GreenfieldLifecycleError("offline bundle signature is not verified")
@@ -1216,7 +1214,7 @@ def verify_greenfield_lifecycle(
             )
             organizations = _browser_create_boundaries(session=browser_session, cwd=browser_cwd)
             users = {
-                fixture_id: _provision_oidc_fixture(source, fixture_id=fixture_id)
+                fixture_id: _provision_local_fixture(source, fixture_id=fixture_id)
                 for fixture_id in ("a", "b")
             }
             browser = _browser_validate_isolation(
@@ -1230,11 +1228,14 @@ def verify_greenfield_lifecycle(
             source_counts = _identity_counts(source)
             source_identity_digest = _identity_digest(source)
             postgres_backup = _postgres_backup(source)
-            clickhouse_backup = _clickhouse_snapshot(source)
+            timeseries_backup = _timeseries_snapshot(source)
             redis_backup = _redis_checkpoint(source)
             artifact_backup = _artifact_digest(source)
             openbao_backup = _openbao_metadata(source)
-            if artifact_backup != storage["artifact_digest"] or redis_backup != storage["redis_checkpoint"]:
+            if (
+                artifact_backup != storage["artifact_digest"]
+                or redis_backup != storage["redis_checkpoint"]
+            ):
                 raise GreenfieldLifecycleError("source representative state changed before backup")
             _down(source, volumes=False)
 
@@ -1243,22 +1244,23 @@ def verify_greenfield_lifecycle(
                 trusted_key=trusted_key,
                 state=target.state,
             )
-            _up(target, "secret-init", "postgresql", "clickhouse", "redis")
+            _up(target, "secret-init", "postgresql", "redis")
             _restore_postgres(target, postgres_backup)
-            _restore_clickhouse(target, clickhouse_backup)
             _restore_redis(target, redis_backup)
             _up(target)
             target_ingress = _start_browser_ingress(target)
             restored_artifact = _restore_artifact(target)
             target_counts = _identity_counts(target)
             target_identity_digest = _identity_digest(target)
-            target_clickhouse = _clickhouse_snapshot(target)
+            target_timeseries = _timeseries_snapshot(target)
             target_redis = _redis_checkpoint(target)
             target_openbao = _openbao_metadata(target)
             if source_counts != target_counts or source_identity_digest != target_identity_digest:
                 raise GreenfieldLifecycleError("PostgreSQL identity restore reconciliation failed")
-            if clickhouse_backup != target_clickhouse:
-                raise GreenfieldLifecycleError("ClickHouse restore reconciliation failed")
+            if timeseries_backup != target_timeseries:
+                raise GreenfieldLifecycleError(
+                    "PostgreSQL timeseries restore reconciliation failed"
+                )
             if redis_backup != target_redis:
                 raise GreenfieldLifecycleError("Redis restore reconciliation failed")
             if artifact_backup != restored_artifact:
@@ -1302,7 +1304,7 @@ def verify_greenfield_lifecycle(
             return {
                 "backup_restore": {
                     "artifact_digest": artifact_backup,
-                    "clickhouse_sha256": _sha256_bytes(clickhouse_backup),
+                    "postgresql_timeseries_sha256": _sha256_bytes(timeseries_backup),
                     "identity_counts": source_counts,
                     "identity_state_digest": source_identity_digest,
                     "openbao_metadata": openbao_backup,
@@ -1335,7 +1337,7 @@ def verify_greenfield_lifecycle(
                 "duration_seconds": round(time.monotonic() - started, 3),
                 "fresh_state": {
                     "current_production_access": False,
-                    "disposable_oidc_users": 2,
+                    "disposable_local_users": 2,
                     "external_provider_writes": False,
                     "organizations": 2,
                     "personal_data_present": False,

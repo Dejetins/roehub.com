@@ -1,0 +1,19 @@
+{
+  "retained_runs": 12,
+  "completed_operations": 4068,
+  "errors": 0,
+  "interval_overruns": 0,
+  "parity_pairs": 6,
+  "snapshot_rows_exact_per_engine": 15130115,
+  "snapshot_columns": 17,
+  "unit_tests": {
+    "passed": 3
+  },
+  "ruff": "passed",
+  "pyright": "0 errors, 0 warnings",
+  "report_tables": 5,
+  "report_links": "all local files exist",
+  "review_mode": "independent methodology review plus focused final self-review",
+  "compatibility": "none; isolated prototype only",
+  "runtime": "replicas stopped; installation DBs and collectors healthy and not restarted"
+}

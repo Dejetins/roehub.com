@@ -237,28 +237,26 @@ def test_transient_checkpoint_failure_retries_without_turning_into_terminal_fail
 
 def test_runtime_storage_classifier_excludes_permanent_errors():
     import psycopg
-    from clickhouse_connect.driver.exceptions import OperationalError
 
     from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
         _retryable_work_storage_error,
     )
 
-    for error in [psycopg.OperationalError(), OperationalError(), TimeoutError()]:
+    for error in [psycopg.OperationalError(), TimeoutError()]:
         assert _retryable_work_storage_error(error)
     for error in [psycopg.errors.InvalidPassword(), psycopg.errors.SyntaxError(), ValueError()]:
         assert not _retryable_work_storage_error(error)
 
 
-def test_clickhouse_memory_error_recovers_but_schema_and_auth_errors_do_not():
-    from clickhouse_connect.driver.exceptions import DatabaseError, OperationalError
+def test_postgres_memory_error_recovers_but_schema_and_auth_errors_do_not():
+    from psycopg.errors import InsufficientPrivilege, InvalidPassword, OutOfMemory, SyntaxError
 
     from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
         _retryable_work_storage_error,
     )
 
     for error in [
-        DatabaseError("Code: 241. memory limit"),
-        DatabaseError("HTTPDriver for private-url received ClickHouse error code 241"),
+        OutOfMemory(),
     ]:
         store = Store()
         store.job.update(completed_units=60, rows_read=60, rows_written=60)
@@ -281,10 +279,8 @@ def test_clickhouse_memory_error_recovers_but_schema_and_auth_errors_do_not():
         assert store.outcome["error_code"] == "storage_memory_pressure"
         assert store.outcome["job"]["error_phase"] == "fill_window"
         assert store.states[-1]["units"] == 60
-    for code in [60, 62, 81, 516, 497]:
-        for cls in [DatabaseError, OperationalError]:
-            assert not _retryable_work_storage_error(cls(f"Code: {code}. permanent"))
-    assert not _retryable_work_storage_error(DatabaseError("unknown failure"))
+    for error in [SyntaxError(), InvalidPassword(), InsufficientPrivilege(), ValueError()]:
+        assert not _retryable_work_storage_error(error)
 
 
 def test_bounded_larger_window_preserves_cursor_and_yields_after_confirmed_insert():

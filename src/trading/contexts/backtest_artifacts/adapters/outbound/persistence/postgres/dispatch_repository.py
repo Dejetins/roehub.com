@@ -18,6 +18,7 @@ from trading.contexts.backtest_artifacts.application.services.management import 
     ManagementError,
     Profile,
     Schedule,
+    SourceTarget,
     digest,
 )
 
@@ -327,37 +328,22 @@ class PostgresArtifactDispatchRepository(PostgresAutomaticBaseRepository):
                 return None
             snapshot = current["snapshot"]
             target = snapshot["source"]
-            coalesce = target.get("revision") == "content_unverified"
-            if coalesce:
-                latest = self._one(
-                    """SELECT desired_target FROM backtest_artifact_source_state
-                    WHERE exchange=%(e)s AND market_type=%(m)s AND symbol=%(s)s""",
-                    e=current["exchange"],
-                    m=current["market_type"],
-                    s=current["symbol"],
+            try:
+                SourceTarget.model_validate(target)
+            except (ValueError, TypeError):
+                self._exec(
+                    "UPDATE backtest_artifact_requests SET state='error', "
+                    "reason='legacy_source_target_invalid', control_version=control_version+1 "
+                    "WHERE request_id=%(r)s",
+                    r=current["request_id"],
                 )
-                candidate = latest["desired_target"].get("source") if latest else None
-                if (
-                    candidate
-                    and candidate.get("revision") == "content_unverified"
-                    and all(
-                        candidate[k] == target[k] for k in ("compute_identity", "funding_identity")
-                    )
-                    and candidate["history"]["start_utc"] <= target["history"]["start_utc"]
-                    and candidate["watermark"] >= target["watermark"]
-                ):
-                    target = candidate
+                return None
             group = self.rows(
                 (
                     "SELECT * FROM backtest_artifact_requests WHERE installation_id=%(i)s AND "
                     "state='queued' AND exchange=%(e)s AND "
                     "market_type=%(m)s AND symbol=%(s)s AND "
-                    "(snapshot->'source'=%(source)s OR (%(coalesce)s AND "
-                    "snapshot->'source'->>'revision'='content_unverified' AND "
-                    "snapshot->'source'->>'compute_identity'=%(compute)s AND "
-                    "snapshot->'source'->>'funding_identity'=%(funding)s AND "
-                    "snapshot->'source'->'history'->>'start_utc'>=%(start)s AND "
-                    "snapshot->'source'->>'watermark'<=%(end)s)) AND "
+                    "snapshot->'source'=%(source)s AND "
                     "snapshot->'root_id'=%(root)s AND "
                     "snapshot->'root_revision'=%(revision)s ORDER "
                     "BY created_at,request_id LIMIT "
@@ -368,11 +354,6 @@ class PostgresArtifactDispatchRepository(PostgresAutomaticBaseRepository):
                 m=current["market_type"],
                 s=current["symbol"],
                 source=Jsonb(target),
-                coalesce=coalesce,
-                compute=target["compute_identity"],
-                funding=target["funding_identity"],
-                start=target["history"]["start_utc"],
-                end=target["watermark"],
                 root=Jsonb(snapshot["root_id"]),
                 revision=Jsonb(snapshot["root_revision"]),
             )

@@ -1,4 +1,4 @@
-"""Disposable PostgreSQL and ClickHouse proof for research organization isolation."""
+"""Disposable PostgreSQL proof for research organization isolation."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from statistics import median, pstdev
 from typing import Any, Callable, cast
 from uuid import UUID, uuid4
 
-import clickhouse_connect
 import psycopg
 
 from trading.contexts.backtest.adapters.outbound import (
@@ -31,12 +30,15 @@ from trading.contexts.backtest.application.services.research_identity import (
     build_research_content_hash,
     build_research_idempotency_key_hash,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleReader,
-    ClickHouseConnectGateway,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+    PostgresCanonicalCandleReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (
+    IngestionGateway,
 )
 from trading.contexts.market_data.application.dto import CanonicalCandleBatch1m
 from trading.platform.errors import RoehubError
+from trading.platform.postgres_budget import admin_connect as budget_connect
 from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
@@ -64,7 +66,7 @@ def _bounded_error_message(error: Exception) -> str:
     return message[:240] or "unavailable"
 
 
-def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
+def run_probe(*, postgres_dsn: str) -> dict[str, object]:
     now = datetime.now(UTC)
     organization_a, organization_b = uuid4(), uuid4()
     user_a, user_b, ambiguous_user, unscoped_user = (uuid4() for _index in range(4))
@@ -76,9 +78,7 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
     )
 
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
-    scope_resolver = PostgresResearchOrganizationScopeResolver(
-        gateway=postgres_gateway
-    )
+    scope_resolver = PostgresResearchOrganizationScopeResolver(gateway=postgres_gateway)
     repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
     user_id_a = UserId(user_a)
     user_id_b = UserId(user_b)
@@ -86,10 +86,7 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
     organization_id_b = OrganizationId(organization_b)
     scope_a = scope_resolver.resolve(user_id=user_id_a)
     scope_b = scope_resolver.resolve(user_id=user_id_b)
-    if (
-        scope_a.organization_id != organization_id_a
-        or scope_b.organization_id != organization_id_b
-    ):
+    if scope_a.organization_id != organization_id_a or scope_b.organization_id != organization_id_b:
         raise ResearchRuntimeProofError("organization scope was not derived server-side")
     _expect_scope_state(
         resolver=scope_resolver,
@@ -168,17 +165,23 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
     )
     if stored_job_a is None or stored_job_b is None:
         raise ResearchRuntimeProofError("production repository rejected an owned job")
-    if repository.get(
-        job_id=job_a,
-        organization_id=organization_id_b,
-        user_id=user_id_b,
-    ) is not None:
+    if (
+        repository.get(
+            job_id=job_a,
+            organization_id=organization_id_b,
+            user_id=user_id_b,
+        )
+        is not None
+    ):
         raise ResearchRuntimeProofError("cross-organization job query leaked a row")
-    if repository.get(
-        job_id=job_a,
-        organization_id=organization_id_a,
-        user_id=user_id_b,
-    ) is not None:
+    if (
+        repository.get(
+            job_id=job_a,
+            organization_id=organization_id_a,
+            user_id=user_id_b,
+        )
+        is not None
+    ):
         raise ResearchRuntimeProofError("cross-user job query leaked a row")
 
     postgres_constraints = {
@@ -245,14 +248,9 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
         ),
     }
 
-    client = clickhouse_connect.get_client(
-        dsn=clickhouse_dsn,
-        database="default",
-        connect_timeout=10,
-    )
+    client = budget_connect(postgres_dsn, autocommit=True)
     try:
-        clickhouse_database = _resolve_clickhouse_database(client)
-        canonical_table = f"{clickhouse_database}.canonical_candles_1m"
+        canonical_table = "market_data.canonical_candles_1m"
         candle_open = now.replace(second=0, microsecond=0)
         candle_count = 120
         candle_rows: list[list[object]] = []
@@ -281,33 +279,20 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
                     uuid4(),
                 ]
             )
-        client.insert(
-            canonical_table,
-            candle_rows,
-            column_names=[
-                "market_id",
-                "symbol",
-                "instrument_key",
-                "ts_open",
-                "ts_close",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume_base",
-                "volume_quote",
-                "trades_count",
-                "taker_buy_volume_base",
-                "taker_buy_volume_quote",
-                "source",
-                "ingested_at",
-                "ingest_id",
-            ],
+        client.execute(
+            "SELECT market_data.ensure_partitions(%s::date, 2)",
+            (candle_open.replace(day=1).date(),),
         )
-        direct_reader = ClickHouseCanonicalCandleReader(
-            gateway=ClickHouseConnectGateway(client),
-            database=clickhouse_database,
-        )
+        with client.cursor() as cursor:
+            cursor.executemany(
+                "INSERT INTO market_data.canonical_candles_1m "
+                "(market_id,symbol,instrument_key,ts_open,ts_close,open,high,low,close,"
+                "volume_base,volume_quote,trades_count,taker_buy_volume_base,"
+                "taker_buy_volume_quote,source,ingested_at,ingest_id) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                candle_rows,
+            )
+        direct_reader = PostgresCanonicalCandleReader(gateway=IngestionGateway(dsn=postgres_dsn))
         scoped_reader = OrganizationScopedCanonicalCandleReader(
             scope_resolver=scope_resolver,
             canonical_reader=direct_reader,
@@ -341,10 +326,9 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
         if direct_batch.row_count() != candle_count:
             raise ResearchRuntimeProofError("shared canonical candle count is incomplete")
         direct_digest = _candle_batch_digest(direct_batch)
-        if (
-            direct_digest != _candle_batch_digest(scoped_batch_a)
-            or direct_digest != _candle_batch_digest(scoped_result_b.candles)
-        ):
+        if direct_digest != _candle_batch_digest(
+            scoped_batch_a
+        ) or direct_digest != _candle_batch_digest(scoped_result_b.candles):
             raise ResearchRuntimeProofError("shared candle parity failed")
         if scoped_result_b.scope.organization_id != organization_id_b:
             raise ResearchRuntimeProofError("shared candle scope was not server-derived")
@@ -362,22 +346,22 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
             time_range=time_range,
             expected_code="research.organization_scope_forbidden",
         )
-        stored_rows = int(
-            client.query(
+        count_row = client.execute(
                 """
-                SELECT count()
-                FROM {canonical_table} FINAL
+                SELECT count(*)
+                FROM {canonical_table}
                 WHERE market_id = 1
                   AND symbol = 'BTCUSDT'
                   AND ts_open >= %(start)s
                   AND ts_open < %(end)s
                 """.format(canonical_table=canonical_table),
-                parameters={
+                {
                     "start": candle_open,
                     "end": candle_open + timedelta(minutes=candle_count),
                 },
-            ).result_rows[0][0]
-        )
+            ).fetchone()
+        assert count_row is not None
+        stored_rows = int(count_row[0])
         if stored_rows != candle_count:
             raise ResearchRuntimeProofError("canonical candles were duplicated per organization")
 
@@ -438,23 +422,6 @@ def run_probe(*, postgres_dsn: str, clickhouse_dsn: str) -> dict[str, object]:
     }
 
 
-def _resolve_clickhouse_database(client: Any) -> str:
-    rows = client.query(
-        """
-        SELECT database
-        FROM system.tables
-        WHERE name = 'canonical_candles_1m'
-        ORDER BY database
-        """
-    ).result_rows
-    if len(rows) != 1:
-        raise ResearchRuntimeProofError("canonical ClickHouse source is not unique")
-    database = str(rows[0][0])
-    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,62}", database) is None:
-        raise ResearchRuntimeProofError("canonical ClickHouse database is invalid")
-    return database
-
-
 def _seed_organizations(
     *,
     dsn: str,
@@ -464,7 +431,7 @@ def _seed_organizations(
 ) -> None:
     organization_a, organization_b = organizations
     user_a, user_b, ambiguous_user, unscoped_user = users
-    with psycopg.connect(dsn, autocommit=False) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn, autocommit=False) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT installation_id FROM identity_installations WHERE singleton_key = TRUE"
         )
@@ -574,7 +541,7 @@ def _insert_job(
         sort_keys=True,
         separators=(",", ":"),
     )
-    with psycopg.connect(dsn, autocommit=True) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.execute(
             """
             INSERT INTO backtest_jobs (
@@ -608,7 +575,7 @@ def _expect_postgres_foreign_key(
     parameters: tuple[object, ...],
 ) -> str:
     try:
-        with psycopg.connect(dsn, autocommit=False) as connection, connection.cursor() as cursor:
+        with budget_connect(dsn, autocommit=False) as connection, connection.cursor() as cursor:
             cursor.execute(cast(Any, query), parameters)
     except psycopg.Error as error:
         if error.sqlstate == "23503":
@@ -673,14 +640,12 @@ def main() -> int:
         print("research tenancy runtime proof failed: disposable proof flag is required")
         return 1
     postgres_dsn = os.environ.get("ROEHUB_STORAGE_POSTGRES_DSN", "").strip()
-    clickhouse_dsn = os.environ.get("ROEHUB_STORAGE_CLICKHOUSE_DSN", "").strip()
-    if not postgres_dsn or not clickhouse_dsn:
+    if not postgres_dsn:
         print("research tenancy runtime proof failed: storage endpoints are unavailable")
         return 1
     try:
         result = run_probe(
             postgres_dsn=postgres_dsn,
-            clickhouse_dsn=clickhouse_dsn,
         )
     except Exception as error:  # noqa: BLE001
         frames = traceback.extract_tb(error.__traceback__)

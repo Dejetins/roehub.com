@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, cast
 
-import psycopg
 from psycopg.rows import dict_row
+
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 class IdentityPostgresGateway(Protocol):
@@ -126,7 +127,7 @@ class PsycopgIdentityPostgresGateway(IdentityPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as connection:
@@ -153,7 +154,7 @@ class PsycopgIdentityPostgresGateway(IdentityPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as connection:
@@ -181,7 +182,7 @@ class PsycopgIdentityPostgresGateway(IdentityPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as connection:

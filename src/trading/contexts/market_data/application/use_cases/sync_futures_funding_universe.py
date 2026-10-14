@@ -70,7 +70,8 @@ class SyncFuturesFundingUniverseUseCase:
             )
             all_rows.extend(rows)
 
-        self._store.upsert_funding_instruments(all_rows)
+        for offset in range(0, len(all_rows), 1000):
+            self._store.upsert_funding_instruments(all_rows[offset : offset + 1000])
         return SyncFuturesFundingUniverseReport(
             markets_total=len(self._market_ids),
             instruments_total=len(all_rows),

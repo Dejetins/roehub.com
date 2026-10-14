@@ -1,1 +1,0 @@
-"""Isolated plugin gateway application."""

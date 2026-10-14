@@ -1,5 +1,22 @@
 # Market Data — WS Live Ingestion Worker & Maintenance Scheduler (v1)
 
+## Consumer wiring — S05, 2026-10-14
+
+Запись raw/canonical/coverage выполняется транзакционно в PostgreSQL. REST/Parquet batches ограничены 8192 строками, metadata/funding — 1000. Месячные партиции заранее создаёт maintenance; application DDL не разрешён.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Closed-minute intake и existing buffer/recovery limits сохраняются. Redis публикация следует за durable PG receipt; неизвестный commit сверяется по идемпотентным ключам, а не объявляется успехом.
+
+
 > Исторический документ: worker больше не читает CSV whitelist. Его вход —
 > `GlobalEffectiveCollectorSet`: объединение пользовательских selections и pin
 > активных стратегий; список обновляется во время работы. Актуальная сеть
@@ -24,7 +41,7 @@
 - `market_id=3` Bybit Spot (V5)
 - `market_id=4` Bybit Futures (V5 linear)
 
-2) Обрабатывает **только closed 1m candles** и записывает их в **ClickHouse raw** (`raw_*_klines_1m`)
+2) Обрабатывает **только closed 1m candles** и записывает их в **PostgreSQL raw** (`raw_*_klines_1m`)
 с SLO: **p95 “receive closed → inserted raw” ≤ 1s (локально)**.
 
 3) Детектирует разрывы (gap) **по последовательности минут** на инструмент:
@@ -73,7 +90,7 @@
 
 ### Minute key
 Везде, где сравниваем минуты, используем **minute bucket**:
-- `toStartOfMinute(ts_open)` в ClickHouse
+- `date_trunc('minute', ts_open)` при UTC session в PostgreSQL
 - в Python: `ts_open` нормализован до “точной минуты” (без секунд/мс)
 
 ---
@@ -84,16 +101,15 @@
 - `market_data.raw_binance_klines_1m`
 - `market_data.raw_bybit_klines_1m`
 
-### Canonical (через MV)
-- `market_data.canonical_candles_1m` формируется автоматически через:
-  - `mv_raw_binance_to_canonical_1m`
-  - `mv_raw_bybit_to_canonical_1m`
-
-**Важно**: Live worker пишет **только** в raw. Прямых записей в canonical нет.
+### Canonical (атомарная транзакция)
+- `market_data.canonical_candles_1m` имеет unique key и version-aware precedence.
+`RawKlineWriter` атомарно сохраняет raw/canonical/coverage/revision; application
+worker не делает независимых прямых canonical writes. Journal receipt закрывается
+только после подтверждённого candle COMMIT и актуального owner token.
 
 ---
 
-## Инструменты (whitelist) и загрузка из ClickHouse
+## Инструменты (whitelist) и загрузка из PostgreSQL
 
 Источник списка активных инструментов для live worker и scheduler:
 - `market_data.ref_instruments`
@@ -129,7 +145,7 @@
   2) “на reconnect/рестарт”: догонка от последней известной минуты (canonical) до текущего момента
 
 REST fill вызывает существующий use-case `RestCatchUp1mUseCase` (или режим/подмножество его логики),
-чтобы дозаписать raw (и, через MV, canonical).
+чтобы дозаписать raw и canonical в одной транзакции.
 
 > REST fill **не должен блокировать** WS ingestion. Это отдельный пул задач/очередь.
 
@@ -167,7 +183,7 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 
 ### A. Загрузка инструментов и разбиение на соединения
 
-1) Читаем из ClickHouse список активных инструментов:
+1) Читаем из PostgreSQL список активных инструментов:
    `SELECT market_id, symbol FROM market_data.ref_instruments WHERE status='ENABLED' AND is_tradable=1`
 
 2) Группируем по `market_id`.
@@ -291,7 +307,7 @@ Job name: **`market-data-ws-worker`**.
 
 Минимум:
 - WS reconnects/messages/errors
-- CH insert batches/rows/duration/errors
+- PostgreSQL transaction batches/rows/duration/errors
 - SLO histograms:
   - `ws_closed_to_insert_start_seconds`
   - `ws_closed_to_insert_done_seconds`
@@ -329,7 +345,7 @@ SIGTERM/SIGINT:
 ### Сохранение незавершённой работы (2026-10-04)
 
 Исправление трёх подтверждённых сценариев отказа использует существующие
-`RestFillRange1mUseCase`, REST/ClickHouse adapters и canonical deduplication.
+`RestFillRange1mUseCase`, REST/PostgreSQL adapters и canonical deduplication.
 Новый журнал `market_data_stream_recovery` (additive PostgreSQL migration `0027`)
 хранит только инструмент, `[start_at,end_at)`, причину, generation token, попытку,
 `next_retry_at` и безопасный код ошибки. Свечи и ответы провайдеров в него не попадают.
@@ -364,7 +380,7 @@ PostgreSQL checkpoint продвигается при сохранении ident
 Синхронные REST и чтение recovery plan в WS worker выполняются в owned
 `spawn`-процессах с 60s deadline на вызов, terminate/kill + join при отмене и
 watchdog смерти родителя. Для live INSERT используется один постоянный writer:
-он прогревается до приёма WS, переиспользует ClickHouse client и обслуживает один
+он прогревается до приёма WS, переиспользует PostgreSQL client и обслуживает один
 пакет за раз. Импорты и подключение не повторяются для каждого пакета. IPC через
 закрытый socketpair ограничен 8 MiB на frame; отправка/получение прерываются по
 таймауту. Ошибка, отмена или неопределённый исход уничтожает текущий процесс до
@@ -396,7 +412,6 @@ worker. Миграция не изменяет пользовательские 
 ## Примечания
 
 - Одна реплика worker (как указано).
-- Дубликаты в raw допустимы; canonical dedup — ReplacingMergeTree(ingested_at).
+- Дубликаты в raw допустимы; canonical dedup — unique key и version-aware upsert.
 - REST не может “сгенерировать” свечи, которых у биржи нет — это нормально.
-- Для worker/scheduler runtime используется thread-local ClickHouse gateway (один CH client на поток), чтобы при `rest_concurrency_instruments > 1` не ловить session-конфликт `Attempt to execute concurrent queries within the same session`.
-- Временный workaround для старых инстансов без фикса: `market_data.ingestion.rest_concurrency_instruments: 1`.
+- Worker/scheduler runtime использует bounded PostgreSQL pools и общий registry соединений; транзакция эксклюзивно владеет connection.

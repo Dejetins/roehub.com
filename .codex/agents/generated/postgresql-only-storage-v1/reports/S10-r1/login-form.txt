@@ -1,0 +1,6 @@
+### Result
+"RESEARCH AND OPERATIONS WORKSPACE\n\nFrom market hypothesis to controlled execution.\n\nRoehub brings strategy research, reproducible backtests, live readiness and exchange operations into one quiet institutional workspace.\n\n01\nStrategies\n\nDesign, compare and operate versioned strategies.\n\n02\nBacktests\n\nConfigure, run and inspect reproducible experiments.\n\n03\nMonitoring\n\nObserve positions, executions, health and freshness.\n\nR\n\nSECURE SESSION\n\nSign in to Roehub\n\nA local passkey is the primary sign-in method. Password and one-time recovery codes are optional fallbacks.\n\nNext\n/\nIdentity provider\nLocal passkey\nCredentials\nPasskey stays on your device\nSign in with passkey\nFallback sign-in methods\nUsername\nPassword\nSign in with password\nUsername\nRecovery code\nRecover access\n\nThe server stores only a public key, fallback hashes, and an opaque session."
+### Ran Playwright code
+```js
+await (async page => {await page.getByText("Fallback sign-in methods",{exact:true}).click();return await page.locator("main").innerText();})(page);
+```

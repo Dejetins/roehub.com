@@ -1,0 +1,557 @@
+{
+  "basis": "S05 entry file hashes; preexisting foreign content retained, only owned changes claimed",
+  "files": [
+    {
+      "path": "apps/api/routes/market_data_reference.py",
+      "status": "modified",
+      "baseline_sha256": "1773fc533ef5fe876ea2736c9f200848e815d335ffda7870cfed37f509b396d6",
+      "sha256": "7581694faa3a4a5f7dc41717fe5fce969f9aa8c6f0ff9b7bee364b09ad2bfafb"
+    },
+    {
+      "path": "apps/api/wiring/modules/market_data_reference.py",
+      "status": "modified",
+      "baseline_sha256": "ded6841c634a02b2087c1cf2dd15fcb048b575defebb78294302a401f15eba2f",
+      "sha256": "2a7db184458e1ed5f918d823ddc5ff1ef39320e0ca244882e075682865f9a31f"
+    },
+    {
+      "path": "apps/api/wiring/modules/ui_strategies_dashboard.py",
+      "status": "modified",
+      "baseline_sha256": "7f9a42285820c8cdf287aa4834e9c3fc6b20bbc7cef0e88e7e14996d6935474a",
+      "sha256": "759ee435e59b7d01db378d4bf05e3464f3ce533103490d84fe81994365ad892b"
+    },
+    {
+      "path": "apps/cli/commands/backfill_1m.py",
+      "status": "modified",
+      "baseline_sha256": "1de0995f6e0b4ca7d880c634de6a95086cbd29fe8b031fe9f99afa0fa138fb70",
+      "sha256": "1a4a81fe5e98447d5a374aefbd24b44d35a8e58398d8ff0808f26388305a5d5a"
+    },
+    {
+      "path": "apps/cli/commands/backtest_artifact_publish.py",
+      "status": "modified",
+      "baseline_sha256": "441224f53f33d72e1841cf78a2a0ef701006c0b90fc84ed0999b1c987c327ba0",
+      "sha256": "e4f4f463aea5e83b4952513a43ac8586056bd0951ac3b1b14a8803329a7f8b83"
+    },
+    {
+      "path": "apps/cli/commands/funding_rate_catchup.py",
+      "status": "modified",
+      "baseline_sha256": "1be93b914aeb32dc4fffa0081478a547ba3fa2875ac67dd3c30264d51c7c249e",
+      "sha256": "1304ad4cda663ab13f9de5c1c816ee78c791398c1e50192a2dc825e2fe683351"
+    },
+    {
+      "path": "apps/cli/commands/rest_catchup_1m.py",
+      "status": "modified",
+      "baseline_sha256": "76902f9d9b55265d195b222edd067aa9200db7f602448a64bda74984819744de",
+      "sha256": "a31f1adbf36aade9a19f2bf3ae6a2c3b046ba419b1970a2036126eba76053a3f"
+    },
+    {
+      "path": "apps/cli/commands/sync_instruments.py",
+      "status": "modified",
+      "baseline_sha256": "cc946902612931a84c6a0e931a493dca53bcb84066eff5d56ae77546b97902af",
+      "sha256": "95aad2c39f60d805ac9612306f74d79cc8ab76d642ca236f29001e5836e6cb6c"
+    },
+    {
+      "path": "apps/cli/wiring/clients/parquet.py",
+      "status": "modified",
+      "baseline_sha256": "17121b375f2a6738c192ef048ed07f7a0627cc04464ac68070d1821244ae4695",
+      "sha256": "8504980e551ba0a7facd2e36bfc8f9aa66cd9da06a9769631f0ba7768af38472"
+    },
+    {
+      "path": "apps/cli/wiring/db/postgres.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "2975bf03d94428734cfa2fbf90c359e2d8855aca383a079699d939d71a31f671"
+    },
+    {
+      "path": "apps/cli/wiring/modules/market_data.py",
+      "status": "modified",
+      "baseline_sha256": "84b0fa3447754709847389d41ec2de462967ef35ccbdaca3cf78a6597a263993",
+      "sha256": "e7cba1d48fcc00e469ab6a88749c04d26af92e8e6c1ccad3aec5692bf84b3f67"
+    },
+    {
+      "path": "apps/migrations/market_data.py",
+      "status": "modified",
+      "baseline_sha256": "fd13fad0271bb00b8d8fa83c33b6e22ab8aa052b4bc11d13f2cb5db3efb892b9",
+      "sha256": "8e0620847cfad53756e8ecdb9e82db9f5362e91a9b1dc8fcfe12e5787591ac11"
+    },
+    {
+      "path": "apps/migrations/storage.py",
+      "status": "modified",
+      "baseline_sha256": "676edeccc53bb5b2698f1e4cd77854aaf92fffc95f8f058dac6ac1c1e22ba2d3",
+      "sha256": "61d85429652bbd60958be3ed25ab40fc4700341b2b8ad5836d1387a8389f9366"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/main/main.py",
+      "status": "modified",
+      "baseline_sha256": "673078295bca910b431b6bd4eaefbb397093feb216faa6cd16e7686f78d3a212",
+      "sha256": "e6c062c207905628d8bb12e3dc015283cc3d95d022efbfc0a7098c23dde818ed"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py",
+      "status": "modified",
+      "baseline_sha256": "dca8e0df638349314733789e6a0bc845d434a27630a85acfadf7572999b582d1",
+      "sha256": "1fdaca83f4aac39c110487c338bd700cd17ba94daee7dd73e8882c8949bf4dae"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+      "status": "modified",
+      "baseline_sha256": "40e4e22792b67a1980bb057e9bcff8d753e70081c421859a16d024915c81b992",
+      "sha256": "963f7eae3b23f6c34a252ce1df0124f1f66427d63c3e1d16698ad387a071ecea"
+    },
+    {
+      "path": "apps/scheduler/market_data_scheduler/main/main.py",
+      "status": "modified",
+      "baseline_sha256": "13b7e4db069a5555ad4309a0fee1c3eb1c37cae35440b9702f026fa34e5b75c9",
+      "sha256": "320da2d3adeff3b29e576cd90f390e26d4dba7011e865788d82603300f1e0715"
+    },
+    {
+      "path": "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+      "status": "modified",
+      "baseline_sha256": "c957b8f68772ab656e8979cd6455ba535eb94c2207a5c9befc1938a47cac705d",
+      "sha256": "2c3f995a09bd32a0ee0da7d615a3141c49b4ba3fdffbc5563320d672809030f5"
+    },
+    {
+      "path": "apps/worker/market_data_ws/main/main.py",
+      "status": "modified",
+      "baseline_sha256": "2d9be73c9a891e92d6b6abbd0ff7a2323ceb185c63279951461829caf7f2d044",
+      "sha256": "339b6ae91351cc1b97926b2f2eaa1ee200bfb64ed09489590d6aa8e804bb8013"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/io_process.py",
+      "status": "modified",
+      "baseline_sha256": "0157895fd37236101391a3799f1681cfe8d61ea47226a28790c47a3008e6ad8d",
+      "sha256": "cd5aca9d4cc933116db6686bbabcf53acfdcc3f86c1877e79c11f7a191c1f804"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+      "status": "modified",
+      "baseline_sha256": "0e3f4ca090b4b1debe780ac883a0183315c332f3565dcf360ba76b95fd47f89e",
+      "sha256": "fafa4f81afc33e1a07872be3b51b733bfb83bc986a31ee74e81626754ad54f58"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/persistent_writer.py",
+      "status": "modified",
+      "baseline_sha256": "bfaf2925949e500a9c274010eb6ae744f147890e8888a7a918370b10a9c704f0",
+      "sha256": "48fe3bf486c26c20f7c2ee7766aef03b8876b22ae21275c5dffe44dd6b76053f"
+    },
+    {
+      "path": "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py",
+      "status": "modified",
+      "baseline_sha256": "5c20647ef854a6bf0fcade8342e8939c6842f68c13c9a564226b961c52ff0d8f",
+      "sha256": "fe4156a3d494bf978df0f6dc67399e785b4437fa78a7189a8f87326bd00ef048"
+    },
+    {
+      "path": "docs/architecture/apps/cli/cli-backfill-1m.md",
+      "status": "modified",
+      "baseline_sha256": "708b99f1e4444d9177ff3cc0f28b239552d6c3183b2a40ad57e90b657ad8cab9",
+      "sha256": "523f1e4f43f7fa0a24653f49a0f9c457bfcdcee44e24ac4c28c9a6021e2dc144"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md",
+      "status": "modified",
+      "baseline_sha256": "5fcf125d3a4f69f760ce734dee0d4368cbd7e546dff9bef49cbcfa9c04573011",
+      "sha256": "d99fb14f5f1726c3b9243bf77f2cae81d8377b2b0a0506f0698acb5c15aaf9d0"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "status": "modified",
+      "baseline_sha256": "40b7359889e34cc9dda8ffa970d74771b6adffcdd2f2410043b79cf2df170c7d",
+      "sha256": "1e5af243c3f57b3bf4aaecbaeb77b850ffa332544ffef3a57840f8aa66fabfd2"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-application-ports.md",
+      "status": "modified",
+      "baseline_sha256": "6d062c98e6c3f0db80579cb2977ce3a80961d8b4c12884d1b51e898e76de5b0d",
+      "sha256": "c50a0daaf49065dee6cc419567999fa69d1d274cf29895ae1796967fcb98d6ea"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md",
+      "status": "modified",
+      "baseline_sha256": "2ddcf064f6660b656ba02abedf9cd6e6cb32363f10907ffe90afa010283dd7e0",
+      "sha256": "05adf76ceb11ff7c3fea4270766d4b7c1db29c7b0d93f3cbadbd47f71849174b"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-live-tail-repair-v1.md",
+      "status": "modified",
+      "baseline_sha256": "185245118842f8a89aff6e0258a8aa1f468b164e1b6c13cb43485dd9d02bd987",
+      "sha256": "b6b8f185e06e69aa6da79cf52c4693958a14a0c4a158f21db605f89bb5d1dc38"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-api-v1.md",
+      "status": "modified",
+      "baseline_sha256": "5d7a7947707a425d0ddf7e27aa71e12fd969324fd50333bc9725e3593300a683",
+      "sha256": "40fdd91ca80850520a673cdf9d5c1109a9200076e6f2c8476ab0234ef716fd52"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-data-sync-v2.md",
+      "status": "modified",
+      "baseline_sha256": "02aa7063d0c9a7b31241c8e9446908a59c678d5563608cdca9884f17c928b47a",
+      "sha256": "91d88d6a3b92c02af3d220c0bba41cfe3c9e7398ddbfc75d43da88dfed1592a4"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-rest-historical-catchup-1m-v2.md",
+      "status": "modified",
+      "baseline_sha256": "3ec690e51eccba37a4c35c29d7a5ffe4770083f3d315eab5b76705b824976784",
+      "sha256": "9988fb90f27e69f25c1232c10cc244df352a6a5236dc8610b01b8ecae9b263e2"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-runtime-config-invariants-v2.md",
+      "status": "modified",
+      "baseline_sha256": "0717491587e8ab6fc1fe45bdb6520f2b5e7b522e28880f7a741c3e818ed95369",
+      "sha256": "698ee580801e5852bddb2677e00b07ae9233aa64f5bc165a5103958752f738bc"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-use-case-backfill-1m.md",
+      "status": "modified",
+      "baseline_sha256": "accab0948d47a589f8ba66fa2086db5cc3c5e7c9b732b003418776914a6d3d8d",
+      "sha256": "29ee2cc603d98629efe486320c4ba89b6763f6d224fb687c146bcf24e1530425"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md",
+      "status": "modified",
+      "baseline_sha256": "2f7aadaed1f276ab89cffb824157da076027ff2cc86ea0307e745616576cc10a",
+      "sha256": "34951739699e603620d8ead9a8c3d704ca4e237fbe1c5a8135ee076312b16de7"
+    },
+    {
+      "path": "docs/architecture/ml/rl-trading-agent-platform-v1.md",
+      "status": "modified",
+      "baseline_sha256": "df35728850ee34b18c8072d260e7d71fa59ff107bf4d5fbee9b0cdb639165eaa",
+      "sha256": "af91d2567bd7b42fa73f4ad11f8063847a2a829e84b6427e9b7cceff4094425a"
+    },
+    {
+      "path": "docs/architecture/project-map/PROJECT_MAP.md",
+      "status": "modified",
+      "baseline_sha256": "24a643a2f37889af209349bbac57eb05024b1c90bf065cae487e29e1dfe616a8",
+      "sha256": "b357dd7a190142f8b9d2c2dde0191b4efc57bb7205f380af792ce3fa93bada2e"
+    },
+    {
+      "path": "docs/architecture/project-map/project-map.json",
+      "status": "modified",
+      "baseline_sha256": "8f2ab09e2e4444f3027adb19f136a283d52ee9a75a412d82873ffd3e52901b16",
+      "sha256": "cbebaf542fcfe76fb001b5a5aa817adfe4ad349253fa8a203328eb11d3f9ed8f"
+    },
+    {
+      "path": "docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md",
+      "status": "modified",
+      "baseline_sha256": "9a23bd9fd367dd2c4fc2b41b3f1f295aea9fcdadb7c787201762ea357472d484",
+      "sha256": "30cf4297cf214b95aa276e06d9aa126228702d4f6fd623b8dd26736930a8d90d"
+    },
+    {
+      "path": "docs/architecture/strategy/strategy-runtime-config-v1.md",
+      "status": "modified",
+      "baseline_sha256": "3e50fa7500280da8f8f41a44b3c241c77639521acfa513657a10a04078e67519",
+      "sha256": "c7e11c5f514a393491490bc6e0c21e53e0660fe329979262a50f99f966ae42b4"
+    },
+    {
+      "path": "docs/runbooks/market-data-live-tail-repair.md",
+      "status": "modified",
+      "baseline_sha256": "37dfceaf02247321968fceddbb12b324628ecf953f0d4b5e14af1da6bbd1b187",
+      "sha256": "6fe4d422d2ae25f811de4e6b245cd51563e44ef7dad437f83df47c5973c5384f"
+    },
+    {
+      "path": "infra/monitoring/rules/market-data-live-tail-repair.rules.yml",
+      "status": "modified",
+      "baseline_sha256": "8d407be9470916b600f4d465f64096b3e7bd6685e17ff02f394a7397428ed4de",
+      "sha256": "24e0d6aaf8bbd2e5487d30de52159cb94540451494fc6c14f9e5fd067ddfed99"
+    },
+    {
+      "path": "migrations/postgres/0039_market_data_consumer_contract_v1.sql",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "47c5d73e98c4a0e3b7bdc50bbee3c5e9d7ff8427bb3b0545a423f2d908f62ff9"
+    },
+    {
+      "path": "migrations/postgres/manifest.json",
+      "status": "modified",
+      "baseline_sha256": "f12c645cf3e9b772375ddeb4fbb208c3e114308d7e016dfdccaf00b41f50ace6",
+      "sha256": "7f8cbd1a52d54ecf3e3695679732c39c8ba35057338cba3b2d42bfa7fb2f2458"
+    },
+    {
+      "path": "scripts/rl_trading/stage04b_binance_futures_history_backfill.py",
+      "status": "modified",
+      "baseline_sha256": "b2e2e3513ec8781956a8fdcb49a6abe17ceb9d9568d96f851bf922c9b474df8b",
+      "sha256": "8d5035031e232d250c5799a45030248208ea1dcb5c6606d485765a4a1e557444"
+    },
+    {
+      "path": "scripts/rl_trading/stage05_roehub_dataset_builder.py",
+      "status": "modified",
+      "baseline_sha256": "59558e01c83b4e5bf5c6bca433fd2f883d22a3de535aa873066b882ac57cc69f",
+      "sha256": "2de14e575d08079e73f3a36bbe1a0d1bd83bcfed6309e4f866ba5bf5e104e044"
+    },
+    {
+      "path": "scripts/rl_trading/stage06_dataset_qa_session_extractor.py",
+      "status": "modified",
+      "baseline_sha256": "7d44ab261e7fe7291037f19f250760735f15e06a5775fb7e1140c9cb15acb9c1",
+      "sha256": "ec13c2e8d141921572c87bb6fe6928ed19bd3e089a5d0d903022d6a12da3f294"
+    },
+    {
+      "path": "scripts/rl_trading/stage08j_article_session_extractor_dataset.py",
+      "status": "modified",
+      "baseline_sha256": "3d792133b2c0ee28aa28f328812674b28101d383e2b83ea8f2a090f7baa605ce",
+      "sha256": "9c6315c80fd0f446aa7253606f88895b2036ea4bdeaf6a62113a11688d5ad351"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+      "status": "modified",
+      "baseline_sha256": "0f5ac780974e1372f5268d7446f0580ea997851b94a24231920d69e9fb3258ea",
+      "sha256": "a65cba65aaa956d8297ca920952a6dc872ee33690c3bfccd07a4b9a642a65088"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+      "status": "modified",
+      "baseline_sha256": "5499524885429598892f9da2e75f014ca8f7b120fdb1f94c28a17f41ff99eaac",
+      "sha256": "fec42f417d2c2d9c144229b391ec9706c77fe403ab666e4ae1425a2e9e10efc7"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+      "status": "modified",
+      "baseline_sha256": "a5b1ae0f454cbfb87be4b71b40dda33c4e2fe54474015d53944f1ce0e637cedd",
+      "sha256": "ba0d8ac5ca133b0aae10f3bd932f5f03df4803271b3d76aab737fd54ad54fe91"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/publication_fence.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "46e1d1ca6dc73644975964872232bf28a73b975a1a1b7a43c51cb8e14d11fb06"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+      "status": "modified",
+      "baseline_sha256": "7d14eebdb08432af1a46ea5e2b37c3ad73a1d7ed511479c27f3a84b7454d1f44",
+      "sha256": "a40efa082566fcfb69c4f20f1572e8e44852dd37a1aac8d654eee84d360da38b"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+      "status": "modified",
+      "baseline_sha256": "3a15bf15b74fc93df7bcfd114cc3edd5e3c21d49d61bf6725e60776a8ed0f52a",
+      "sha256": "e3c7a7a2cfa55706c6a73c8e60233baaeac9c766bc51c93dab8ad571b3143a63"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+      "status": "modified",
+      "baseline_sha256": "7eebe9c08a89661a437f23c4b5abfd2595f1478ac7f4f456ec7510fbf40c96ed",
+      "sha256": "bf8be5c9333f5d1891a2a60325a502840c88420c33978db8187e46aba1e9121e"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+      "status": "modified",
+      "baseline_sha256": "4f266b87e326d141ff875591874ce5e6a57bb3412b3d63e69ad664b5a571d936",
+      "sha256": "19c5cab527350bc7a82eb8cab5040792a01187e346c825750755e1a414aa7303"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "68ef619c1f11c5313f651002456bb3bc6ea34c6a7e26916ec21e5b3476b2c5f9"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/INGESTION.md",
+      "status": "modified",
+      "baseline_sha256": "a3aa6859e66a7d1c828375ba862331d797756d2e2f2e991d1fc2e4dca90f3cc9",
+      "sha256": "7928596fb7fcbef193a0ce3cb577fbf08fdf9319fffc4461048f2bb564e9be92"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/funding_writer.py",
+      "status": "modified",
+      "baseline_sha256": "3673c02ab567968f91b8775f2028827e8f6b12e34cfdf10c78f5201e2a824126",
+      "sha256": "3009ed98b82a0e903c4f2cfe746f35f33e301136e1b8a37f762541c8ed38bc6c"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_range_verifier.py",
+      "status": "modified",
+      "baseline_sha256": "5c0d72a780bf25fb74ed513554a21f371f78693dd03793c6daebbfb761fa3664",
+      "sha256": "4481a7a1f46236657e58f263be28590c6e4849a8277e706109ecc5bb75df3f5a"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py",
+      "status": "modified",
+      "baseline_sha256": "7f0c74c6e76796ac8c880d57334ac4e2c9d1f14abf67938d50f4b38a654ce2e4",
+      "sha256": "55da2acb569b620a5fc6a410ebd801b2d8d203294e96e637f8fbf191938b8598"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py",
+      "status": "modified",
+      "baseline_sha256": "1266f1a114d1e2b6267e9f238e6d46d7c9259162ebaaa46c441b830d34c33390",
+      "sha256": "510a1acf0aa520a04a6a520c2d9a81830e1c5ed7ce950619bc261f4304f8df54"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/research_export.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "42c31ccb075af6374e9b1a4be54974458b9ed0c61c27ee58ff427b0bcd487ffe"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_errors.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "15033e4c636a50609090f851da2c3969eb35a40453582ce777bd4f51dc8d9509"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+      "status": "modified",
+      "baseline_sha256": "491fc2fa584ccb62668d0dbbd27f63ae0328b2d4e0928f13ee21c6d18c68d9d5",
+      "sha256": "966498418ac554a0852f3f4319d8cc1d472e21cc891d032ed0663ceb8ffd33e7"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/ports/stores/history_range_verifier.py",
+      "status": "modified",
+      "baseline_sha256": "40c52df8900cd298da3d97de47df0be38f40b8a8dd113af513e0e9002ce217e2",
+      "sha256": "4f89e3617998ecd200756ac9d60ed430bb12bf067304f04099ab701c7ed0ecab"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/services/closed_candle_tail_provider.py",
+      "status": "modified",
+      "baseline_sha256": "f4a8900db8e70a619360fcc22b15d32d50a7c5b62079edfc61f01a6d3c5f0f56",
+      "sha256": "5e7f5e50609b37cb6849c1a8d33930e4fb8aa7c3bb82c96c4e7ffd3014b41752"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/backfill_1m_candles.py",
+      "status": "modified",
+      "baseline_sha256": "417f7d02552df35c0c94e9dfee9f759cc5db337667c8a6e6c1fcfd6880258cee",
+      "sha256": "88466f683768d2af3ff8427f64d78e6157b86a3d6cb346e607682361a5ac06d5"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/backfill_funding_rates.py",
+      "status": "modified",
+      "baseline_sha256": "c22e1416f7a8400a1218ec8d12971aacbc9342fdc5684b35b28578d51e28388e",
+      "sha256": "475a347b4b79723654628bd1cb6421f4d1499aad44b3209a0454e4175f19172c"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/enrich_ref_instruments_from_exchange.py",
+      "status": "modified",
+      "baseline_sha256": "a1977f54df8269478dfcb0a7fa3b9773a8e4524eab1ce740d4130009c04063ba",
+      "sha256": "28b6702d794ee7309778ad24b41b0abf8262c9589decd6da16b8b5bac0464eb5"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/refresh_instrument_catalog_from_exchange.py",
+      "status": "modified",
+      "baseline_sha256": "98a3a74b0ab282225da372542f7ad6b431f4361e9ea6ba7e15f0d58534efd340",
+      "sha256": "b66321e06bef5e835ca4334c92fe1e63d5a1ca557d7d11cf16e4c10bce8ef2ce"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/rest_catchup_1m.py",
+      "status": "modified",
+      "baseline_sha256": "f394dc475fe08d74403a6861734b718a2ee78b5b195e380a21b838ed9d262b44",
+      "sha256": "725e5aa569fa37febda7d535224181d1c1a4444f293109afefe4ebf4c398948e"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/rest_fill_range_1m.py",
+      "status": "modified",
+      "baseline_sha256": "da1cfab00598eb9c65415364ab6cb46c2100c00660fbe9c2270e9aed3ffba736",
+      "sha256": "f42b561544bd360b4af08188d456d3abf8696ea81a1ecc3d007db0b4fee44162"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/sync_futures_funding_universe.py",
+      "status": "modified",
+      "baseline_sha256": "f0da8088642453fa7224a0fb4822f5619ef6b47fdc21118a0803e29f85baa8b8",
+      "sha256": "192369335e809fea44e010ccbfdd3d03865409cdd03057c8d2025a035214ac63"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/sync_whitelist_to_ref_instruments.py",
+      "status": "modified",
+      "baseline_sha256": "73c6861c08193b77e34924f447ce042e7674700863a7b6be262db6e3e1c8047a",
+      "sha256": "8eefee2c04e70c5c09238bb6f0097d1d8e4e0d864298981705f38bfd124f5ccf"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_postgres_consumers.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "9fe6b9a2ee0dcb683885578e2ac243173191f2dcfbcf57255a98a839b4b5ea5f"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+      "status": "modified",
+      "baseline_sha256": "f4f170559582bfb33d90110bad61c1ce997c4a26085c205c99b62822aa6a33ca",
+      "sha256": "84f7db586783e39d61917256bcb7d3a05a0c4c59841bdd8e859bb8c56ccf4068"
+    },
+    {
+      "path": "tests/unit/apps/api/test_market_data_reference_wiring_module.py",
+      "status": "modified",
+      "baseline_sha256": "0bb97e2fbb132bf6d3d10a3cfcba6333e511fb163cb733a103f1dc3bdc6984cc",
+      "sha256": "7273b99498b6a033163caba49cff4cffc2ba364874fe1cc4eba94f8a7ae64317"
+    },
+    {
+      "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+      "status": "modified",
+      "baseline_sha256": "17864aca576dfec25d113c0a5fc99ac319af3d0f254750008f0e79fdce2ca2cb",
+      "sha256": "de74e78f393bdeccb8caad9aa0ce9eff0ee452fe288b47a46be6c280d9c8e5f2"
+    },
+    {
+      "path": "tests/unit/apps/migrations/test_storage_lifecycle.py",
+      "status": "modified",
+      "baseline_sha256": "f50d346959d09399d9154982dd43fb2330666da455c63dda4f8559dc90ab399c",
+      "sha256": "845af1aff95df9e9c0991fdb2b65a5353a73ecf653f24c130584c5d2e94d563a"
+    },
+    {
+      "path": "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+      "status": "modified",
+      "baseline_sha256": "f30a54fd8af063e769e171d7334efa44dfddfc5317054af5ca681a405f611b03",
+      "sha256": "a6a628f069056d8076feab963b5becea895908a0f59e8f8b229cfac35e9c791b"
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+      "status": "modified",
+      "baseline_sha256": "38de956a0526fe6574f675e7a09378834cb44aa3bb07c99ed503006dd9c5b8d8",
+      "sha256": "ccc28240defe41dcccf997b17aa98f3e20ae2e1d8bd84a5b0d74dada8e26a362"
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py",
+      "status": "modified",
+      "baseline_sha256": "9fde67975becc8e518b5f12af6eac227685d76bd9b46f2b5067ed8f83b086b04",
+      "sha256": "d5b02278531a553f2703ba427b0a42d558dc6ff9c7cb42d010ffec708a85a989"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py",
+      "status": "modified",
+      "baseline_sha256": "165edf6f5f0d22e8c9c6bdd532e175ecd0c9e1f0aef54865886eb04a979321eb",
+      "sha256": "3184388b676d26aad2320d81680c7326645e5e080a89aaf9b55b23da60b83107"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_dns_lifecycle.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "sha256": "34ca200e96b990d25c611a741d2ca0ce87040a6b37a92e9b11544b822306b00b"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/application/services/test_closed_candle_tail_provider.py",
+      "status": "modified",
+      "baseline_sha256": "1745db416740f5e735e166da205b012afdaf1110f1aa9093edce3000f5a0d1f7",
+      "sha256": "30cbb2e3b227f43ec8556cd512e63343bc3a49f07659328f14bf4a335ec41a36"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/application/services/test_work_requests.py",
+      "status": "modified",
+      "baseline_sha256": "860ff934a394825f6efdecf800c883311671f8a6bd8545c9a175000632aff738",
+      "sha256": "6b1df9ea07636925ed683c041101e6ad0a714b0e0068f1c8313f00dc7c60e81b"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/application/use_cases/test_rest_fill_range_1m.py",
+      "status": "modified",
+      "baseline_sha256": "c68001dbe817e73b4bcc695ba12511d78d16e3740876a1f755153dbf47b47ea8",
+      "sha256": "410f3ffa0351b4d045116723b93fad020bb778553f3fb34c02ef652cc00e1f4a"
+    },
+    {
+      "path": "tests/unit/contexts/strategy/adapters/test_strategy_live_runner_wiring_module.py",
+      "status": "modified",
+      "baseline_sha256": "b9e62e4616bdc11cfdc76c48cfa672294a0c6c1e4ed78725484ef10d359b7d7a",
+      "sha256": "39e32fc5d673e54fbdbca1b899a27da98a4e63edb6b9038a414f0a788794d676"
+    },
+    {
+      "path": "tests/unit/contexts/strategy/application/test_closed_candle_tail_provider_contract.py",
+      "status": "modified",
+      "baseline_sha256": "ca5b52c550c4e513bc3c88a41d69a02462ffe7a175313ceda0ef8b9247af94ef",
+      "sha256": "aa84b9b1a4498b2251a9c83b3600d668e92aa3d0df2f466fa8a266b4c6e497f8"
+    },
+    {
+      "path": "tests/unit/contexts/strategy/application/test_strategy_live_runner.py",
+      "status": "modified",
+      "baseline_sha256": "2007e5af3f3bb3ccc6b57195e5dd5f82aa41eb108cc00e187f665c54e653b3e8",
+      "sha256": "7592debb01b4a9a273dccd50a98f9ddeba945cf856ddf535ff8db04a7b74b5c9"
+    },
+    {
+      "path": "tests/unit/infra/test_monitoring_assets.py",
+      "status": "modified",
+      "baseline_sha256": "ea29999d783064752ba2b4beeabc16e38e72935d0d2882500f8130da10e5b124",
+      "sha256": "837ffe8bff67e6248b0f7b7d79db130f7951ba5ff0480e0d2a95ab70e0baea59"
+    }
+  ]
+}

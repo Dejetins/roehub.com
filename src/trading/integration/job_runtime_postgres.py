@@ -12,6 +12,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from trading.integration.job_runtime import JobEnvelope, JobResultManifest
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 class JobRuntimeCatalogError(RuntimeError):
@@ -54,7 +55,7 @@ class PostgresJobRuntimeCatalog:
         self._dsn = dsn
 
     def _connect(self) -> psycopg.Connection[Any]:
-        return psycopg.connect(self._dsn, row_factory=cast(Any, dict_row))
+        return budget_connect(self._dsn, row_factory=cast(Any, dict_row))
 
     def submit(self, *, envelope: JobEnvelope, created_at: datetime) -> UUID:
         payload = envelope.model_dump(mode="json", by_alias=True)
@@ -411,9 +412,7 @@ class PostgresJobRuntimeCatalog:
                 else:
                     outcome = "timed_out" if attempt["deadline"] <= now else "crashed"
                     error_code = (
-                        "job.deadline_exceeded"
-                        if outcome == "timed_out"
-                        else "job.worker_lost"
+                        "job.deadline_exceeded" if outcome == "timed_out" else "job.worker_lost"
                     )
                 cursor.execute(
                     """UPDATE job_runtime_attempts

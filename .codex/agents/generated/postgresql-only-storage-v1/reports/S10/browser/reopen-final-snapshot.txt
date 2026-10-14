@@ -1,0 +1,59 @@
+### Page
+- Page URL: http://127.0.0.1:20120/login?next=%2Fdata
+- Page Title: Sign in to Roehub | Roehub
+### Snapshot
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "Roehub" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [aria-hidden] [ref=e6]: R
+      - generic "Preferences" [ref=e8]:
+        - button "Theme" [ref=e10] [cursor=pointer]:
+          - generic [ref=e11]: Graphite
+        - button "Language" [ref=e13] [cursor=pointer]:
+          - generic [ref=e14]: EN
+    - main [ref=e15]:
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - paragraph [ref=e18]: Research and operations workspace
+          - heading "From market hypothesis to controlled execution." [level=1] [ref=e19]
+          - paragraph [ref=e20]: Roehub brings strategy research, reproducible backtests, live readiness and exchange operations into one quiet institutional workspace.
+          - generic "Roehub workspaces" [ref=e21]:
+            - article [ref=e22]:
+              - text: "01"
+              - strong [ref=e23]: Strategies
+              - paragraph [ref=e24]: Design, compare and operate versioned strategies.
+            - article [ref=e25]:
+              - text: "02"
+              - strong [ref=e26]: Backtests
+              - paragraph [ref=e27]: Configure, run and inspect reproducible experiments.
+            - article [ref=e28]:
+              - text: "03"
+              - strong [ref=e29]: Monitoring
+              - paragraph [ref=e30]: Observe positions, executions, health and freshness.
+        - generic [ref=e31]:
+          - generic [aria-hidden] [ref=e32]: R
+          - paragraph [ref=e33]: Secure session
+          - heading "Sign in to Roehub" [level=2] [ref=e34]
+          - paragraph [ref=e35]: A local passkey is the primary sign-in method. Password and one-time recovery codes are optional fallbacks.
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - term [ref=e38]: Next
+              - definition [ref=e39]: /data
+            - generic [ref=e40]:
+              - term [ref=e41]: Identity provider
+              - definition [ref=e42]: Local passkey
+            - generic [ref=e43]:
+              - term [ref=e44]: Credentials
+              - definition [ref=e45]: Passkey stays on your device
+          - generic [ref=e48]:
+            - button "Sign in with passkey" [ref=e49] [cursor=pointer]
+            - group [ref=e50]:
+              - generic "Fallback sign-in methods" [ref=e51] [cursor=pointer]
+          - status [ref=e46]
+          - paragraph [ref=e47]: The server stores only a public key, fallback hashes, and an opaque session.
+```

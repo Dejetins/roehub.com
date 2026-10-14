@@ -1,0 +1,26 @@
+import cProfile
+import pstats
+import sys
+
+from tools.qa.postgres_production_soak import APP_DSN, OUT
+from tools.qa.postgres_production_workload import replay
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (
+    IngestionGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
+)
+
+name = sys.argv[1]
+g = IngestionGateway(APP_DSN, deadline_s=30)
+p = cProfile.Profile()
+try:
+    batches = [replay("S09CPU" + name.upper(), i * 1000, 1000) for i in range(3)]
+    p.enable()
+    for b in batches:
+        PostgresRawKlineWriter(g).write_1m(b)
+    p.disable()
+finally:
+    g.close()
+with (OUT / ("writer-cpu-" + name + ".txt")).open("w") as f:
+    pstats.Stats(p, stream=f).sort_stats("tottime").print_stats(45)

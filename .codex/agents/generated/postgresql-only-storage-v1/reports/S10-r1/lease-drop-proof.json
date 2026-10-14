@@ -1,0 +1,9 @@
+{
+  "started_at": "2026-10-14T08:34:46.568333+00:00",
+  "client": "de77ff2be52d83fc8d0eaab572a6a2534edc81433f69b30f14b649ddf200efb0",
+  "scope": "disposable client and PostgreSQL only",
+  "healthy_idle_lease_present": true,
+  "client_settings": "{\"pg_backend_pid\": 331, \"current_setting\": \"15000\"}",
+  "lease_released": true,
+  "elapsed_seconds": 11.731
+}

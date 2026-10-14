@@ -1,0 +1,73 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f?variant=job_ad277dfde18f__ema_close_w10__risk_none__vh_a7f9fb5e
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f8e8]:
+  - link "Skip to content" [ref=f8e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f8e10]:
+    - generic [ref=f8e11]: RoeHub
+    - navigation "Language" [ref=f8e12]:
+      - link "Русский" [ref=f8e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests%2Fad277dfd-bc79-41c4-a3e7-03c40df5e18f%3Fvariant%3Djob_ad277dfde18f__ema_close_w10__risk_none__vh_a7f9fb5e
+      - link "English" [ref=f8e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests%2Fad277dfd-bc79-41c4-a3e7-03c40df5e18f%3Fvariant%3Djob_ad277dfde18f__ema_close_w10__risk_none__vh_a7f9fb5e
+  - complementary [ref=f8e15]:
+    - navigation "Navigation" [ref=f8e16]:
+      - link "Overview" [ref=f8e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f8e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f8e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f8e29]:
+        - text: Data
+        - generic [ref=f8e34]: Unavailable
+      - link "Settings" [ref=f8e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f8e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f8e43]:
+    - generic [ref=f8e44]:
+      - heading "Backtests" [level=1] [ref=f8e45]
+      - generic [ref=f8e47]:
+        - button "Hide history" [expanded] [ref=f8e48] [cursor=pointer]
+        - region [ref=f8e49]:
+          - generic [ref=f8e50]:
+            - heading "Jobs" [level=2] [ref=f8e51]
+            - link "New backtest" [ref=f8e52] [cursor=pointer]:
+              - /url: /backtests/new
+            - generic [ref=f8e54]:
+              - button "Refresh" [disabled] [ref=f8e55]
+              - button "Filters" [ref=f8e62] [cursor=pointer]
+          - tablist "Jobs" [ref=f8e65]:
+            - tab "New backtest" [ref=f8e66] [cursor=pointer]
+            - tab "History" [selected] [ref=f8e67] [cursor=pointer]
+          - tabpanel "History" [ref=f8e68]:
+            - paragraph [ref=f8e69]: All states · All risk modes
+            - status [ref=f8e70]:
+              - generic [ref=f8e71]: Updating…
+            - status
+            - navigation "Job pages" [ref=f8e72]:
+              - generic [ref=f8e73]:
+                - text: Rows per page
+                - combobox "Page size (1–250)" [ref=f8e74]:
+                  - option "5"
+                  - option "10"
+                  - option "25"
+                  - option "50" [selected]
+                  - option "100"
+                  - option "250"
+              - button "First page" [disabled] [ref=f8e75]
+              - button "Next page" [disabled] [ref=f8e79]
+            - paragraph [ref=f8e82]: Newest first. Risk filtering applies within each server page; an empty page can still have a next page.
+            - group [ref=f8e83]:
+              - generic "Search, instrument and date filters" [ref=f8e84] [cursor=pointer]
+        - region "Backtest detail" [ref=f8e85]:
+          - status:
+            - generic: Updating…
+  - contentinfo [ref=f8e86]:
+    - text: Artifact-backed backtests
+    - generic [ref=f8e87]: Library snapshots · live selected job
+```

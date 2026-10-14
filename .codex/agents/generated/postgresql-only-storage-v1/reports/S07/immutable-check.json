@@ -1,0 +1,1382 @@
+[
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S01/receipt-f36956a29b8a413095d7be563259edda.md",
+    "sha256": "52c431f34c9d6a05dc040d1066e07a36b50a5e8f920a1f5464ebd6a015b20a5b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S02/receipt-50a61577ff324ec38501e65bef918355.md",
+    "sha256": "b27f87c89bbfa872f61b47c9cf2c954e61989704216e13cfd3bbdddebddfc14c",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S03/receipt-7c6b7401707e4f629df7b763be16f0b4.md",
+    "sha256": "cb42a7e1feabe70c43cc560b41755ca5d7ae6a3328368c578a85c368a9315aa5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S04/receipt-29b327ca5daa497b96a1f3bcc5e9f214.md",
+    "sha256": "58141e4b678d58b9dab1266ddb3cf8061d31b04f26b3221f0d4077f4aa1cdd80",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S05/receipt-aa42a38497f048d194b183c6be6eed95.md",
+    "sha256": "07c2f0fce00d3c93d0296963e620730a8d83daa5ba8ccab56d2369a9f5dbb74f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/receipts/S06/receipt-2c11b063466c43ad996e088015fe1685.md",
+    "sha256": "e14d0f79f48d197d3c2af2c2396bd9f345dea0f0f86048cf49e41405906982e3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01.md",
+    "sha256": "4213b0a4046130f5372c1b72adac459432383f284dca1071c3d97b738cb90dd3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/accept-result.json",
+    "sha256": "2b27f321459f424be7d7f00859a55083bb197e2e4d184f7dd67c0068c655120e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/audit-summary.json",
+    "sha256": "290e7c2412cb0947b060a56cc0805e3a083a138efda2266fda5b8ec1a4a95dcd",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/audit_sources.py",
+    "sha256": "b6759ca5ad26b9e21908ebc5c84605a70fa0f2ce0cc7cfb526d3cd9ddfce58ef",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/baseline-files.json",
+    "sha256": "15f7a36cb8726176c8deca7272e913ab81736a5648b1e05e385c38047b1822c7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/baseline-head.txt",
+    "sha256": "ff5bec844e30f696286639c0ef9ca09199031c4a1484527e2dc25fd7b55dbd11",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/baseline-signatures.json",
+    "sha256": "b69e62fdd8531c5595f63f1ab754119580583a3a766c1c5d2e516e19654484c9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/baseline-status.txt",
+    "sha256": "4b1bcf44ae28fb6554ae47a548448c4de40fcb5b53c0b512d1a3fcea0db48a2f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/caller-edges.json",
+    "sha256": "3da2e0752d3cfad0e1118e973474567a5b5b6a6d6f0f1b8d5558819bbdbc14c5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/changes-from-baseline.json",
+    "sha256": "ca08c1e928a75cc1233389f693a4d854b5e65134d1f95849c65119a8028542fb",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/discovery-and-gates.md",
+    "sha256": "94c14f9b29308f746f67b104f9635bb7fff641ec9a3c180700c52f4ea913c9f4",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/doc-amendments.json",
+    "sha256": "d7fcdcbc80ce905c9ddc5718cbb999b24a14a625087a417df655050b2a51a459",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/independent-review.md",
+    "sha256": "bfa2f0ec00fdb438e8fe99e3f935097fab1177b9a68605e60eff59dfc369a1ec",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/initial-appendix.json",
+    "sha256": "4e30efde7036966c124250b5d35e4de83adcbbcb3917f96509ee79e98d44cdd4",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/inventory-baseline.json",
+    "sha256": "1fc485146efb9be6290def4fa23c2ded413857a72f67c70a84fff59e3bb0ee98",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/inventory.json",
+    "sha256": "d262aa3b2ac2ea695096215337dfc3339d05e891e6ea6c0cdf99c8c5f5c26def",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/owned-files.json",
+    "sha256": "a260183beb4df6ed113a28f0fb27a00ea7c78eb8db16004f512c816a07cb4a48",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/ownership-and-contract-check.json",
+    "sha256": "cf53bdbb4735d782179d037483dda735d125d46ce0a4c2c48fa0dc71d5db8858",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/performance-baseline.json",
+    "sha256": "653990150793a0d58f98e269a0bf23a5aca6f1b16d21dfd28d4adc76b444ab5b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/persisted-fields.json",
+    "sha256": "c5e5fc7408ce6b021e99e23aaefc0b8620617021ac36a4c9bbd8943b4fb83b88",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/query-catalogue.md",
+    "sha256": "54c6d3042edb65be275bb226dfad74d3f40d9d95cc36dc78243611e435d6cda9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/verify_s01.py",
+    "sha256": "1a6382be9f4e961ef3cb3b8d4d7f3bc2f8bb96ee2bb43dad8110c3b4af3e5e83",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02.md",
+    "sha256": "c15913c1811d2889ee8bafa8efcad7b4c326e84f1357361969817410902c130d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/baseline-files.json",
+    "sha256": "79d2bd073264cc0a702c8ca04345691cecb7820b7eee80ef418e2dfb54f460e7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/baseline-status.txt",
+    "sha256": "c440f0d1f63b8fdcacfd23df18ef5990a261419fe6d433151f8ada9bd3993fd2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/commands-and-corrections.md",
+    "sha256": "cf6917d778be0f6951de337f0c9ac123a7a08ed5770c6874a4bcb994c7e0d44c",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/disposable-runtime.json",
+    "sha256": "47e5abf51c9bb53f21c6d0f982365a5d12ff22329dd11b6e7e1676a5f0b110ba",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/independent-review.md",
+    "sha256": "eff1a695e15be0be195673fb5328427eeeab7b76f1b3e5ff003b1ef3ecd5a583",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/owned-files.json",
+    "sha256": "3dd81921bfb4d909513d810c4d4efc28f29639c1bf738694d78ef7ba223f7965",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/ownership-check.json",
+    "sha256": "baa1ca10f081cf64407d9f41c200dbc26bf106ad95823a76a9fa4ebf97fe6f2e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/postgres-version.txt",
+    "sha256": "57604faffb7210e92e660f6f6beec5cf3e49a3f9f06261518db247e873a431d6",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03-post-transition.md",
+    "sha256": "f8cf74e0d8a9d94d9ba9b44115e0cd4642ec475695a27e1d625344600000dd75",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03.md",
+    "sha256": "9334598980ec81ade85200d52602409de868591133bbfdde77758680c5a1a7d6",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/accept-result.json",
+    "sha256": "4bc8d97e57d19e412a227ca34ec96618bb3bbbcc1fef9974767092175ba9105b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/baseline-files.json",
+    "sha256": "32278736ab0b446d6d6b38cf0b4eb5a7df949413c45f4dde61d9e493f4f2b8f1",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/baseline-status.txt",
+    "sha256": "9a28258fffd686e82bff6e6f75c57c740b5e740d8a7609b7ba8e671489ae5c97",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/commands-and-corrections.md",
+    "sha256": "64c680a8e412df649f7e78fef32f968b4a07295493618be3846afa2a3cc2791a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/disposable-runtime.json",
+    "sha256": "fb73d31cf4ee724364ac359ed4d48eeba4603301ddf70a4b80794942bd258c0e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/independent-review.md",
+    "sha256": "b1cd0239d55cc55dc5bcf854842a5312c1ddf5e49ef5a52e9c91373012d31435",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/next-entry-check.json",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/owned-files.json",
+    "sha256": "3a6bfe87abb9a7379876b6cbcf622fc68a81a47b494e010cc553bc83589610c5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/ownership-check.json",
+    "sha256": "51ac8719d47e8a42f64ccf6f239a08110ee461f91ec933c82f8aeef591aec9be",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/post-transition-navigation.json",
+    "sha256": "d0fe271790aaae3573afa61845c3a2006787a0d751640be5d3bd341f70e8f2a2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/postgres-settings.txt",
+    "sha256": "a04b5d2fceb89049f628432164b67a8ae34f46c71c57e90c7481fd1ca796679a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/receipt-check-attempt1.json",
+    "sha256": "1bf1b960bc2ff36960a9aec3065dbe04072dc6c325ba3cd279916d26a11519e9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/receipt-check.json",
+    "sha256": "9906224acc6120fdd56a9f8e4a3a83432b3987f566df6e98db74b65cc41ce270",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/verify_ownership.py",
+    "sha256": "aa00db6ddbdc091f13cd15377c4f044827ae8ba87a81b9bbccf2b449b79166e4",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04-post-transition.md",
+    "sha256": "f2a9d3e4597129890bf2ba2fa1315020f63068eb9335b33440edcebdf9076ae3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04-post-transition/navigation.json",
+    "sha256": "b9edc70cb8e672a3b1600bccf258c08d3adf9f037bf69c03e6a3587a2f3aaf5e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04-post-transition/next-entry-check.json",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04-post-transition/receipt-check.json",
+    "sha256": "9906224acc6120fdd56a9f8e4a3a83432b3987f566df6e98db74b65cc41ce270",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04.md",
+    "sha256": "b90b09ec7ea9c6d838b46f9032940f1ee85b6d23b3ea0baaa722a331c18d1a73",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/baseline-files.json",
+    "sha256": "0ef9bec18b8cd9930dc7ac3e0259b68c288aac907d1c34bac3d2eb87fa9075c5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/baseline-status.txt",
+    "sha256": "00501b6fd7d9a1295d568cb4b31aae46ba0a17858af31cd92230eef28c0e3059",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/cleanup.json",
+    "sha256": "9d25b3782266993791757d275e509d63c84445e9cc973e48334d65861926cd7a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/disposable-environment.json",
+    "sha256": "fd51684501e2b598771dc7a6ee3d202c82cbce67a60a561153bd0425b0d7dfa0",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/evidence-manifest.json",
+    "sha256": "490c78119cfae8d24bb1ce56b9356e16e1fa0e4b7ef2041a1e1db88a793d25e6",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/independent-review.md",
+    "sha256": "97a70038d952630e6986b8b1ecf812769bac5caf98786b589541eda7604cad50",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/owned-files.json",
+    "sha256": "762fdc3556417d5238f742edfd92fc72d363c09aef07bef2f079d1d3bbd4c826",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/owned-paths.txt",
+    "sha256": "b0679ebb71b5da78a1edc86e1ecbd8e689df7f46b84430ce89998177fff353f9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/ownership-check.json",
+    "sha256": "f04293cce793f51dc6757b42337e733586560768bba4081b8cd97c77aab68c9f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-catalogue.csv",
+    "sha256": "c4f32a5ee0b5f8ecca729dd46aaba684611335e9fea2e85873ad1cad1ff8fa56",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-families.md",
+    "sha256": "d1fe7d73b22145e49b4f41d31b547089eb5539b78689b72838f2b788dc344692",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-plans.json",
+    "sha256": "1dcbf16e1e74ddb416635ca8b4cc26831d83183f843ae199e8cf88ea3cddc7de",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-results-progress.json",
+    "sha256": "3342ff1ab18dae0117b932f47905a2a345bd4039fb26199a618dad31e65dc48b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-results.json",
+    "sha256": "3342ff1ab18dae0117b932f47905a2a345bd4039fb26199a618dad31e65dc48b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query_probe.py",
+    "sha256": "2e051a2067878319d6f1225a6c36527920d33a57e0672e55cd8fce6d2a4299c7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/representative-fixture.json",
+    "sha256": "b9b33776144e7a5d97e96f73e1a40d7a0f78610a805309349e8ada1019b5b52a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/verification.md",
+    "sha256": "c58c2e82df36a636af4240eca584f3d26086ce306bac996328fd26400771a655",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05-post-transition.md",
+    "sha256": "37920eda5eeb791d07a10b801c89f95ca66848360c2b58a2e2a56c25b8b49bc0",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05.md",
+    "sha256": "1fa0e315c834b81d982d38d7ebdf82f571b43aa9fa1958010ccb8517b91643ff",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/accept-result.json",
+    "sha256": "6c9fc489b987031f1dc81527bfd55f48f49c363e5938abeaf7d984c519db7c86",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/audit_consumers.py",
+    "sha256": "ee1560287a10970f665e52895a6d35c275932a4dcbac6e49507c502a4ca787b9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/backtests-pg.png",
+    "sha256": "fa5b31d67c72b3fe593ea99960c477de18a58c1179c94474d3c1ba80cdabbe3f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/baseline-files.json",
+    "sha256": "8a2722a8471ded07cd5c3b4ecff15d4505bb95bf783e14f28d1389c6cfa9beb5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/baseline-status.txt",
+    "sha256": "a2d16b46fcb5c3e4a6cc0979f75e68423ba9158f2676809e3a92f52eb0a98963",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-pg-symbol.png",
+    "sha256": "a9486d1f0997700024a4eac1f66c396f6cc5c28190ee25fc07c33c0ef57911f1",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-pg-symbol.txt",
+    "sha256": "bb7d1e443c33df8435c1a64382715916aaf52c7a1305117dd20892732e4559a1",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/caller-audit.json",
+    "sha256": "6f39e390477f5c7881e6f8ce03a75969f612d7f6da8f5428e3ba9e22cbdb5c97",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/cleanup.json",
+    "sha256": "301c50aa02451281f08904f37474625b5e50875ce73266c7510e841cd02a8f02",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/disposable-environment.json",
+    "sha256": "dcd5adf5086017eeaf9038bbc49c702041f9c14b7e7170d95f41344158ea61b8",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/independent-review.md",
+    "sha256": "c3a0b72b2586c9ce929de4ccd793086ef878942d8e1c2277cbcb89d77e607d3b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/owned-files.json",
+    "sha256": "21bbc97de9b9cc913b45283eacea0d10c13702f54551c3509e15e149cedbc0b1",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ownership-check.json",
+    "sha256": "12f94cc8d3cd81d295308c7641a772e6e597125a9e394fbf956de33e69d063bd",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/strategies-browser.txt",
+    "sha256": "9a489f3a3f99341cf16f01b694ef6708f4eb18acc2b310fb9deeb8a54520fc95",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/strategies-pg.png",
+    "sha256": "b349f3ca725bd80330d872b5bfc7af61d61b9e5d9f168a7f3f45df73ffd1f8a9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/verification.md",
+    "sha256": "a19438cb2f3bbc8b7ee38c508f84ee3fdba954d233b1ef341b3fbe6bcd87879d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06.md",
+    "sha256": "1369894fdd9a90e817de44b555ce6c8a9f269ad9578775f44e81924f5c4a4ffe",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/backup-runtime6.json",
+    "sha256": "7a47ff9f99112c441d0b0512f17671b378dfb41bf30df2740687c36bf3f4f2e0",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/backup-runtime7.json",
+    "sha256": "19a6eb4ddfd5bc985ff5b3f657e222c248d6c8d8322d266994cfb7203b5526a3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/baseline-files.json",
+    "sha256": "cf6ff8b5370d81f7f709462e265f9435bbb50531e7c779832c5ee471408ead5d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/baseline-status.txt",
+    "sha256": "6d38a73671a380d94e3d0152ae4ec79403de8cff5d7751db73f44fa124798334",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/connection-recovery-review.md",
+    "sha256": "33c7deb133ddea51ca17ecdbf0e9c7f93666ba53275bf5e0e46beed2847a97ba",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/immutability-check.json",
+    "sha256": "fb0557bf4056c2c5bab4f3108b6852be2e486d66ec8208312d3089e93e632f94",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/immutability-final.json",
+    "sha256": "fb0557bf4056c2c5bab4f3108b6852be2e486d66ec8208312d3089e93e632f94",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/owned-paths.json",
+    "sha256": "989cf190bf3aa8ad43b36f26fd8f1fbae9666654ba9d77c6657100aad3a11948",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_async_cancellation.py",
+    "sha256": "70da3e5812d7a11d90234954597c77b9b5128fd5b282148cd5a70794ebd97102",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_budget.py",
+    "sha256": "cef9b1f73ef89c28f37bdb9aa5a531c97232a5d4bca1c8ce64e7fdbadc1919e2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_maintenance.py",
+    "sha256": "723edbbda58eda7393ef817057c2caef806abeb0de9b73b8204b7f891fbc59a3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_native.py",
+    "sha256": "03f87bd9f08d1d77b4597fb6d00dc40f21c1b6a4aa02da338613ccb7e4ba8e29",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_native_cli.py",
+    "sha256": "e33ee216296cbc9065366fa0a931fa736ad3dcc50e4bb1a275a59975661c22ff",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_operator_recovery.py",
+    "sha256": "c703b0003d89b7a460b6c6df08c2deaae3a4462900a615f612fb37c7aef6412b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_run.py",
+    "sha256": "00a120271fd4ef36ffd4f0cc976ee1989661c36c9df474b6bd7f66fdf1b62919",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_transport.py",
+    "sha256": "e6d1c2706e9441a4a9c7c318a6d4838d50e5eddd6530f7e3837440def4b48f77",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/prove_transport_negative.py",
+    "sha256": "fe84e7db8f3bc0c200889bbce2cc738d87843b1f1900dcf09d4e6e1cfe2e57a5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-embedded-base-1.json",
+    "sha256": "309dd365ff57d43fae102c26bbe8011ac2bf1ee3747b0fc6ba01668dd4a1fe2b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-embedded-ml-1.json",
+    "sha256": "02ddef345f490b0dab602d70920433e8dd411eeda7a8d792d68e374123700ba6",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-embedded-trading-1.json",
+    "sha256": "39581bda50903171bd4c33ea4311247d756c2723e21c790acef7d9d1cae79fc7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-external-base-1.json",
+    "sha256": "7995124b0f8dca39c7d313c0ee536e713ef4c3e15a0f0f26cfc8dd6d1f376972",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-external-ml-1.json",
+    "sha256": "9bdc85db20fb1fc5b1b5de55af17beb873637ec49e81ded219307395b5e5c396",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/run-external-trading-1.json",
+    "sha256": "dbbd3677df91dfe4757e1072beb6dd8963b777c3cdc345d87c0432a1643a5872",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/transition-note.md",
+    "sha256": "2f3870dcec4dc1fde59cbf51b8f4686e0a68c311078a5651673aaec5fa574341",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/validation-summary.json",
+    "sha256": "7f6283d7f4317693b5d16969f35c2c43ecd14b341abb6e513fcafd7afde55498",
+    "unchanged": true
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md",
+    "sha256": "aaae2c08d5eae5c88d1b9be6727507836348634fccb7bded3ad35579872e8091",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0001_identity_v1.sql",
+    "sha256": "cbed5f0e60961b7eefa725cb8d01afde1abf2984991bebc6d9fc540e7b9d8f4c",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0002_identity_2fa_totp_v1.sql",
+    "sha256": "e4176ed13fda36b4fdc1f4d9f2baa38f90a3c541bab6a00d39464e2cff200bf2",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0003_identity_exchange_keys_v1.sql",
+    "sha256": "ed428cf71c33310665b768ecba21c222b46ab12e1a3b5486533b3b96f4a1beee",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0004_identity_exchange_keys_v2.sql",
+    "sha256": "74bf7e2fc3795b9bc390257bbf2ecb6723eb162d5ab42334ba9543ff46f00e80",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0005_identity_keycloak_cutover_v1.sql",
+    "sha256": "9cbd50ea64173197c3c88388810584275cf356c00b2bcac6acc7466e79e6e099",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0006_identity_account_settings_v1.sql",
+    "sha256": "0d4972a40c2935935b4f1040828f58b56f5a0b5351b48c1cc9e68ba81afbd566",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0007_identity_exchange_audit_events_v1.sql",
+    "sha256": "e72a255df0ae771a7aac7bb856a38e416157001ce6a46dd1e5a68d3c08d4d14d",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0008_exchange_connections_v1.sql",
+    "sha256": "b19972076a4d8bbc9e0b349fad8e96fae04a84ca63af7019542112b54a721073",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0009_identity_exchange_reclassification_audit_v1.sql",
+    "sha256": "95f1a8c96c5c178a50b760148efb29002e091f9f673f79c373c1e867991bb246",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0010_strategy_exchange_bindings_v1.sql",
+    "sha256": "70e1c6045c1dcdcf0a43db854d503fe60d31a47b0f441cb3f75d098c258e1438",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0011_identity_organizations_rbac_audit_v1.sql",
+    "sha256": "ec1111df0509a261caa70158b29c9ab6fe43aeb9eb0a93133a597cbba6388567",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0012_identity_local_auth_v1.sql",
+    "sha256": "a8d9c5bf9b6becb92ada7f8ee16fe206d90ca3e15bb2de28bfa232610fb9cd18",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0013_identity_oidc_provider_v1.sql",
+    "sha256": "3a1c1d713fdf920eebd420ef66294635eb47cec0892103c2277dc18fc4892628",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0014_research_organization_isolation_v1.sql",
+    "sha256": "90ce17fdf55b481e705a6622f962366198db8602c57344a8286f4ab364bafc7a",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0015_trading_organization_isolation_v1.sql",
+    "sha256": "e04daad19bbb500e7cdb17ef59570b6ee05896f98f8020e25c841a91f6ab7053",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0016_notification_provider_instances_v1.sql",
+    "sha256": "9908a7ac66aa175f4448ecb17fcd9c8911637ed8ed8b0f4f5bb74983d3f4e70c",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0017_extensions_plugin_platform_v1alpha1.sql",
+    "sha256": "b1865fa9b49a1b4c3212796a2e615dcc33f5eaf41e380915066e4163dab7928c",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0018_artifact_store_v1.sql",
+    "sha256": "428b0bfcbd111352c8a8653aff7c363e051c192a950dc1e33c4caebcdda49375",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0019_isolated_job_runtime_v1.sql",
+    "sha256": "c33e9a6a9dda70f78f42122a5c4777cd1777b04536f3d942d11ef9e44a3c103c",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0020_execution_gateway_mainnet_safety_v1.sql",
+    "sha256": "4e5228f53e0e40f97adf78a957d3365c7f77eef35f1ae892545a269f5fe734be",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0021_control_operation_audit_v1.sql",
+    "sha256": "71178ba2b6c8f5aeba1dc522111ccb016fa4d7b4d6e28c67453092398e7dd988",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0022_market_data_instrument_selections_v1.sql",
+    "sha256": "82a9d30383e73e2ad44da7cfddbb75eb9b84537b9c4c19cadcd725f464a38495",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0023_market_data_work_requests_v1.sql",
+    "sha256": "6ec83126f3335b32816a3ffc0754353854bf99a9101b2f84ac98b43c1f249888",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0024_market_data_full_history_v1.sql",
+    "sha256": "8b968fad082f7e4ef9d75400d16425bfda6a5c4f4c8e5d50656bb6a3b92ea21c",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0025_market_data_work_recovery_v1.sql",
+    "sha256": "90f20a2c47032c1f2e788af29142fa610fd551a56fe758c72c59850dc8d93c5b",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0026_market_data_queue_events_v1.sql",
+    "sha256": "69270e25c1fffe5397a39876ec4cbb9d03da09ea730c62ee5bc8bf2c30e11bff",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0027_market_data_stream_recovery_v1.sql",
+    "sha256": "a50fa21ced963af9e68e0ef42b25cd050eac47280c6f9ef255c93982446bce66",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0028_backtest_input_recipe_v1.sql",
+    "sha256": "338c9be2f943f429a2b85f00e3fb566b2538e655286e8c8e3ba4f0e0702e01a0",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0029_backtest_artifact_management_v1.sql",
+    "sha256": "ac3b66333786594567030cd6bf46f97d2a20eeb94dae86913b6b89e0e90a348b",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0030_backtest_artifact_dispatch_v1.sql",
+    "sha256": "cf0b9ae38b283d13ae685e41a8722182d0684c9953b34a33b25f14c297d4ecac",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0031_backtest_artifact_storage_v1.sql",
+    "sha256": "44099594d16c9873f3f8312980c7d2330d094d03b0972e509bbadd89861c34d8",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0032_identity_browser_devices_v1.sql",
+    "sha256": "63f82235a1c370c0a0f6ea5b064079ddee2b8f42f07750f74b603b9487e9c4d5",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0033_market_data_stream_connections_v1.sql",
+    "sha256": "5b44830c80e84142dc52153aaaf9adccbc984b8eeee3cf9644daf17dbefe86d7",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0034_market_data_provider_admission_v1.sql",
+    "sha256": "c3772dad10b9b3b14693028b827b16863847bbc8723e3e05e0c1de4451080c3f",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0035_market_data_stream_events_v1.sql",
+    "sha256": "7251af68dd4afa69975e55672c3033f17d45c684eb0c273a8ab31805b9d00266",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0036_market_data_storage_v1.sql",
+    "sha256": "34543fdd22aef3a6224ba29046cd894f917d5bb4b0809c6f8563c1d8daa6a7b9",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0037_market_data_reference_versions_v1.sql",
+    "sha256": "52b421e8c24d2b8d00a4ddc9fa93e0388399f1de526663eee212f31ff78cf178",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0038_market_data_verification_fences_v1.sql",
+    "sha256": "8af6d62c18daacc9c7db317ea98b65afa37a807aeee195c74fd6f1c170d02011",
+    "unchanged": true
+  },
+  {
+    "path": "migrations/postgres/0039_market_data_consumer_contract_v1.sql",
+    "sha256": "47c5d73e98c4a0e3b7bdc50bbee3c5e9d7ff8427bb3b0545a423f2d908f62ff9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/audit-lint.log",
+    "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-bootstrap.log",
+    "sha256": "d66bdf9e3b8758eda25677697f482a247898bc9dc40a8cae7dcffe1692ecc01a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-console-final.log",
+    "sha256": "d0e5634bb0c1271965327ad2ac18107af18fa7da6d2c9ce13e03eeda6cb603db",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-network.log",
+    "sha256": "61cc4a8f77a5ebba1cddbc9b55dde23b1aec36e41c35568f86cf79d6a99300ce",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-pg-symbol-request.log",
+    "sha256": "3039d9da6888ca889141f1171eb31edcbf43886f865f08d57f9b6de24feb6888",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/browser-reference-api.log",
+    "sha256": "af91a138ee11c344bb3faf950059e3dc3fca0b0782f4a0bec70890ee44339dcd",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/composition-unit-attempt1.log",
+    "sha256": "4b010b65547a1bddf0fc3a64ddb2027f9ef34264d2b87fd5ba960172dacbffe9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/composition-unit-attempt2.log",
+    "sha256": "f33a6f31ec15389b8df7910aae7816d3a9fe86b6196c42c1a982ae073d169ab7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt1.log",
+    "sha256": "e497b97017bb0eadcc0e81448cab02878b3b56eda6ee30e6bbfb4e604b1628e2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt2.log",
+    "sha256": "989748f1fd1689c9684987b1897d73e3d4fb40ad1860b464cb6a881b3673e40a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt3.log",
+    "sha256": "059308462cb13b33ada1ffca036837f7bf695c9674324f09cbe2e805a5d01059",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt4.log",
+    "sha256": "78b00db179987f0ae617728513b88d7c479a512dfe12ab74210a92d5a31b4959",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt5.log",
+    "sha256": "71ed1fa93f6b925288094cc6e0a2f20d694d7e28b0a7683e00ed32dae9e8df94",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt6.log",
+    "sha256": "5105cea59eaade9e3736a3e725339b7d4ea5c17df1905e74858dd6f6f2738392",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt7.log",
+    "sha256": "378fe8984f1205002bf3bbae0c09cc2c1a84d8ea80a837a4f9d632ebb633ad21",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-attempt8.log",
+    "sha256": "8fe99c8d22b4894c1fd1bd6398e1b55a4b0793edd7c40fffafdc8d932d73625d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-final.log",
+    "sha256": "184709d6fec5e40d71144d876705bdeb9aec79a2ad03523d44cc5445ae468849",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-final2.log",
+    "sha256": "6518c47bc43b2bc6c8d3a9ae8b6e0fd2fe9d65d73b95ffc3deee42c2f014a84e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-final3.log",
+    "sha256": "8cb8fc5701daf2610c641fa7395b22c50ffab7b6ef949c1547ec69e3f17c45ad",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/consumers-management.log",
+    "sha256": "a35157bfce016fd0e5767f78dc5e770414877442bd3b1d196f8e8e2290e534a0",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/diff-check.log",
+    "sha256": "b937e14a836df82f2345eb5fb0204ef98b07e19f28660066c5de5851972813c6",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/dns-lifecycle.log",
+    "sha256": "fbe7f61d13a0aebf048eaadc1eda7c2d1283f3761254f635e8bcc4933c808ff2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/entry-check.log",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ingestion-readers-final.log",
+    "sha256": "bac670e39993bc6418df362b1edd4d4e7e8496d926b35791112ba9ff42f14a59",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ingestion-readers-regression.log",
+    "sha256": "1aa7bbd30d73baaa095570658bea1321bc39ea5ca92456096c70aabdc3af499d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ingestion-readers-regression2.log",
+    "sha256": "44f93dab2c53285782ff75b7ccde6fa6d4d985afff79d2d2bf7843b3176938e5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/project-map-check.log",
+    "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/project-map-generate.log",
+    "sha256": "01ebc26631c2d26fcc6a02b1e9cd8e68c8c735c8072f43b5246a99ba966af623",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/pyright-attempt2.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/pyright-final.log",
+    "sha256": "d56c43636b82f455621b25cea4a9ea3e4ecaeb2974fff35ea2a2813febbbcd65",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/pyright-final2.log",
+    "sha256": "9380e2126ad1cd46ed6e9afb43a2c9dff3f0c70a621f9c023e3e08d32cbd5ffb",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/pyright-initial.log",
+    "sha256": "d77e0ecc03f698ba6c59e5249a7e70175285fa9782241f25adce894e9d970246",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/pyright-pass.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/real-attempt2.log",
+    "sha256": "4d8a8fdcf5407e0e41dc9441abaff926ff2c4c67f0a3f1a9c374b4e6829c1ffc",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/real-attempt3.log",
+    "sha256": "d67cb5f3931e303aa5af2f22b024985b702d41c5e19679502e257ac8ebe2d707",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/real-initial.log",
+    "sha256": "b745b640b39850666ddf4ac8789dca68f3ace512faf7b9b7ecd56145e0066479",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/repair-consumers-final.log",
+    "sha256": "e3eccb17bfca1663453dbdceedb8c4df5d642a3064712c9e854d34df7b26eeaf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/repair-consumers.log",
+    "sha256": "513c6c56383309a10af98bfd35f999dc05dac23d4d529e3c742e4bb532087dee",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ruff-attempt2.log",
+    "sha256": "842b43de55ad81b4e8c52a5e4ede3552fbbe2c0f4a67fe84ccf5b81eae861258",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ruff-attempt3.log",
+    "sha256": "d48942d89a4688f8b9fb1aff990ab369201137b99d1368339edbcfdf499dbeb9",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ruff-final.log",
+    "sha256": "8e8564d89af235d551eecaa5ba18db48705eaee97737d921d805187a6c7a49fa",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ruff-final2.log",
+    "sha256": "f69dd8e9b54a9a0b1c99cfabfb5b3504244c7fe7465edc42cb551a75247c0a93",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/ruff-pass.log",
+    "sha256": "942524cf52722697808fe4026ec2532da1fdffa3b1037bff4533c140fbbc1584",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/schema-access-final.log",
+    "sha256": "5eeb46042d6d795ee7d663f6369d8f1d270ca5bfdc2fa344ba6efd5898be74e4",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/schema-access-regression.log",
+    "sha256": "5e49ce8e3718992cb48f745f5498aae9d53218ba1004331eec30bfeaef770573",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-attempt2.log",
+    "sha256": "592f57fbd54b60b6d30dd36bfabb7e749d82fcbfa2e83687e4ebc0210d38be63",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-attempt3.log",
+    "sha256": "b68f928286ab69bdc6bdd23ccc8d8f5dd12cc124b7ae1ccd97d5cecb55a997d5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-attempt4.log",
+    "sha256": "fba7e686cfcd34a22bbb5e59680044eb104330bd0740cdddffb7d49c74baed22",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-attempt5.log",
+    "sha256": "37bc8213f66e041429ce8af8a6613ee8c64bf70a5c8a95cc8c9cf2cb433ecb5b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-final.log",
+    "sha256": "3aebe86e57e078396ff98fdf4fa86e60bb68d15138b3c96a8b31e9c91cbdbf3c",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-final2.log",
+    "sha256": "33e6e7afa29dd393365fe6e314f5eb8a610f6efe6f2378e9ebf477100ff2f2aa",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S05/unit-initial.log",
+    "sha256": "357f2752ab1d413c503516cd94da51db2762cb552287fa62177388969a5c46fc",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/real-pg-verified.log",
+    "sha256": "e665f31bf5b8f11a1be2bf67963b251102939d338573114d3ffb62b8fd8b7f2f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/unit-tests.log",
+    "sha256": "be5d42976d5647938d54e70cd29aa618c6da73c2077ecf46f8ed9eca9324d725",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/ruff.log",
+    "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/pyright.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/project-map-check.log",
+    "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S02/disposable-cleanup.log",
+    "sha256": "56cbf714fdb789b887efb003c1fd8be466befbf810938d103ef155e91baef34f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/real-pg-final.log",
+    "sha256": "f8cdf2c98f1284cd54f4e4186fc8cd82d2ead55bf1f26d439c42f707cf085e39",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/unit-final.log",
+    "sha256": "ee04d117fce2979d7bbc9f1171afe6409c3a6843dbda6264f347572223c85508",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/recovery-unit.log",
+    "sha256": "7d1dc7feb84fd1faeba6b06afe9343736311b1ee6116a0b1f613b7c16326e0ed",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/ruff-final.log",
+    "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/pyright-final.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/disposable-cleanup.log",
+    "sha256": "d12e58e1d4dfeac714dc7e6a45d1d4d2d40ba6c2195d01b0d3a1b51ff6600ac1",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/project-map-check.log",
+    "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/entry-check.log",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S03/diff-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/diff-check.log",
+    "sha256": "bde294368bfed77c2cddf8cec271d398aee9cdbab3b26e1059281bd33adb0120",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/entry-attempt.log",
+    "sha256": "d857d102cd8ef279091e52150574547658aec424dd11dbdd8352f4bd1f2c8359",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/entry-check.log",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/project-map-check.log",
+    "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/project-map-generate.log",
+    "sha256": "01ebc26631c2d26fcc6a02b1e9cd8e68c8c735c8072f43b5246a99ba966af623",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/pyright-attempt2.log",
+    "sha256": "c13280abf85322e0be1396c06aea83f38f46272457906af2230a98061fc604dd",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/pyright-final.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/pyright-initial.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-attempt2.log",
+    "sha256": "6e32ef67093efb42715a7e09273cb6106613e7dac7473c758ee02dc8c883da74",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-attempt3.log",
+    "sha256": "927cc0611cb07b09dbcbeb3fce139edcd7587551df3121de38408d718ba3c581",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-attempt4.log",
+    "sha256": "1081f5ae48af46310f1aebef5507ae94f19a78ee0e47119f5b4e1b9c4cf0bf85",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-attempt5.log",
+    "sha256": "302673f7b8113a69071a051805ae386a3a22a10b64e0f81130b58da7d4073e12",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-final.log",
+    "sha256": "4c12f77b9a277822aa78e2bb0c2f500ea906ef644d5d8f918f3b5f388f9f3102",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-final2.log",
+    "sha256": "272c3d3de9b61f7befeb8f13293c990543a7b5df7faebe8451d5e85eb5493d1e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-final3.log",
+    "sha256": "272c3d3de9b61f7befeb8f13293c990543a7b5df7faebe8451d5e85eb5493d1e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/query-probe-initial.log",
+    "sha256": "1b1633b974b167ee95566c3a35a98282ce4e082c88fae3473215faf6051a4d50",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt2.log",
+    "sha256": "d7b02cfb8c6380f46eeed328f14c449779a089eab656bcb6f97226c576e7664d",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt3.log",
+    "sha256": "1b2868c57d424f2aecaae6dbb0302ce316c8f58896e8992177cef2e4e86305c8",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt4.log",
+    "sha256": "1aaa92f488b0637a9f55a3ccf94107d4f8d1013862e568ad74054f8fa86b8d05",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt5.log",
+    "sha256": "a3db8f0ef4d092bc6bac55d22e685c5adf8f3b1781c9f06d34cecff37f89c562",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt6.log",
+    "sha256": "f81dd597816ea65218fdfed6a975025fd40d0ae38ecf3165772b0491c7213bbd",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-attempt7.log",
+    "sha256": "9904ac0d7b8ec4a1f27862e81ac5739a440b691414a21ecc20cc428a874bffdf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-final.log",
+    "sha256": "0a706c305eb1eae84f7f07d0e2bb84c9b5e55cba42f8063fd4fd67a52c0d3449",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/real-initial.log",
+    "sha256": "005b0a8a99f900a2b7c76284c5588e2f55f9f77dce782b2757231d53f149b0f8",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/ruff-attempt2.log",
+    "sha256": "badeb181d9f9493919d01744011ecfa23a2c40297aba67283192680690f6604e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/ruff-final.log",
+    "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/ruff-initial.log",
+    "sha256": "068f42de4b44453188cba500ddfd596c5ac682d44547a6954d390ff725426d5b",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/schema-attempt2.log",
+    "sha256": "eb32f7a72b1188c2f4fce66085645755b824477a5011d39c482a7437223389b2",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/schema-attempt3.log",
+    "sha256": "9e561cb0175a4f77f4fafdbcb5127f5ec80d5a88e88690fc9ac67b91c3ae1708",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/schema-final.log",
+    "sha256": "73171d5515710d7dfbe6e25c3e2f2ecb63ba82068e49639a0aaa64cb732f7bbf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/unit-final.log",
+    "sha256": "dc9ff41aaeb52e35f3582787f58f7cdbb503c352bcd8ddf0590b63ffe583d591",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S04/unit-initial.log",
+    "sha256": "7a7f50d0e11e0cf3143847f5c5b9aa83c31fe96c9cb9ed84b79302906c736491",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/docs-index-check.log",
+    "sha256": "401ab7824560aed6da162e0f88076ac89f8ca62bb69b00b739e0ae679b23326f",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/project-map-check.log",
+    "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/entry-check.log",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S01/diff-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/unit-final2.log",
+    "sha256": "93e577461351d7059655b0654701af5855df3f38118e7f3055928fee2dd22be5",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/generated-final.log",
+    "sha256": "2ba92e25d7f087f526a5f40cd8845cfba94a44756e6dc7a9f1fa0d9f6afecd9c",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/ruff-final2.log",
+    "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/pyright-final1.log",
+    "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/storage-runtime5.log",
+    "sha256": "d109aa88dd963a74f4128c22f40cb4eb63deec8498049014f012a195fd76afd3",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/budget-runtime8.log",
+    "sha256": "b2197f81b6223deea5e9ee9e0d816cbc0e48b62794222f5f3ea4c6edd50dbc5a",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/operator-recovery3.log",
+    "sha256": "eb2503bc2c1032280282a91d18dfbf18fb85547e726800a0c4549774521a5050",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/native-cli-runtime1.log",
+    "sha256": "2bb09e128541ac70b2a1f04edd1dab981eaae755359a05054fa994e68b3226d7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/tls-endpoint-negative1.log",
+    "sha256": "3c0dddafad81944552483248f17943835b88854af11d50991ffa14cbb6de341e",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/async-cancellation2.log",
+    "sha256": "bd1f8ddf6b5fa11ee9d9cbce13990b9586ca80febfa734f4d9ab0e7177484ac8",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/maintenance-runtime5.log",
+    "sha256": "274e4bbf4bdd57fffb097e36b7621f4fd95319295d197fa2e9774dc598f80472",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/cleanup-final.log",
+    "sha256": "d785cec4a3e0ce903802d5f24b3cbdd11dd566318c32007ac71d320ab8644ed7",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/pack-draft-final.log",
+    "sha256": "a2fcffb83f327997b90a23008b9fb189391cbd2ad934bd18d837d0bbe2c1dbbb",
+    "unchanged": true
+  },
+  {
+    "path": ".codex/agents/generated/postgresql-only-storage-v1/reports/S06/pack-entry-final.log",
+    "sha256": "109d359948a95e1ee6aeaae8a0e6c5ff68d4a8a88d5227cfc6ee4a3433448143",
+    "unchanged": true
+  }
+]

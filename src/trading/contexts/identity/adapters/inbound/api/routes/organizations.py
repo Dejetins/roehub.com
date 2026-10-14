@@ -22,14 +22,12 @@ from trading.contexts.identity.domain.entities import (
     OrganizationAccess,
     OrganizationInvitation,
     OrganizationMembership,
-    PluginPermissionGrant,
     SupportAccessGrant,
 )
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
 Role = Literal["owner", "admin", "operator", "trader", "viewer"]
-PluginPermission = Literal["read", "configure", "operate"]
 
 
 class BootstrapInstallationRequest(BaseModel):
@@ -58,8 +56,6 @@ class InvitationRequest(BaseModel):
     expires_at: datetime
 
 
-class PluginPermissionRequest(BaseModel):
-    permission: PluginPermission
 
 
 class SupportAccessRequest(BaseModel):
@@ -104,12 +100,6 @@ class InvitationResponse(BaseModel):
     created_at: datetime
 
 
-class PluginPermissionResponse(BaseModel):
-    organization_id: UUID
-    plugin_id: str
-    user_id: UUID
-    permission: PluginPermission
-    updated_at: datetime
 
 
 class SupportAccessResponse(BaseModel):
@@ -350,40 +340,6 @@ def build_organizations_router(
             ) from error
         return _invitation_response(invitation)
 
-    @router.put(
-        "/organizations/{organization_id}/plugins/{plugin_id}/permissions/{user_id}",
-        response_model=PluginPermissionResponse,
-    )
-    def set_plugin_permission(
-        organization_id: UUID,
-        plugin_id: str,
-        user_id: UUID,
-        request: PluginPermissionRequest,
-        http_request: Request,
-        principal: CurrentUserPrincipal = Depends(current_user_dependency),
-    ) -> PluginPermissionResponse:
-        _enforce_same_origin_mutation(request=http_request)
-        try:
-            grant = service.set_plugin_permission(
-                principal=principal,
-                organization_id=OrganizationId(organization_id),
-                plugin_id=plugin_id,
-                user_id=UserId(user_id),
-                permission=request.permission,
-                now=clock.now(),
-            )
-        except OrganizationAccessError as error:
-            raise _audited_api_error(
-                service=service,
-                principal=principal,
-                organization_id=OrganizationId(organization_id),
-                action="plugin.permission_set",
-                target_type="plugin_permission",
-                target_id=f"{plugin_id}:{user_id}",
-                error=error,
-                now=clock.now(),
-            ) from error
-        return _plugin_permission_response(grant)
 
     @router.post(
         "/installations/support-access",
@@ -553,14 +509,6 @@ def _invitation_response(value: OrganizationInvitation) -> InvitationResponse:
     )
 
 
-def _plugin_permission_response(value: PluginPermissionGrant) -> PluginPermissionResponse:
-    return PluginPermissionResponse(
-        organization_id=value.organization_id.value,
-        plugin_id=value.plugin_id,
-        user_id=value.user_id.value,
-        permission=value.permission,
-        updated_at=value.updated_at,
-    )
 
 
 def _support_access_response(value: SupportAccessGrant) -> SupportAccessResponse:

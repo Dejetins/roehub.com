@@ -9,7 +9,6 @@
   "profile": "trading",
   "schema": "io.roehub.openbao-input/v1alpha1",
   "secret_references": [
-    "openbao://kv/roehub/storage/clickhouse#credentials",
     "openbao://kv/roehub/storage/postgresql#credentials",
     "openbao://kv/roehub/storage/redis#credentials"
   ],

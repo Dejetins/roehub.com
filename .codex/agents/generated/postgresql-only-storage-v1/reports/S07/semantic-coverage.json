@@ -1,0 +1,715 @@
+[
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py::test_writer_routes_binance_markets_to_binance_raw_and_normalizes_non_nullable",
+    "source_sha256": "c9c37c8825a885fbf958d16c411a2414bd156ee51e073c532176a518b60d2dc6",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_four_routes_duplicates_replay_and_nulls",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_provider_raw_fields_preserve_values_and_routes"
+    ],
+    "semantic_disposition": "All four provider routes, raw fields/null normalization and mixed batch semantics exercised against actual PG.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py::test_writer_routes_bybit_markets_to_bybit_raw_and_normalizes_turnover",
+    "source_sha256": "c9c37c8825a885fbf958d16c411a2414bd156ee51e073c532176a518b60d2dc6",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_four_routes_duplicates_replay_and_nulls",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_provider_raw_fields_preserve_values_and_routes"
+    ],
+    "semantic_disposition": "All four provider routes, raw fields/null normalization and mixed batch semantics exercised against actual PG.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py::test_writer_splits_mixed_market_batch_into_separate_raw_tables",
+    "source_sha256": "c9c37c8825a885fbf958d16c411a2414bd156ee51e073c532176a518b60d2dc6",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_four_routes_duplicates_replay_and_nulls",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_provider_raw_fields_preserve_values_and_routes"
+    ],
+    "semantic_disposition": "All four provider routes, raw fields/null normalization and mixed batch semantics exercised against actual PG.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_instrument_reader.py::test_enabled_reader_uses_latest_state_query_and_maps_rows",
+    "source_sha256": "ccf38832818d0f8ac6a9cf9a930bba3798f831827ea19a8cc4e98027174789c1",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_instrument_reader.py::test_enabled_reader_raises_on_invalid_market_id_type",
+    "source_sha256": "ccf38832818d0f8ac6a9cf9a930bba3798f831827ea19a8cc4e98027174789c1",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_instrument_coverage_reader.py::test_coverage_is_exact_distinct_closed_minutes_and_never_exceeds_one_hundred_percent",
+    "source_sha256": "61cb6845bbe43e4f676fc716e550d5d337d4adae8ce96b39b0d40e094e2c18a9",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_bounds_returns_min_max",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_max_ts_open_lt",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_max_ts_open_lt_can_apply_inclusive_after_filter",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_bounds_1m_applies_exclusive_before_filter",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_distinct_ts_opens",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_daily_counts_uses_distinct_minute_buckets",
+    "source_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_write_funding_rates_routes_to_raw_and_canonical_tables",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_upsert_funding_universe_keeps_interval_metadata",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_list_tradable_funding_instruments_does_not_alias_max_updated_at",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_list_tradable_funding_instruments_treats_clickhouse_naive_time_as_utc",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_latest_funding_time_uses_nullable_max_for_empty_history",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_read_funding_coverage_reports_degraded_partial_window",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py::test_read_funding_coverage_reports_unavailable_without_rows",
+    "source_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_funding_interval_revision_and_nullable_fields",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_empty_and_partial_funding_keep_quality_and_utc",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_funding_revision_nulls_versions"
+    ],
+    "semantic_disposition": "Funding provider routes, interval metadata, UTC, empty/latest, partial gap policy; obsolete aggregate alias workaround replaced by typed current rows.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py::test_thread_local_gateway_creates_distinct_clients_for_distinct_threads",
+    "source_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py::test_thread_local_gateway_reuses_one_client_in_same_thread",
+    "source_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py::test_thread_local_gateway_select_mapping_matches_legacy_gateway_behavior",
+    "source_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py::test_admission_waits_instead_of_exceeding_user_limit_and_releases_after_error",
+    "source_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py::test_admission_is_shared_across_independent_adapters_including_client_creation",
+    "source_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_tradable_instrument_search_reader.py::test_search_reader_uses_latest_state_query_without_prefix_filter",
+    "source_sha256": "9a8d25aaa818f337054c724f363230ede9164d6bfe701501271f08cc62561e4f",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_tradable_instrument_search_reader.py::test_search_reader_applies_prefix_filter_and_bind_parameter",
+    "source_sha256": "9a8d25aaa818f337054c724f363230ede9164d6bfe701501271f08cc62561e4f",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_tradable_instrument_search_reader.py::test_search_reader_raises_on_invalid_market_id_type",
+    "source_sha256": "9a8d25aaa818f337054c724f363230ede9164d6bfe701501271f08cc62561e4f",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_market_reader.py::test_enabled_market_reader_uses_latest_state_query_and_maps_rows",
+    "source_sha256": "675c324b5e0e0e6e484fa97bf5c91c5c3ce6450a03423290aaa7cff355c43d10",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_market_reader.py::test_enabled_market_reader_raises_on_invalid_market_id_type",
+    "source_sha256": "675c324b5e0e0e6e484fa97bf5c91c5c3ce6450a03423290aaa7cff355c43d10",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_btcusdt_market_readiness_reader.py::test_clickhouse_btcusdt_market_readiness_reader_maps_latest_reference_rows",
+    "source_sha256": "bee23dda74641b0057b6f96da03457288d9cf48ef5ce5e037c6babba97a01f47",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_reference_search_readiness_catalog"
+    ],
+    "semantic_disposition": "Enabled/tradable/search/readiness mapping uses PG current PK rows and bound values. Database smallint plus domain validation replaces fake malformed engine output; query-text argMax/LIMIT BY assertions are engine-specific.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_reader.py::test_reader_uses_one_final_query_for_requested_range",
+    "source_sha256": "74f634c955f829a5e049ade885b10ce36b7ec8d6ae7d7974ca6c4babbe1768e4",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_reader.py::test_reader_reads_columnar_arrays_for_precompute_fast_path",
+    "source_sha256": "74f634c955f829a5e049ade885b10ce36b7ec8d6ae7d7974ca6c4babbe1768e4",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_stream_dto_arrays_and_index",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_duplicate_coverage_cap_and_inclusive_lower_bound"
+    ],
+    "semantic_disposition": "DTO/array ordering, UTC half-open bounds, distinct minute masks/counts and coverage cap; engine SQL text expectations replaced by result assertions.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_ref_instruments_writer.py::test_upsert_enrichment_writes_enrichment_columns_and_status_flags",
+    "source_sha256": "5842183be29d8197a07b89cbe82b9bf700945a74a8b88605eada480cfa48b4df",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_reference_partial_null_and_universe",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_reference_equal_version_permutations_all_null_and_independent_clocks"
+    ],
+    "semantic_disposition": "Versioned enrichment and independent clocks, including explicit NULL authority.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/contexts/market_data/adapters/test_clickhouse_ref_instruments_writer.py::test_existing_latest_enrichment_reads_latest_snapshot_fields",
+    "source_sha256": "5842183be29d8197a07b89cbe82b9bf700945a74a8b88605eada480cfa48b4df",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_reference_partial_null_and_universe",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_reference_equal_version_permutations_all_null_and_independent_clocks"
+    ],
+    "semantic_disposition": "Versioned enrichment and independent clocks, including explicit NULL authority.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/apps/monitoring/test_clickhouse_exporter.py::test_clickhouse_exporter_emits_successful_snapshot_metric_families",
+    "source_sha256": "4ce19ddfa338a0d0fb10ca2d2b09799aa7c8ad101ad4ce6f4aeb28a367949de3",
+    "successors": [
+      "tests/unit/apps/monitoring/test_postgres_observer.py"
+    ],
+    "semantic_disposition": "PG observer metric families, degraded sample and redaction replace retired engine metrics.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/apps/monitoring/test_clickhouse_exporter.py::test_clickhouse_exporter_reports_failed_scrape_without_crashing",
+    "source_sha256": "4ce19ddfa338a0d0fb10ca2d2b09799aa7c8ad101ad4ce6f4aeb28a367949de3",
+    "successors": [
+      "tests/unit/apps/monitoring/test_postgres_observer.py"
+    ],
+    "semantic_disposition": "PG observer metric families, degraded sample and redaction replace retired engine metrics.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/tools/test_clickhouse_workload_installation.py::test_class_identity_is_composition_owned_and_missing_secret_fails_closed",
+    "source_sha256": "d7f56a84e8d2a888cfa158f2d85f2e233a73474d0068f2272c95b1a9f6efa43e",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/tools/test_clickhouse_workload_installation.py::test_additive_provisioning_preserves_credentials_and_refuses_unsafe_paths",
+    "source_sha256": "d7f56a84e8d2a888cfa158f2d85f2e233a73474d0068f2272c95b1a9f6efa43e",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/tools/test_clickhouse_workload_installation.py::test_scoped_grants_do_not_give_interactive_or_artifacts_writes",
+    "source_sha256": "d7f56a84e8d2a888cfa158f2d85f2e233a73474d0068f2272c95b1a9f6efa43e",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/unit/tools/test_clickhouse_workload_installation.py::test_entrypoint_disabled_default_is_not_recreated_without_authentication",
+    "source_sha256": "d7f56a84e8d2a888cfa158f2d85f2e233a73474d0068f2272c95b1a9f6efa43e",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_grants_mv_and_normal_scheduler_funding",
+    "source_sha256": "cb9ab7c0dbd2fd8855bc6b32f525eb457b11f406a6d5a75a7447276199f7a1dd",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_cap_overrides_are_denied",
+    "source_sha256": "cb9ab7c0dbd2fd8855bc6b32f525eb457b11f406a6d5a75a7447276199f7a1dd",
+    "successors": [
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_bounds_pool_global_slots_and_session_reset",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_locks_generation_race_retry_cap_and_non_superuser",
+      "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_saturated_market_slots_preserve_declared_control_headroom"
+    ],
+    "semantic_disposition": "PG finite pool, shared pre-handshake budget, session reset and non-superuser privileges; engine-specific XML/users/settings/HTTP-client assumptions retired under S06 role contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_empty_duplicates_internal_and_day_boundary_gaps",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_zero_history_preparation_admits_only_after_real_gap_is_filled",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_index_drift_source_halt_and_late_candle_are_distinct",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_empty_source_range_and_lost_lease",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_latest_actual_candle_respects_exclusive_bound_duplicates_and_source_absences",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  },
+  {
+    "retired_test": "tests/real_infra/market_data/test_full_history_clickhouse.py::test_artifact_observation_exact_cutoff_empty_epoch_duplicates_and_repair",
+    "source_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+    "successors": [
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_exact_before_epoch_zero",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_actual_absence_unknown_frontier_and_late",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_rebuild_delete_and_stale_fences",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_empty_provider_receipt_and_final_lease_check",
+      "tests/real_infra/market_data/test_postgres_readers_frontier.py::test_partial_day_missing_day_and_policy_refresh",
+      "tests/real_infra/market_data/test_postgres_legacy_semantics.py::test_zero_history_gate_waits_for_last_actual_minute"
+    ],
+    "semantic_disposition": "Exact actual/absence/gap/cutoff/epoch/lease/repair semantics retained; implicit query-time bitmap repair replaced by explicit bounded PG maintenance contract.",
+    "verification": {
+      "result": "pass",
+      "evidence": "semantic-ci-final3.log",
+      "scope": "82 actual PostgreSQL semantic replacement checks; engine-specific assertions replaced by result-level contracts as individually described"
+    }
+  }
+]

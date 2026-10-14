@@ -1,4 +1,4 @@
-"""Greenfield PostgreSQL, ClickHouse, and Redis lifecycle for self-hosted Roehub."""
+"""Greenfield PostgreSQL and Redis lifecycle for self-hosted Roehub."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Any, Mapping, cast
 from urllib.parse import urlsplit
 
-import clickhouse_connect
-import psycopg
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 from redis import Redis
@@ -36,6 +34,7 @@ from apps.migrations.bootstrap import (
     apply_market_data_provider_admission_sql,
     apply_market_data_queue_events_sql,
     apply_market_data_stream_connections_sql,
+    apply_market_data_stream_events_sql,
     apply_market_data_stream_recovery_sql,
     apply_market_data_work_recovery_sql,
     apply_market_data_work_requests_sql,
@@ -54,18 +53,18 @@ from apps.migrations.main import (
 from apps.migrations.main import (
     main as run_alembic_migrations_main,
 )
+from apps.migrations.market_data import market_data_schema_ready, provision_market_data_access
+from trading.platform.postgres_budget import admin_connect as budget_connect
 
-STORAGE_STATUS_SCHEMA = "io.roehub.storage-status/v1alpha1"
-RUNTIME_CONFIG_SCHEMA = "io.roehub.runtime-config/v1alpha1"
+STORAGE_STATUS_SCHEMA = "io.roehub.storage-status/v2alpha1"
+RUNTIME_CONFIG_SCHEMA = "io.roehub.runtime-config/v2alpha1"
 POSTGRES_MANIFEST_SCHEMA = "io.roehub.postgres-migrations/v1alpha1"
-CLICKHOUSE_MANIFEST_SCHEMA = "io.roehub.clickhouse-migrations/v1alpha1"
 POSTGRES_STATE_TABLE = "roehub_storage_migrations"
-CLICKHOUSE_STATE_TABLE = "roehub_schema_migrations"
 POSTGRES_LOCK_KEY = 56329814721
 SUPPORTED_PROFILE_STORES: dict[str, tuple[str, ...]] = {
     "base": ("postgresql", "redis"),
-    "trading": ("postgresql", "clickhouse", "redis"),
-    "ml": ("postgresql", "clickhouse", "redis"),
+    "trading": ("postgresql", "redis"),
+    "ml": ("postgresql", "redis"),
 }
 
 
@@ -98,10 +97,8 @@ class StorageEndpoints:
     """Secret-bearing runtime endpoints kept outside user-edited configuration."""
 
     postgresql_dsn: str
-    clickhouse_dsn: str | None
     redis_url: str
     redis_auth: str | None = None
-    clickhouse_auth: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,21 +189,16 @@ def load_storage_endpoints(
     postgresql_dsn = environ.get("ROEHUB_STORAGE_POSTGRES_DSN", "").strip()
     redis_url = environ.get("ROEHUB_STORAGE_REDIS_URL", "").strip()
     redis_auth = environ.get("ROEHUB_STORAGE_REDIS_PASSWORD", "").strip()
-    clickhouse_dsn = environ.get("ROEHUB_STORAGE_CLICKHOUSE_DSN", "").strip()
-    clickhouse_auth = environ.get("ROEHUB_STORAGE_CLICKHOUSE_PASSWORD", "").strip()
+    if any(key.startswith("ROEHUB_STORAGE_CLICKHOUSE") for key in environ):
+        raise StorageLifecycleError("legacy storage environment is incompatible with PG-only v2")
     if not postgresql_dsn:
         raise StorageLifecycleError("ROEHUB_STORAGE_POSTGRES_DSN is required")
     if not redis_url:
         raise StorageLifecycleError("ROEHUB_STORAGE_REDIS_URL is required")
-    if "clickhouse" in config.stores and not clickhouse_dsn:
-        raise StorageLifecycleError("ROEHUB_STORAGE_CLICKHOUSE_DSN is required")
-
     endpoints = StorageEndpoints(
         postgresql_dsn=postgresql_dsn,
-        clickhouse_dsn=clickhouse_dsn or None,
         redis_url=redis_url,
         redis_auth=redis_auth or None,
-        clickhouse_auth=clickhouse_auth or None,
     )
     _validate_endpoint_hosts(config=config, endpoints=endpoints)
     return endpoints
@@ -230,15 +222,6 @@ def _validate_endpoint_hosts(*, config: StorageConfig, endpoints: StorageEndpoin
         actual=redis_parts.hostname or "",
     )
 
-    if endpoints.clickhouse_dsn is not None:
-        clickhouse_parts = urlsplit(endpoints.clickhouse_dsn)
-        if clickhouse_parts.scheme not in {"http", "https"}:
-            raise StorageLifecycleError("ClickHouse endpoint must use http:// or https://")
-        _require_endpoint_host(
-            store=config.stores["clickhouse"],
-            actual=clickhouse_parts.hostname or "",
-        )
-
 
 def _require_endpoint_host(*, store: StoreConfig, actual: str) -> None:
     if actual.lower() != store.host.lower():
@@ -256,7 +239,7 @@ def check_postgres_capabilities(dsn: str) -> dict[str, Any]:
     """Verify the certified PostgreSQL 16 capability profile without durable writes."""
 
     try:
-        with psycopg.connect(
+        with budget_connect(
             normalize_psycopg_dsn(dsn=dsn),
             autocommit=True,
             row_factory=cast(Any, dict_row),
@@ -303,7 +286,7 @@ def check_postgres_capabilities(dsn: str) -> dict[str, Any]:
             if not bool(lock_row["acquired"]):
                 raise StorageLifecycleError("PostgreSQL advisory-lock capability is unavailable")
 
-        with psycopg.connect(normalize_psycopg_dsn(dsn=dsn), autocommit=False) as connection:
+        with budget_connect(normalize_psycopg_dsn(dsn=dsn), autocommit=False) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, "CREATE TEMP TABLE roehub_ddl_probe(value integer)"))
             connection.rollback()
@@ -315,66 +298,6 @@ def check_postgres_capabilities(dsn: str) -> dict[str, Any]:
         "engine": "PostgreSQL",
         "version": str(row["version"]),
         "capabilities": ["advisory-lock", "schema-create", "transactional-ddl"],
-    }
-
-
-def _quote_clickhouse_identifier(value: str) -> str:
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,62}", value):
-        raise StorageLifecycleError("invalid ClickHouse database identifier")
-    return f"`{value}`"
-
-
-def _open_clickhouse(dsn: str, *, auth: str | None = None) -> Any:
-    try:
-        options: dict[str, Any] = {}
-        if auth is not None:
-            options["password"] = auth
-        return clickhouse_connect.get_client(
-            dsn=dsn,
-            database="default",
-            connect_timeout=10,
-            **options,
-        )
-    except Exception as error:  # noqa: BLE001
-        raise StorageLifecycleError("ClickHouse connection failed") from error
-
-
-def check_clickhouse_capabilities(
-    dsn: str,
-    *,
-    database: str,
-    auth: str | None = None,
-) -> dict[str, Any]:
-    """Verify the certified ClickHouse 24.8 profile and transient DDL capability."""
-
-    client = _open_clickhouse(dsn, auth=auth)
-    database_sql = _quote_clickhouse_identifier(database)
-    probe = _quote_clickhouse_identifier(f"roehub_capability_probe_{uuid.uuid4().hex}")
-    try:
-        version = str(client.command("SELECT version()"))
-        version_parts = _version_tuple(version)
-        if version_parts[:2] != (24, 8):
-            raise StorageLifecycleError("ClickHouse certified profile requires version 24.8.x")
-        client.command(f"CREATE DATABASE IF NOT EXISTS {database_sql}")
-        client.command(f"CREATE TABLE {database_sql}.{probe} (value UInt8) ENGINE = Memory")
-        client.command(f"DROP TABLE {database_sql}.{probe}")
-        system_tables = int(client.command("SELECT count() FROM system.tables"))
-        if system_tables <= 0:
-            raise StorageLifecycleError("ClickHouse system catalog capability is unavailable")
-    except StorageLifecycleError:
-        raise
-    except Exception as error:  # noqa: BLE001
-        try:
-            client.command(f"DROP TABLE IF EXISTS {database_sql}.{probe}")
-        except Exception:  # noqa: BLE001
-            pass
-        raise StorageLifecycleError("ClickHouse capability check failed") from error
-    finally:
-        client.close()
-    return {
-        "engine": "ClickHouse",
-        "version": version,
-        "capabilities": ["database-create", "merge-tree", "system-catalog"],
     }
 
 
@@ -428,8 +351,8 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
     if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
         raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
     raw_phases = payload.get("phases")
-    if not isinstance(raw_phases, list) or len(raw_phases) != 26:
-        raise StorageLifecycleError("PostgreSQL migration manifest must define twenty-six phases")
+    if not isinstance(raw_phases, list) or len(raw_phases) != 32:
+        raise StorageLifecycleError("PostgreSQL migration manifest must define thirty-two phases")
     phases: dict[str, tuple[str, tuple[Path, ...]]] = {}
     for raw_phase in raw_phases:
         if not isinstance(raw_phase, dict):
@@ -492,6 +415,12 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
         "identity-browser-devices-0032",
         "market-data-stream-connections-0033",
         "market-data-provider-admission-0034",
+        "market-data-stream-events-0035",
+        "market-data-storage-0036",
+        "market-data-reference-0037",
+        "market-data-verification-0038",
+        "market-data-consumers-0039",
+        "market-data-append-fence-0040",
     }:
         raise StorageLifecycleError("PostgreSQL migration phases are incomplete")
     return phases
@@ -508,7 +437,7 @@ def _ensure_postgres_state_table(dsn: str) -> None:
         )
     """
     try:
-        with psycopg.connect(normalize_psycopg_dsn(dsn=dsn), autocommit=True) as connection:
+        with budget_connect(normalize_psycopg_dsn(dsn=dsn), autocommit=True) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, sql))
     except Exception as error:  # noqa: BLE001
@@ -517,7 +446,7 @@ def _ensure_postgres_state_table(dsn: str) -> None:
 
 def _read_postgres_markers(dsn: str) -> dict[tuple[str, str], str]:
     try:
-        with psycopg.connect(
+        with budget_connect(
             normalize_psycopg_dsn(dsn=dsn),
             autocommit=True,
             row_factory=cast(Any, dict_row),
@@ -533,12 +462,31 @@ def _read_postgres_markers(dsn: str) -> dict[tuple[str, str], str]:
                 rows = cast(list[Mapping[str, Any]], cursor.fetchall())
     except Exception as error:  # noqa: BLE001
         raise StorageLifecycleError("cannot read PostgreSQL migration state") from error
-    return {(str(row["store"]), str(row["version"])): str(row["checksum"]) for row in rows}
+    # Adoption attests a verified current schema, not historical SQL execution.
+    # Keep its distinct durable provenance; lifecycle eligibility uses the same
+    # immutable phase checksum and rejects conflicting applied/adopted records.
+    result: dict[tuple[str, str], str] = {}
+    for row in rows:
+        store = str(row["store"])
+        if store == "postgres-sql-adopted":
+            from apps.migrations.legacy_adoption import ADOPTABLE_PHASES
+
+            if str(row["version"]) not in ADOPTABLE_PHASES or not any(
+                item["store"] == "postgres-adoption-reference" for item in rows
+            ):
+                raise StorageLifecycleError("unsupported PostgreSQL adoption provenance")
+            store = "postgres-sql"
+        key = (store, str(row["version"]))
+        checksum = str(row["checksum"])
+        if key in result and result[key] != checksum:
+            raise StorageLifecycleError("conflicting PostgreSQL phase provenance")
+        result[key] = checksum
+    return result
 
 
 def _record_postgres_marker(dsn: str, *, store: str, version: str, checksum: str) -> None:
     try:
-        with psycopg.connect(normalize_psycopg_dsn(dsn=dsn), autocommit=True) as connection:
+        with budget_connect(normalize_psycopg_dsn(dsn=dsn), autocommit=True) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     cast(
@@ -792,9 +740,7 @@ def apply_postgres_migrations(
         )
 
     execution_gateway_version = "execution-gateway-safety-0020"
-    execution_gateway_checksum, _execution_gateway_paths = phases[
-        execution_gateway_version
-    ]
+    execution_gateway_checksum, _execution_gateway_paths = phases[execution_gateway_version]
     if ("postgres-sql", execution_gateway_version) not in markers:
         try:
             apply_execution_gateway_mainnet_safety_sql(
@@ -821,9 +767,7 @@ def apply_postgres_migrations(
                 migrations_dir=manifest_path.parent,
             )
         except Exception as error:  # noqa: BLE001
-            raise StorageLifecycleError(
-                "control operation audit migration phase failed"
-            ) from error
+            raise StorageLifecycleError("control operation audit migration phase failed") from error
         _record_postgres_marker(
             dsn,
             store="postgres-sql",
@@ -852,7 +796,6 @@ def apply_postgres_migrations(
             checksum=market_data_selections_checksum,
         )
 
-
     work_version = "market-data-work-requests-0023"
     work_checksum, _work_paths = phases[work_version]
     if ("postgres-sql", work_version) not in markers:
@@ -865,7 +808,6 @@ def apply_postgres_migrations(
         _record_postgres_marker(
             dsn, store="postgres-sql", version=work_version, checksum=work_checksum
         )
-
 
     history_version = "market-data-full-history-0024"
     history_checksum, _history_paths = phases[history_version]
@@ -893,7 +835,6 @@ def apply_postgres_migrations(
             dsn, store="postgres-sql", version=recovery_version, checksum=recovery_checksum
         )
 
-
     queue_version = "market-data-queue-events-0026"
     queue_checksum, _queue_paths = phases[queue_version]
     if ("postgres-sql", queue_version) not in markers:
@@ -906,7 +847,6 @@ def apply_postgres_migrations(
         _record_postgres_marker(
             dsn, store="postgres-sql", version=queue_version, checksum=queue_checksum
         )
-
 
     stream_version = "market-data-stream-recovery-0027"
     stream_checksum, _stream_paths = phases[stream_version]
@@ -921,7 +861,6 @@ def apply_postgres_migrations(
             dsn, store="postgres-sql", version=stream_version, checksum=stream_checksum
         )
 
-
     recipe_version = "backtest-input-recipe-0028"
     recipe_checksum, _recipe_paths = phases[recipe_version]
     if ("postgres-sql", recipe_version) not in markers:
@@ -933,37 +872,43 @@ def apply_postgres_migrations(
             dsn, store="postgres-sql", version=recipe_version, checksum=recipe_checksum
         )
 
-
     management_version = "backtest-artifact-management-0029"
     management_checksum, _ = phases[management_version]
     if ("postgres-sql", management_version) not in markers:
         try:
             apply_backtest_artifact_management_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("artifact management migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=management_version, checksum=management_checksum)
+            dsn, store="postgres-sql", version=management_version, checksum=management_checksum
+        )
     dispatch_version = "backtest-artifact-dispatch-0030"
     dispatch_checksum, _ = phases[dispatch_version]
     if ("postgres-sql", dispatch_version) not in markers:
         try:
             apply_backtest_artifact_dispatch_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("artifact dispatch migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=dispatch_version, checksum=dispatch_checksum)
+            dsn, store="postgres-sql", version=dispatch_version, checksum=dispatch_checksum
+        )
     artifact_storage_version = "backtest-artifact-storage-0031"
     artifact_storage_checksum, _ = phases[artifact_storage_version]
     if ("postgres-sql", artifact_storage_version) not in markers:
         try:
             apply_backtest_artifact_storage_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("artifact storage migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=artifact_storage_version,
+            dsn,
+            store="postgres-sql",
+            version=artifact_storage_version,
             checksum=artifact_storage_checksum,
         )
 
@@ -972,240 +917,130 @@ def apply_postgres_migrations(
     if ("postgres-sql", devices_version) not in markers:
         try:
             apply_identity_browser_devices_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("identity browser devices migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=devices_version, checksum=devices_checksum)
+            dsn, store="postgres-sql", version=devices_version, checksum=devices_checksum
+        )
 
     connections_version = "market-data-stream-connections-0033"
     connections_checksum, _ = phases[connections_version]
     if ("postgres-sql", connections_version) not in markers:
         try:
             apply_market_data_stream_connections_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("stream connections migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=connections_version, checksum=connections_checksum)
+            dsn, store="postgres-sql", version=connections_version, checksum=connections_checksum
+        )
 
     admission_version = "market-data-provider-admission-0034"
     admission_checksum, _ = phases[admission_version]
     if ("postgres-sql", admission_version) not in markers:
         try:
             apply_market_data_provider_admission_sql(
-                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
         except Exception as error:
             raise StorageLifecycleError("provider admission migration failed") from error
         _record_postgres_marker(
-            dsn, store="postgres-sql", version=admission_version, checksum=admission_checksum)
+            dsn, store="postgres-sql", version=admission_version, checksum=admission_checksum
+        )
 
-
-def _load_clickhouse_migrations(manifest_path: Path) -> tuple[str, tuple[MigrationFile, ...]]:
-    payload = _load_json_object(manifest_path, label="ClickHouse migration manifest")
-    if payload.get("schema") != CLICKHOUSE_MANIFEST_SCHEMA:
-        raise StorageLifecycleError("unsupported ClickHouse migration manifest schema")
-    database_token = payload.get("database_token")
-    raw_migrations = payload.get("migrations")
-    if not isinstance(database_token, str) or not re.fullmatch(
-        r"[A-Za-z][A-Za-z0-9_-]{0,62}", database_token
-    ):
-        raise StorageLifecycleError("invalid ClickHouse database token")
-    if not isinstance(raw_migrations, list) or not raw_migrations:
-        raise StorageLifecycleError("ClickHouse migration manifest is empty")
-    migrations: list[MigrationFile] = []
-    for raw in raw_migrations:
-        if not isinstance(raw, dict):
-            raise StorageLifecycleError("invalid ClickHouse migration entry")
-        version = raw.get("version")
-        name = raw.get("name")
-        relative = raw.get("path")
-        expected_sha = raw.get("sha256")
-        if not all(isinstance(value, str) for value in (version, name, relative, expected_sha)):
-            raise StorageLifecycleError("invalid ClickHouse migration identity")
-        if Path(cast(str, relative)).name != relative:
-            raise StorageLifecycleError("unsafe ClickHouse migration path")
-        path = manifest_path.parent / cast(str, relative)
+    events_version = "market-data-stream-events-0035"
+    events_checksum, _ = phases[events_version]
+    if ("postgres-sql", events_version) not in markers:
         try:
-            content = path.read_bytes()
-        except OSError as error:
-            raise StorageLifecycleError("missing ClickHouse migration source") from error
-        if _sha256(content) != expected_sha:
-            raise StorageLifecycleError("ClickHouse migration source checksum mismatch")
-        migrations.append(
-            MigrationFile(
-                version=cast(str, version),
-                name=cast(str, name),
-                path=path,
-                sha256=cast(str, expected_sha),
+            apply_market_data_stream_events_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
             )
+        except Exception as error:
+            raise StorageLifecycleError("stream events migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=events_version, checksum=events_checksum
         )
-    versions = [migration.version for migration in migrations]
-    if versions != sorted(versions) or len(versions) != len(set(versions)):
-        raise StorageLifecycleError("ClickHouse migrations must be uniquely ordered")
-    return database_token, tuple(migrations)
 
-
-def split_clickhouse_sql(sql: str) -> tuple[str, ...]:
-    """Split ClickHouse DDL without treating comments or quoted semicolons as boundaries."""
-
-    statements: list[str] = []
-    current: list[str] = []
-    quote: str | None = None
-    line_comment = False
-    block_comment = False
-    index = 0
-    while index < len(sql):
-        char = sql[index]
-        next_char = sql[index + 1] if index + 1 < len(sql) else ""
-        if line_comment:
-            if char == "\n":
-                line_comment = False
-                current.append(char)
-            index += 1
-            continue
-        if block_comment:
-            if char == "*" and next_char == "/":
-                block_comment = False
-                index += 2
-            else:
-                index += 1
-            continue
-        if quote is not None:
-            current.append(char)
-            if char == "\\" and next_char:
-                current.append(next_char)
-                index += 2
-                continue
-            if char == quote:
-                if next_char == quote and quote in {"'", '"'}:
-                    current.append(next_char)
-                    index += 2
-                    continue
-                quote = None
-            index += 1
-            continue
-        if char == "-" and next_char == "-":
-            line_comment = True
-            index += 2
-            continue
-        if char == "/" and next_char == "*":
-            block_comment = True
-            index += 2
-            continue
-        if char in {"'", '"', "`"}:
-            quote = char
-            current.append(char)
-            index += 1
-            continue
-        if char == ";":
-            statement = "".join(current).strip()
-            if statement:
-                statements.append(statement)
-            current = []
-            index += 1
-            continue
-        current.append(char)
-        index += 1
-    if quote is not None or block_comment:
-        raise StorageLifecycleError("unterminated ClickHouse SQL quote or comment")
-    final_statement = "".join(current).strip()
-    if final_statement:
-        statements.append(final_statement)
-    return tuple(statements)
-
-
-def _render_clickhouse_sql(source: bytes, *, database_token: str, database: str) -> bytes:
-    text = source.decode("utf-8")
-    rendered = re.sub(rf"\b{re.escape(database_token)}\b", database, text)
-    if re.search(r"\b(?:DROP\s+DATABASE|DROP\s+TABLE|TRUNCATE\s+TABLE)\b", rendered, re.I):
-        raise StorageLifecycleError("destructive ClickHouse DDL is forbidden")
-    return rendered.encode()
-
-
-def _ensure_clickhouse_state(client: Any, *, database: str) -> None:
-    database_sql = _quote_clickhouse_identifier(database)
-    client.command(f"CREATE DATABASE IF NOT EXISTS {database_sql}")
-    client.command(
-        f"""
-        CREATE TABLE IF NOT EXISTS {database_sql}.{CLICKHOUSE_STATE_TABLE} (
-            store LowCardinality(String),
-            version String,
-            checksum FixedString(64),
-            applied_at DateTime64(3, 'UTC') DEFAULT now64(3)
-        )
-        ENGINE = ReplacingMergeTree(applied_at)
-        ORDER BY (store, version)
-        """
-    )
-
-
-def _read_clickhouse_markers(client: Any, *, database: str) -> dict[str, str]:
-    database_sql = _quote_clickhouse_identifier(database)
-    result = client.query(
-        f"""
-        SELECT version, checksum
-        FROM {database_sql}.{CLICKHOUSE_STATE_TABLE} FINAL
-        WHERE store = 'clickhouse'
-        ORDER BY version
-        """
-    )
-    return {
-        str(row[0]): row[1].decode("ascii") if isinstance(row[1], bytes) else str(row[1])
-        for row in result.result_rows
-    }
-
-
-def apply_clickhouse_migrations(
-    dsn: str,
-    *,
-    database: str,
-    manifest_path: Path,
-    auth: str | None = None,
-) -> None:
-    """Apply ordered idempotent ClickHouse DDL and persist per-source checksums."""
-
-    database_token, migrations = _load_clickhouse_migrations(manifest_path)
-    client = _open_clickhouse(dsn, auth=auth)
-    database_sql = _quote_clickhouse_identifier(database)
-    try:
-        _ensure_clickhouse_state(client, database=database)
-        markers = _read_clickhouse_markers(client, database=database)
-        expected: dict[str, str] = {}
-        rendered_sources: dict[str, bytes] = {}
-        for migration in migrations:
-            rendered = _render_clickhouse_sql(
-                migration.path.read_bytes(),
-                database_token=database_token,
-                database=database,
+    market_version = "market-data-storage-0036"
+    market_checksum, market_paths = phases[market_version]
+    if ("postgres-sql", market_version) not in markers:
+        # The new phase has no embedded COMMIT: DDL and marker share one transaction.
+        with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (POSTGRES_LOCK_KEY,))
+            for path in market_paths:
+                connection.execute(cast(Any, path.read_text()), prepare=False)
+            connection.execute(
+                "INSERT INTO roehub_storage_migrations (store, version, checksum) "
+                "VALUES (%s,%s,%s) ON CONFLICT (store,version) DO NOTHING",
+                ("postgres-sql", market_version, market_checksum),
             )
-            rendered_sources[migration.version] = rendered
-            expected[migration.version] = _sha256(rendered)
-        for version, checksum in markers.items():
-            if version in expected and checksum != expected[version]:
-                raise StorageLifecycleError("applied ClickHouse migration checksum drift detected")
-        for migration in migrations:
-            if migration.version in markers:
-                continue
-            for statement in split_clickhouse_sql(rendered_sources[migration.version].decode()):
-                if re.match(r"^USE\s+", statement, re.I):
-                    continue
-                client.command(statement)
-            client.command(
-                f"""
-                INSERT INTO {database_sql}.{CLICKHOUSE_STATE_TABLE}
-                    (store, version, checksum)
-                VALUES
-                    ('clickhouse', {{version:String}}, {{checksum:String}})
-                """,
-                parameters={"version": migration.version, "checksum": expected[migration.version]},
+    reference_version = "market-data-reference-0037"
+    reference_checksum, reference_paths = phases[reference_version]
+    with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (POSTGRES_LOCK_KEY,))
+        present = connection.execute(
+            "SELECT 1 FROM roehub_storage_migrations WHERE store=%s AND version=%s",
+            ("postgres-sql", reference_version),
+        ).fetchone()
+        if not present:
+            for path in reference_paths:
+                connection.execute(cast(Any, path.read_text()), prepare=False)
+            connection.execute(
+                "INSERT INTO roehub_storage_migrations (store,version,checksum) VALUES (%s,%s,%s)",
+                ("postgres-sql", reference_version, reference_checksum),
             )
-    except StorageLifecycleError:
-        raise
-    except Exception as error:  # noqa: BLE001
-        raise StorageLifecycleError("ClickHouse migration failed") from error
-    finally:
-        client.close()
+    verification_version = "market-data-verification-0038"
+    verification_checksum, verification_paths = phases[verification_version]
+    with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (POSTGRES_LOCK_KEY,))
+        present = connection.execute(
+            "SELECT 1 FROM roehub_storage_migrations WHERE store=%s AND version=%s",
+            ("postgres-sql", verification_version),
+        ).fetchone()
+        if not present:
+            for path in verification_paths:
+                connection.execute(cast(Any, path.read_text()), prepare=False)
+            connection.execute(
+                "INSERT INTO roehub_storage_migrations (store,version,checksum) VALUES (%s,%s,%s)",
+                ("postgres-sql", verification_version, verification_checksum),
+            )
+    consumer_version = "market-data-consumers-0039"
+    consumer_checksum, consumer_paths = phases[consumer_version]
+    with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (POSTGRES_LOCK_KEY,))
+        present = connection.execute(
+            "SELECT 1 FROM roehub_storage_migrations WHERE store=%s AND version=%s",
+            ("postgres-sql", consumer_version),
+        ).fetchone()
+        if not present:
+            for path in consumer_paths:
+                connection.execute(cast(Any, path.read_text()), prepare=False)
+            connection.execute(
+                "INSERT INTO roehub_storage_migrations (store,version,checksum) VALUES (%s,%s,%s)",
+                ("postgres-sql", consumer_version, consumer_checksum),
+            )
+    append_version = "market-data-append-fence-0040"
+    append_checksum, append_paths = phases[append_version]
+    with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (POSTGRES_LOCK_KEY,))
+        present = connection.execute(
+            "SELECT 1 FROM roehub_storage_migrations WHERE store=%s AND version=%s",
+            ("postgres-sql", append_version),
+        ).fetchone()
+        if not present:
+            for path in append_paths:
+                connection.execute(cast(Any, path.read_text()), prepare=False)
+            connection.execute(
+                "INSERT INTO roehub_storage_migrations (store,version,checksum) VALUES (%s,%s,%s)",
+                ("postgres-sql", append_version, append_checksum),
+            )
+    from apps.migrations.market_data import provision_current_partitions
+
+    with budget_connect(normalize_psycopg_dsn(dsn=dsn)) as connection:
+        provision_current_partitions(connection)
 
 
 def _postgres_schema_status(
@@ -1224,7 +1059,7 @@ def _postgres_schema_status(
         if markers.get(("postgres-alembic", revision.version)) != revision.sha256:
             raise StorageLifecycleError("PostgreSQL Alembic history is not ready")
     try:
-        with psycopg.connect(
+        with budget_connect(
             normalize_psycopg_dsn(dsn=dsn),
             autocommit=True,
             row_factory=cast(Any, dict_row),
@@ -1266,77 +1101,25 @@ def _postgres_schema_status(
                             to_regclass('public.job_runtime_attempts') IS NOT NULL
                                 AS job_runtime_ready,
                             to_regclass('public.execution_mainnet_approvals') IS NOT NULL
-                                AS execution_gateway_ready
+                                AS execution_gateway_ready,
+                            to_regclass('market_data.canonical_candles_1m') IS NOT NULL
+                                AS market_storage_ready,
+                            to_regclass('market_data.instrument_generations') IS NOT NULL
+                                AS market_generation_ready
                         """,
                     )
                 )
                 table_row = cast(Mapping[str, Any] | None, cursor.fetchone())
+                market_ready = market_data_schema_ready(connection)
     except Exception as error:  # noqa: BLE001
         raise StorageLifecycleError("cannot read PostgreSQL schema version") from error
     head = revisions[-1].version
     if row is None or str(row["version_num"]) != head:
         raise StorageLifecycleError("PostgreSQL Alembic head is not ready")
-    if table_row is None or not all(bool(table_row[key]) for key in table_row):
+    if not market_ready or table_row is None or not all(bool(table_row[key]) for key in table_row):
         raise StorageLifecycleError("PostgreSQL required schema tables are missing")
-    return [
-        "identity-0001-0009",
-        f"alembic:{head}",
-        "strategy-0010",
-        "organization-0011",
-        "local-auth-0012",
-        "oidc-provider-0013",
-        "research-tenancy-0014",
-        "trading-tenancy-0015",
-        "notification-providers-0016",
-        "extensions-plugin-platform-0017",
-        "artifact-store-0018",
-        "isolated-job-runtime-0019",
-        "execution-gateway-safety-0020",
-    ]
-
-
-def _clickhouse_schema_status(
-    dsn: str,
-    *,
-    database: str,
-    manifest_path: Path,
-    auth: str | None = None,
-) -> list[str]:
-    database_token, migrations = _load_clickhouse_migrations(manifest_path)
-    client = _open_clickhouse(dsn, auth=auth)
-    try:
-        _ensure_clickhouse_state(client, database=database)
-        markers = _read_clickhouse_markers(client, database=database)
-        for migration in migrations:
-            rendered = _render_clickhouse_sql(
-                migration.path.read_bytes(),
-                database_token=database_token,
-                database=database,
-            )
-            if markers.get(migration.version) != _sha256(rendered):
-                raise StorageLifecycleError("ClickHouse schema migration is not ready")
-        database_sql = _quote_clickhouse_identifier(database)
-        count = int(
-            client.command(
-                """
-                SELECT count()
-                FROM system.tables
-                WHERE database = {database:String}
-                  AND name IN ('canonical_candles_1m', 'canonical_funding_rates')
-                """,
-                parameters={"database": database},
-            )
-        )
-        if count != 2:
-            raise StorageLifecycleError("ClickHouse required schema tables are missing")
-        client.command(f"SELECT count() FROM {database_sql}.{CLICKHOUSE_STATE_TABLE}")
-    except StorageLifecycleError:
-        raise
-    except Exception as error:  # noqa: BLE001
-        raise StorageLifecycleError("cannot read ClickHouse schema version") from error
-    finally:
-        client.close()
-    return [migration.version for migration in migrations]
+    ordered = list(phases)
+    return [ordered[0], f"alembic:{head}", *ordered[1:]]
 
 
 def build_storage_status(
@@ -1345,7 +1128,6 @@ def build_storage_status(
     endpoints: StorageEndpoints,
     repo_root: Path,
     postgres_manifest: Path,
-    clickhouse_manifest: Path,
     require_schema: bool,
 ) -> dict[str, Any]:
     """Build a secret-free status contract for future `roehubctl` consumers."""
@@ -1378,30 +1160,6 @@ def build_storage_status(
             "ready": True,
         },
     }
-    if "clickhouse" in config.stores:
-        if endpoints.clickhouse_dsn is None:
-            raise StorageLifecycleError("ClickHouse endpoint is required by profile")
-        clickhouse_capabilities = check_clickhouse_capabilities(
-            endpoints.clickhouse_dsn,
-            database=config.stores["clickhouse"].database,
-            auth=endpoints.clickhouse_auth,
-        )
-        clickhouse_versions = (
-            _clickhouse_schema_status(
-                endpoints.clickhouse_dsn,
-                database=config.stores["clickhouse"].database,
-                manifest_path=clickhouse_manifest,
-                auth=endpoints.clickhouse_auth,
-            )
-            if require_schema
-            else []
-        )
-        stores["clickhouse"] = {
-            "mode": config.stores["clickhouse"].mode,
-            **clickhouse_capabilities,
-            "schema_versions": clickhouse_versions,
-            "ready": True,
-        }
     return {
         "schema": STORAGE_STATUS_SCHEMA,
         "profile": config.profile,
@@ -1411,11 +1169,6 @@ def build_storage_status(
             "postgresql": [
                 "credentials-restorable-separately",
                 "pg-dump-or-consistent-volume-snapshot",
-                "schema-status-ready",
-            ],
-            "clickhouse": [
-                "consistent-parts-or-freeze-backup",
-                "credentials-restorable-separately",
                 "schema-status-ready",
             ],
             "redis": [
@@ -1432,7 +1185,6 @@ def bootstrap_storage(
     endpoints: StorageEndpoints,
     repo_root: Path,
     postgres_manifest: Path,
-    clickhouse_manifest: Path,
 ) -> dict[str, Any]:
     """Run the single ordered storage bootstrap and return its readiness proof."""
 
@@ -1441,33 +1193,35 @@ def bootstrap_storage(
         endpoints.redis_url,
         auth=endpoints.redis_auth,
     )
-    if "clickhouse" in config.stores:
-        if endpoints.clickhouse_dsn is None:
-            raise StorageLifecycleError("ClickHouse endpoint is required by profile")
-        check_clickhouse_capabilities(
-            endpoints.clickhouse_dsn,
-            database=config.stores["clickhouse"].database,
-            auth=endpoints.clickhouse_auth,
-        )
 
     apply_postgres_migrations(
         endpoints.postgresql_dsn,
         repo_root=repo_root,
         manifest_path=postgres_manifest,
     )
-    if "clickhouse" in config.stores:
-        assert endpoints.clickhouse_dsn is not None
-        apply_clickhouse_migrations(
-            endpoints.clickhouse_dsn,
-            database=config.stores["clickhouse"].database,
-            manifest_path=clickhouse_manifest,
-            auth=endpoints.clickhouse_auth,
-        )
+    provision_runtime_roles(endpoints.postgresql_dsn)
     return build_storage_status(
         config=config,
         endpoints=endpoints,
         repo_root=repo_root,
         postgres_manifest=postgres_manifest,
-        clickhouse_manifest=clickhouse_manifest,
         require_schema=True,
     )
+
+
+def provision_runtime_roles(dsn: str) -> None:
+    """Grant application DML and isolate partition maintenance after migrations."""
+    with budget_connect(dsn, autocommit=True) as connection:
+        provision_market_data_access(
+            connection, application_role="roehub_app", maintenance_role="roehub_maintenance"
+        )
+        connection.execute("GRANT USAGE ON SCHEMA public TO roehub_app, roehub_maintenance")
+        connection.execute(
+            "GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO roehub_app"
+        )
+        connection.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO roehub_app")
+        connection.execute(
+            "GRANT SELECT ON market_data_work_requests,market_data_stream_recovery "
+            "TO roehub_maintenance"
+        )
+        connection.execute("GRANT USAGE ON SCHEMA market_data TO roehub_monitor")

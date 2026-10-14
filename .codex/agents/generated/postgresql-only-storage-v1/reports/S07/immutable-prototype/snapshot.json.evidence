@@ -1,0 +1,542 @@
+{
+  "cutoff_exclusive_utc": "2026-10-12T00:00:00Z",
+  "started_at": "2026-10-13T15:51:29.502277+00:00",
+  "parts": [
+    {
+      "path": "201906.parquet",
+      "bytes": 733708,
+      "sha256": "e38e6c4adac9cf8c803ad784b72e59e75fad293e70a04eae11e238fded3ab520",
+      "seconds": 0.09077095799148083
+    },
+    {
+      "path": "201907.parquet",
+      "bytes": 2308441,
+      "sha256": "817d59c864ec09a3754c7483955dc394531e008dd100e4911bf355fed5d2a686",
+      "seconds": 0.12114804098382592
+    },
+    {
+      "path": "201908.parquet",
+      "bytes": 2763931,
+      "sha256": "97e8799ce02043ce3f0933cf39a5d428e3ce6610b9ba92e919ddc5e57e0a1480",
+      "seconds": 0.14881366700865328
+    },
+    {
+      "path": "201909.parquet",
+      "bytes": 2415287,
+      "sha256": "a92fd813e4be263807190088b9b890463fb350caab8c08730a5abe9802ff84e5",
+      "seconds": 0.16489579190965742
+    },
+    {
+      "path": "201910.parquet",
+      "bytes": 2414762,
+      "sha256": "71a613ff698e00890c4dd0392c19dcddf62c95c107755cd71b804f831f68db38",
+      "seconds": 0.14973895892035216
+    },
+    {
+      "path": "201911.parquet",
+      "bytes": 2588624,
+      "sha256": "8034caf040d95ace930492992b8b6590c40ad254a7a5254360a94afca4845de8",
+      "seconds": 0.12069266592152417
+    },
+    {
+      "path": "201912.parquet",
+      "bytes": 2586618,
+      "sha256": "ba03cfbfd1da4ee979613ab7638307e52cfb4a3dfa8ba35557fce622f447ac1a",
+      "seconds": 0.11022079200483859
+    },
+    {
+      "path": "202001.parquet",
+      "bytes": 2340762,
+      "sha256": "f34ecf1227877b2b48fa36d820b770fd1978f9dbf897ec5866233330636bf48f",
+      "seconds": 0.10663195804227144
+    },
+    {
+      "path": "202002.parquet",
+      "bytes": 3402473,
+      "sha256": "1d630214a9ecb2a50b79f24377d3760f3c374a107bbaa0f8dc50e36ef58b0827",
+      "seconds": 0.14936329203192145
+    },
+    {
+      "path": "202003.parquet",
+      "bytes": 3212591,
+      "sha256": "2c881b592d514f694406b9082d2a04f893380f1a7da2e5911e0e2a07c600fb7e",
+      "seconds": 0.14119554194621742
+    },
+    {
+      "path": "202004.parquet",
+      "bytes": 2411843,
+      "sha256": "918efa50cdbd71d19f1cc9d640880928b5af5ada8787b23ad7c4659f1170560b",
+      "seconds": 0.17692770808935165
+    },
+    {
+      "path": "202005.parquet",
+      "bytes": 2826535,
+      "sha256": "d5a758775837ce8295be707bb932f063ea86dabde91333979266428d972e15b4",
+      "seconds": 0.15707679197657853
+    },
+    {
+      "path": "202006.parquet",
+      "bytes": 2825853,
+      "sha256": "e9ee48366bfd55ce088e5e11ce32a34b8e15415413ca5f2e3d4389ed1c5d8fed",
+      "seconds": 0.16891124995891005
+    },
+    {
+      "path": "202007.parquet",
+      "bytes": 4057598,
+      "sha256": "fbc4c5e62838dea39598106462aee00378e8bd086e3dd54f4d3e62d20bf4f63a",
+      "seconds": 0.1523925829678774
+    },
+    {
+      "path": "202008.parquet",
+      "bytes": 4980838,
+      "sha256": "21d6013c9bc594b20ad3ded44df3a85963e947551dfd0f1b410276f8c85c1391",
+      "seconds": 0.14488108397927135
+    },
+    {
+      "path": "202009.parquet",
+      "bytes": 4343356,
+      "sha256": "e24731fcb994fd548586291e548079e72fb4efb68f3859522b68c9cf49293a51",
+      "seconds": 0.14392241707537323
+    },
+    {
+      "path": "202010.parquet",
+      "bytes": 5592793,
+      "sha256": "be02202200fc5b65f6053e7e081af23c0a88efedc320a7994742a621a6a1823e",
+      "seconds": 0.1919117079814896
+    },
+    {
+      "path": "202011.parquet",
+      "bytes": 7211443,
+      "sha256": "a6f8a16b58828d4648f9f7846d9eca36a586bc145d93d7ae796304e7d27e3186",
+      "seconds": 0.23187458305619657
+    },
+    {
+      "path": "202012.parquet",
+      "bytes": 7502352,
+      "sha256": "3e355af02f56c97332cdba0b99118dfed4279d40c9ca2799e3aa94e6b31f5212",
+      "seconds": 0.23899216705467552
+    },
+    {
+      "path": "202101.parquet",
+      "bytes": 8250095,
+      "sha256": "d8ba13cf669e2efd9df98f29cb22551867ff21bdfaf8d3308494e7a9b0ec44df",
+      "seconds": 0.2372992499731481
+    },
+    {
+      "path": "202102.parquet",
+      "bytes": 8268901,
+      "sha256": "a646e4158163dbe341fcb9d8722cc315110acf7203429ccdbaa7a9a9b205b539",
+      "seconds": 0.23999316699337214
+    },
+    {
+      "path": "202103.parquet",
+      "bytes": 9208510,
+      "sha256": "bbd240df3b6ceece19528ba6386974daab6dbca85527221f989f4c6876303332",
+      "seconds": 0.24004358309321105
+    },
+    {
+      "path": "202104.parquet",
+      "bytes": 8906907,
+      "sha256": "6b6bfee1fc301a4bf979c6bc6aaa4097013b4fa5ba4f1dd54d73981878311238",
+      "seconds": 0.24916691693942994
+    },
+    {
+      "path": "202105.parquet",
+      "bytes": 8620232,
+      "sha256": "788d21854a59f5bd74cd246f527d60b82cbbbfeb0ef4a43c0e8c23af42ca186d",
+      "seconds": 0.23198033403605223
+    },
+    {
+      "path": "202106.parquet",
+      "bytes": 7768335,
+      "sha256": "c6e6b0bf2e330d3ac972a467afab17aff4cd277b6bd46e4311744b4c03e9c304",
+      "seconds": 0.24905295798089355
+    },
+    {
+      "path": "202107.parquet",
+      "bytes": 7713619,
+      "sha256": "c9369bff247a3c064b60690661e2a1366af5012996d48d789f60fd633806d5b3",
+      "seconds": 0.21532112499698997
+    },
+    {
+      "path": "202108.parquet",
+      "bytes": 7807663,
+      "sha256": "f1a8beb8fee4f06fcc1cf1e37977e0d14a75c321d8c9c72f5b66cce5cbfac7c1",
+      "seconds": 0.2619493749225512
+    },
+    {
+      "path": "202109.parquet",
+      "bytes": 6981824,
+      "sha256": "dd8c5e405d1e1b8a04b75f76eb5d5e555be725765711c2ee8e4a49831e3ae21c",
+      "seconds": 0.2457910419907421
+    },
+    {
+      "path": "202110.parquet",
+      "bytes": 6997005,
+      "sha256": "b9d0be6d88da0a92e6351f4e593a1ad32f1807476965d7a8ab7c7ade774766e9",
+      "seconds": 0.25106104102451354
+    },
+    {
+      "path": "202111.parquet",
+      "bytes": 7087860,
+      "sha256": "66c5a79536c26ad54275d08963dd442b9d00649271c68f8954a9b36886ba30df",
+      "seconds": 0.245285207987763
+    },
+    {
+      "path": "202112.parquet",
+      "bytes": 7131071,
+      "sha256": "2c6baa42a068d4254fcfa4328c05d75eb87fbe75bc2d11ba6f6e47bd54bf1f62",
+      "seconds": 0.29558549995999783
+    },
+    {
+      "path": "202201.parquet",
+      "bytes": 6919773,
+      "sha256": "386dc5e6bcc7364b17986917405a7c1e8fbf35ee260f361e76a9521313949459",
+      "seconds": 0.3169973340118304
+    },
+    {
+      "path": "202202.parquet",
+      "bytes": 6034419,
+      "sha256": "c0615a51b059600f2192e6f8e738117865c2b30e9f14804e2251b975838dd3ff",
+      "seconds": 0.23527183302212507
+    },
+    {
+      "path": "202203.parquet",
+      "bytes": 6636612,
+      "sha256": "01ce65c3af284fe7920f2bc92904821874259d41bbaa9d4a14824181e96e840d",
+      "seconds": 0.24802437494508922
+    },
+    {
+      "path": "202204.parquet",
+      "bytes": 6454389,
+      "sha256": "82f5fc0fe1da750b9d11750862347f255c4ae44e6ff4248db87b89f82d1e4460",
+      "seconds": 0.24321983300615102
+    },
+    {
+      "path": "202205.parquet",
+      "bytes": 6738181,
+      "sha256": "17a46eb729b08da586483ccf0babfc5dc37696a8524679781f6de9a5f06ede2b",
+      "seconds": 0.2863059169612825
+    },
+    {
+      "path": "202206.parquet",
+      "bytes": 6139411,
+      "sha256": "efe9ee0db092d99b07e1403986bb6276e2907e1a95f68851e18f8a9b1baad908",
+      "seconds": 0.2607448329217732
+    },
+    {
+      "path": "202207.parquet",
+      "bytes": 5910898,
+      "sha256": "c85ac7b2fc1e5d3484eb42bc4f5d1421cad33354fdec6e4b9805e7279727177a",
+      "seconds": 0.28609133302234113
+    },
+    {
+      "path": "202208.parquet",
+      "bytes": 5998417,
+      "sha256": "6dda93552ffdef2e515dd7e9910fd851049e0f15d8ca79c0319188bb2be61030",
+      "seconds": 0.289696125080809
+    },
+    {
+      "path": "202209.parquet",
+      "bytes": 5630353,
+      "sha256": "2d4409bf5e63526a3ef91a82404cdbecab0f87d96803cdb3b64300e3c4d2f554",
+      "seconds": 0.29410275002010167
+    },
+    {
+      "path": "202210.parquet",
+      "bytes": 5506128,
+      "sha256": "d241dc60bf84932f046846f0231cf5bcf06df0889973c20dde31f2546cc35dfe",
+      "seconds": 0.27216570801101625
+    },
+    {
+      "path": "202211.parquet",
+      "bytes": 5576863,
+      "sha256": "bb0ec6d842091472b09c2884ba7d1775a1b2def5638067b7437c261de8bfe310",
+      "seconds": 0.188963417080231
+    },
+    {
+      "path": "202212.parquet",
+      "bytes": 4472761,
+      "sha256": "83903b621ddd72401b8d7af8821c87b9211e3ecd4ef8986e5ceb9204a40c53b4",
+      "seconds": 0.1612809170037508
+    },
+    {
+      "path": "202301.parquet",
+      "bytes": 5487352,
+      "sha256": "eacdd2b1ce003594924bdb8157148d3ce30a0c915d21f8a4195b5e5587d1bea2",
+      "seconds": 0.1805035419529304
+    },
+    {
+      "path": "202302.parquet",
+      "bytes": 5322224,
+      "sha256": "5620430f40878a413b2bd9d3b198a30b073ec096a19243ac2a83bed5d9da1aa4",
+      "seconds": 0.19774329208303243
+    },
+    {
+      "path": "202303.parquet",
+      "bytes": 5906259,
+      "sha256": "91e7b181983cd2fbd880d9ab7e4280154eb90213c45c8f062c28c954fb63f78b",
+      "seconds": 0.2199122499441728
+    },
+    {
+      "path": "202304.parquet",
+      "bytes": 5568416,
+      "sha256": "be4f7c55feab7f035211ea0590c447493fa98f4b93c86c4b2d29d9bcc21c010f",
+      "seconds": 0.24603008304256946
+    },
+    {
+      "path": "202305.parquet",
+      "bytes": 4958212,
+      "sha256": "4f0e61a1b6b792a58bffbfad4d285bc1a967afc5a8c5e0fddb9eed698950b0a6",
+      "seconds": 0.2148713329806924
+    },
+    {
+      "path": "202306.parquet",
+      "bytes": 5034031,
+      "sha256": "f9862a2c3baa77de75afadeaa89a3cc86aa36eab8e6d94ffc11070ab6c485493",
+      "seconds": 0.18384800001513213
+    },
+    {
+      "path": "202307.parquet",
+      "bytes": 5932568,
+      "sha256": "f5b3769dd61ae018402be233485fbdd88f36b94848b60e5fa5604729ea136d7c",
+      "seconds": 0.20200912503059953
+    },
+    {
+      "path": "202308.parquet",
+      "bytes": 5396568,
+      "sha256": "fa54a403b32227c85132b47bbd93df348db1f501754504a2291460519274f608",
+      "seconds": 0.22955666691996157
+    },
+    {
+      "path": "202309.parquet",
+      "bytes": 4983162,
+      "sha256": "34ad2a492f29469c76ff36e037a40fe1d4bd3199cb1f2cc80cb55a81c5824675",
+      "seconds": 0.18437599996104836
+    },
+    {
+      "path": "202310.parquet",
+      "bytes": 5375808,
+      "sha256": "5a1670b717b94f7a1f1066a8fb7002043cee3e7aa011902b061b7f53a71eadfb",
+      "seconds": 0.18863441597204655
+    },
+    {
+      "path": "202311.parquet",
+      "bytes": 6103881,
+      "sha256": "5254f85522acce09f70856a7c403c40812e1e53ce61efeac74ede01a8d473ee3",
+      "seconds": 0.20006862503942102
+    },
+    {
+      "path": "202312.parquet",
+      "bytes": 6608666,
+      "sha256": "232fa500f3d28fc976f8434a3c59c87bd22a67ccdcdd3c341c88a9fd06f93d7a",
+      "seconds": 0.2009758329950273
+    },
+    {
+      "path": "202401.parquet",
+      "bytes": 6093123,
+      "sha256": "5d7386c7a2ade632e2546c4a4554bdb2394b882190c3c1c130eb55e27e760de6",
+      "seconds": 0.1982456250116229
+    },
+    {
+      "path": "202402.parquet",
+      "bytes": 5712184,
+      "sha256": "28fea60916bd900fb59b0d4676ab68152b9831f0336a8302f2704f10358f954f",
+      "seconds": 0.1592339159687981
+    },
+    {
+      "path": "202403.parquet",
+      "bytes": 7220132,
+      "sha256": "84360e3f2dd9ca566caf6e2852aeb1d1b432718bb380e3dca8f531d86aeb1a82",
+      "seconds": 0.229277916951105
+    },
+    {
+      "path": "202404.parquet",
+      "bytes": 6687966,
+      "sha256": "e646b7f6ab90b0fd2c8b4207f9ae7305a82513447af96942834960251f955c90",
+      "seconds": 0.17746458295732737
+    },
+    {
+      "path": "202405.parquet",
+      "bytes": 6436059,
+      "sha256": "d46d5bca54c1755e86e2ea766c549c4d2c2ee53d3ff40fbdc08cfd7521598f15",
+      "seconds": 0.2414041250012815
+    },
+    {
+      "path": "202406.parquet",
+      "bytes": 7527217,
+      "sha256": "196ff1b3e37e9319827d886a79b7013cb0b40e605016a576cc072a39879a4626",
+      "seconds": 0.25202270795125514
+    },
+    {
+      "path": "202407.parquet",
+      "bytes": 10438295,
+      "sha256": "8d7cc8f61366cd1b1de1ba64455ae25ab904333cce8e5a6767aca1a5e12c6941",
+      "seconds": 0.30992675002198666
+    },
+    {
+      "path": "202408.parquet",
+      "bytes": 10340493,
+      "sha256": "f4f1e20d7b5f68329104d48822e36df6962b943bd549a65aae445edd376f4dd9",
+      "seconds": 0.34195879101753235
+    },
+    {
+      "path": "202409.parquet",
+      "bytes": 9922095,
+      "sha256": "68511961430cce29ca7771b603b79b5c3b52a0a36383c9b8c4ac854e7630f1e1",
+      "seconds": 0.4012778749456629
+    },
+    {
+      "path": "202410.parquet",
+      "bytes": 10045717,
+      "sha256": "b2f0db28736d570a6baef570727b3eb0bc8d1fb51ea11544bfa1653a4927935e",
+      "seconds": 0.30155075003858656
+    },
+    {
+      "path": "202411.parquet",
+      "bytes": 12300182,
+      "sha256": "d50687ebf20b23dae0e7bc8214c865779627bc0b27fb035fc31686e83103a9c2",
+      "seconds": 0.3167130840010941
+    },
+    {
+      "path": "202412.parquet",
+      "bytes": 13530083,
+      "sha256": "9c5b4acfeb2d1d98c057957023d75443a9239d6181ea1aadacaa64838089719d",
+      "seconds": 0.3626575000816956
+    },
+    {
+      "path": "202501.parquet",
+      "bytes": 11317423,
+      "sha256": "1a481b5999c055531957028e057cda20b694dc8407f6ec8a4fdd96b7c512e920",
+      "seconds": 0.297923875041306
+    },
+    {
+      "path": "202502.parquet",
+      "bytes": 9882034,
+      "sha256": "157f155502b270b795ca7024c5232de8bde89fe7e3290d392ca904f2aa9df0a7",
+      "seconds": 0.27029170806054026
+    },
+    {
+      "path": "202503.parquet",
+      "bytes": 10282492,
+      "sha256": "a74101048ece0a8580049cce5cd585637c25b2e3c4d2bac469ea4b898edf2545",
+      "seconds": 0.30002558301202953
+    },
+    {
+      "path": "202504.parquet",
+      "bytes": 9912333,
+      "sha256": "49dae06bbf421a87b450ca3dc202f9684a236949a37c1573c56775fb6402ee1e",
+      "seconds": 0.2914482910418883
+    },
+    {
+      "path": "202505.parquet",
+      "bytes": 10304442,
+      "sha256": "310aa6d57d5b1394fb68ab0ae60f3617e364c2e9fd26ce870410fbf46750255d",
+      "seconds": 0.3056445000693202
+    },
+    {
+      "path": "202506.parquet",
+      "bytes": 9332029,
+      "sha256": "573d253153759c05ef108a33427f52f6904a0a8386a57787a7c36fd9b19d3865",
+      "seconds": 0.2863413750892505
+    },
+    {
+      "path": "202507.parquet",
+      "bytes": 10048016,
+      "sha256": "e83e7830f1afefe3cefaf1c35f9ebd7f80f933b87bc543a6d583888b7b55b300",
+      "seconds": 0.3132297919364646
+    },
+    {
+      "path": "202508.parquet",
+      "bytes": 9736782,
+      "sha256": "02901f98f174743b2a4b28f0a7fc12d8ccb25d7fbb13540e9ec811ed3f5c8e7f",
+      "seconds": 0.3224622500129044
+    },
+    {
+      "path": "202509.parquet",
+      "bytes": 11023468,
+      "sha256": "c45beb43b008551d79751c94e65be3950d93fa926cc211bf68551438cb100102",
+      "seconds": 0.3298336670268327
+    },
+    {
+      "path": "202510.parquet",
+      "bytes": 13948161,
+      "sha256": "fa4b1cbf716870bcc415b0e53840b8c353956424eb338a3ac80af10201e9188d",
+      "seconds": 0.3775059999898076
+    },
+    {
+      "path": "202511.parquet",
+      "bytes": 13327115,
+      "sha256": "ed731a3dc3050d6c93ef7eadfd4423bcdb6755254919b43bb9bc1822b7b47e71",
+      "seconds": 0.39721808407921344
+    },
+    {
+      "path": "202512.parquet",
+      "bytes": 12444374,
+      "sha256": "3f93f74cfb0b1dfff817a28a6922228e634dad5fd66c0c499411742ca6b92ed2",
+      "seconds": 0.3599023330025375
+    },
+    {
+      "path": "202601.parquet",
+      "bytes": 12306991,
+      "sha256": "28d5de1160f89ca5a938b7d3dcad2d480e8ca94136d789c45abfbff3935f814f",
+      "seconds": 0.39317383395973593
+    },
+    {
+      "path": "202602.parquet",
+      "bytes": 11379706,
+      "sha256": "c2e2cc9168a0319e90e4a1b0fb4fe9213dc40585aff0a8f041760e1e162a6205",
+      "seconds": 0.3198976250132546
+    },
+    {
+      "path": "202603.parquet",
+      "bytes": 11084366,
+      "sha256": "6b5a1f288b9e02f31c4ef3e2c53e92d012be270e8e90a4894194d1f089ea8cd1",
+      "seconds": 0.33055787498597056
+    },
+    {
+      "path": "202604.parquet",
+      "bytes": 10642815,
+      "sha256": "3e991a99c9cc7032777cbaf8b622b085fbdf56690c67e9eb4b87eacc86d3848a",
+      "seconds": 0.3812845000065863
+    },
+    {
+      "path": "202605.parquet",
+      "bytes": 10248077,
+      "sha256": "bd6d41de6ef95908c5cd5dab230a8b93d530055b8c76f8c5170183f7f5ea5f0a",
+      "seconds": 0.46466316701844335
+    },
+    {
+      "path": "202606.parquet",
+      "bytes": 10823021,
+      "sha256": "d0a321761c2ed7821daeff3ee9a35a3a2fda757f4f74aca0d91eebc35f465c48",
+      "seconds": 0.41100116597954184
+    },
+    {
+      "path": "202607.parquet",
+      "bytes": 10148355,
+      "sha256": "0d57a69adf6f77b7e3398e134523a9dffc6b26776633cc6d3d9493ffc31d5693",
+      "seconds": 0.536659000092186
+    },
+    {
+      "path": "202608.parquet",
+      "bytes": 14029604,
+      "sha256": "f938638d63a2e149878da5022536f845a6e15db899ee8aaa26d8f4a123e838b6",
+      "seconds": 0.4166162080364302
+    },
+    {
+      "path": "202609.parquet",
+      "bytes": 27099343,
+      "sha256": "ad8a4326a91cf4f1a36f4c1f3ffae6b9a776c1f82f71f65559ac13a9c4e211f7",
+      "seconds": 0.7751532500842586
+    },
+    {
+      "path": "202610.parquet",
+      "bytes": 5599889,
+      "sha256": "ef655591e2609fe19bf2e5db35415515f7f8fabbaec7877e62d2820b62b1b8c4",
+      "seconds": 0.21159149997401983
+    }
+  ],
+  "failed_initial_export": "whole history FINAL exceeded the 128 MiB query limit; replaced by sequential monthly reads without raising limits",
+  "finished_at": "2026-10-13T15:51:52.361080+00:00"
+}

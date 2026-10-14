@@ -11,19 +11,19 @@ groups:
           summary: Market Data live-tail gap is still unrepaired after policy window
           description: Strategy live-runner deferred Redis ACK because a closed 1m gap was not repaired.
           runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
-          action: Check strategy checkpoint, Redis pending messages, repair audit rows, hot cache, ClickHouse circuit, and REST tail errors.
+          action: Check strategy checkpoint, Redis pending messages, repair audit rows, hot cache, canonical store circuit, and REST tail errors.
 
-      - alert: MarketDataClickHouseRepairCircuitOpenTooLong
-        expr: market_data_clickhouse_repair_circuit_state{job="strategy-producer"} == 1
+      - alert: MarketDataCanonicalStoreRepairCircuitOpenTooLong
+        expr: market_data_canonical_store_repair_circuit_state{job="strategy-producer"} == 1
         for: 2m
         labels:
           severity: warning
           owner: market-data
         annotations:
-          summary: ClickHouse repair circuit is open
-          description: Live-tail provider is bypassing ClickHouse repair reads and relying on Redis hot cache or REST tail.
+          summary: canonical store repair circuit is open
+          description: Live-tail provider is bypassing canonical store repair reads and relying on Redis hot cache or REST tail.
           runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
-          action: Check ClickHouse HTTP/native health and recent `market_data_candle_repair_events` source attempts.
+          action: Check PostgreSQL health and recent `market_data_candle_repair_events` source attempts.
 
       - alert: MarketDataRestTailRepairErrors
         expr: increase(market_data_live_tail_repair_total{job="strategy-producer",source="rest",status=~"failed|rate_limited"}[10m]) > 0

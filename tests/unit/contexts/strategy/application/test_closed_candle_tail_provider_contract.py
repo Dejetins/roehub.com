@@ -83,7 +83,7 @@ def test_closed_candle_tail_provider_can_return_missing_result_deterministically
         sources_attempted=(
             CandleRepairSourceAttempt(source="redis_hot_cache", status="miss"),
             CandleRepairSourceAttempt(
-                source="clickhouse",
+                source="canonical_store",
                 status="failed",
                 error_code="http_connection_reset",
             ),
@@ -107,12 +107,10 @@ def test_closed_candle_tail_provider_can_return_missing_result_deterministically
         "2026-06-29T12:00:00.000Z",
         "2026-06-29T12:02:00.000Z",
     )
-    assert tuple(str(ts) for ts in returned.missing_ts_opens) == (
-        "2026-06-29T12:01:00.000Z",
-    )
+    assert tuple(str(ts) for ts in returned.missing_ts_opens) == ("2026-06-29T12:01:00.000Z",)
     assert tuple(attempt.source for attempt in returned.sources_attempted) == (
         "redis_hot_cache",
-        "clickhouse",
+        "canonical_store",
         "rest",
     )
     assert returned.error_code == "short_tail_missing"

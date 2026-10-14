@@ -149,7 +149,6 @@ def build_ui_account_router(
         return _profile_response(
             profile=profile,
             preferences=preferences,
-            subscription_status=str(principal.paid_level),
         )
 
     @router.put("/ui/account/profile", response_model=AccountProfileResponse)
@@ -173,7 +172,6 @@ def build_ui_account_router(
         return _profile_response(
             profile=profile,
             preferences=preferences,
-            subscription_status=str(principal.paid_level),
         )
 
     @router.get("/ui/account/limits", response_model=AccountLimitsResponse)
@@ -191,12 +189,10 @@ def build_ui_account_router(
         active_connections = tuple(row for row in connections if row.status == "active")
         base_limits = account_settings.get_limits(
             owner_user_id=principal.user_id,
-            plan=str(principal.paid_level),
             exchange_connections_used=len(active_connections),
             api_keys_used=len(active_connections),
         )
         return AccountLimitsResponse(
-            plan=str(base_limits["plan"]),
             exchange_connections_used=int(base_limits["exchange_connections_used"]),
             exchange_connections_limit=int(base_limits["exchange_connections_limit"]),
             api_keys_used=int(base_limits["api_keys_used"]),
@@ -957,7 +953,6 @@ def _profile_response(
     *,
     profile: AccountProfileSettings,
     preferences: AccountPreferences,
-    subscription_status: str,
 ) -> AccountProfileResponse:
     return AccountProfileResponse(
         user_id=str(profile.owner_user_id),
@@ -966,7 +961,6 @@ def _profile_response(
         timezone=profile.timezone,
         locale=preferences.locale,
         telegram_discord=profile.telegram_discord,
-        subscription_status=subscription_status,
         updated_at=profile.updated_at,
     )
 
@@ -1503,13 +1497,13 @@ def _enforce_recent_auth(*, principal: CurrentUserPrincipal, now: datetime) -> N
     if principal.session_created_at is None:
         raise RoehubError(
             code="recent_auth_required",
-            message="Recent Keycloak authentication is required.",
+            message="Recent authentication is required.",
             details={},
         )
     if principal.session_created_at + _RECENT_AUTH_WINDOW < now:
         raise RoehubError(
             code="recent_auth_required",
-            message="Recent Keycloak authentication is required.",
+            message="Recent authentication is required.",
             details={},
         )
 

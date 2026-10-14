@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
@@ -18,10 +19,8 @@ class RuntimeProofError(RuntimeError):
 
 _SENSITIVE_ENV_KEYS = (
     "ROEHUB_STORAGE_POSTGRES_PASSWORD",
-    "ROEHUB_STORAGE_CLICKHOUSE_PASSWORD",
     "ROEHUB_STORAGE_REDIS_PASSWORD",
     "ROEHUB_STORAGE_POSTGRES_DSN",
-    "ROEHUB_STORAGE_CLICKHOUSE_DSN",
     "ROEHUB_STORAGE_REDIS_URL",
 )
 
@@ -114,27 +113,6 @@ def _local_auth_status(stdout: str) -> dict[str, object]:
         or payload.get("audit_immutable") != "passed"
     ):
         raise RuntimeProofError("local auth runtime proof is incomplete")
-    return payload
-
-
-def _oidc_status(stdout: str) -> dict[str, object]:
-    start = stdout.find("{")
-    if start < 0:
-        raise RuntimeProofError("OIDC proof returned no JSON status")
-    try:
-        payload = json.loads(stdout[start:])
-    except json.JSONDecodeError as error:
-        raise RuntimeProofError("OIDC proof returned invalid JSON status") from error
-    if (
-        not isinstance(payload, dict)
-        or payload.get("schema") != "io.roehub.oidc-runtime-proof/v1alpha1"
-        or payload.get("invitation_provisioning") != "passed"
-        or payload.get("uninvited_provisioning") != "rejected"
-        or payload.get("authenticated_linking") != "passed"
-        or payload.get("subject_takeover") != "rejected"
-        or payload.get("audit_immutable") != "passed"
-    ):
-        raise RuntimeProofError("OIDC runtime proof is incomplete")
     return payload
 
 
@@ -231,25 +209,11 @@ def _notification_provider_status(stdout: str) -> dict[str, object]:
 
 
 def _assert_versions(payload: dict[str, object], *, mode: str) -> None:
-    expected = {
-        "postgresql": [
-            "identity-0001-0009",
-            "alembic:20260711_0043",
-            "strategy-0010",
-            "organization-0011",
-            "local-auth-0012",
-            "oidc-provider-0013",
-            "research-tenancy-0014",
-            "trading-tenancy-0015",
-            "notification-providers-0016",
-            "extensions-plugin-platform-0017",
-            "artifact-store-0018",
-            "isolated-job-runtime-0019",
-            "execution-gateway-safety-0020",
-        ],
-        "clickhouse": ["0001", "0002"],
-        "redis": [],
-    }
+    manifest = json.loads(
+        (Path(__file__).resolve().parents[2] / "migrations/postgres/manifest.json").read_text()
+    )
+    phases = [phase["version"] for phase in manifest["phases"]]
+    expected = {"postgresql": [phases[0], "alembic:20260711_0043", *phases[1:]], "redis": []}
     stores = payload.get("stores")
     if not isinstance(stores, dict):
         raise RuntimeProofError("storage status has no stores")
@@ -264,7 +228,9 @@ def _assert_versions(payload: dict[str, object], *, mode: str) -> None:
             )
 
 
-def _generate_config(repo_root: Path, output: Path, *, config: Path | None) -> Path:
+def _generate_config(
+    repo_root: Path, output: Path, *, config: Path | None, profile: str = "trading"
+) -> Path:
     command = [
         "uv",
         "run",
@@ -273,13 +239,13 @@ def _generate_config(repo_root: Path, output: Path, *, config: Path | None) -> P
         "--output",
         str(output),
         "--profile",
-        "trading",
+        profile,
         "--write",
     ]
     if config is not None:
         command[4:4] = ["--config", str(config)]
     _run(command, cwd=repo_root, environ=os.environ)
-    service_config = output / "trading/service-config.json"
+    service_config = output / profile / "service-config.json"
     if not service_config.is_file():
         raise RuntimeProofError("installation generator produced no service config")
     return service_config
@@ -287,18 +253,15 @@ def _generate_config(repo_root: Path, output: Path, *, config: Path | None) -> P
 
 def _proof_environment(service_config: Path) -> dict[str, str]:
     environ = dict(os.environ)
-    credential_keys = _SENSITIVE_ENV_KEYS[:3]
+    credential_keys = _SENSITIVE_ENV_KEYS[:2]
     credential_values = tuple(secrets.token_hex(24) for _key in credential_keys)
     environ.update(dict(zip(credential_keys, credential_values, strict=True)))
     environ["ROEHUB_STORAGE_POSTGRES_DSN"] = (
         "host=postgresql port=5432 dbname=roehub user=roehub password="
         + environ[credential_keys[0]]
     )
-    environ["ROEHUB_STORAGE_CLICKHOUSE_DSN"] = (
-        "http://roehub:" + environ[credential_keys[1]] + "@clickhouse:8123/default"
-    )
     environ["ROEHUB_STORAGE_REDIS_URL"] = (
-        "redis://:" + environ[credential_keys[2]] + "@redis:6379/0"
+        "redis://:" + environ[credential_keys[1]] + "@redis:6379/0"
     )
     environ["ROEHUB_STORAGE_SERVICE_CONFIG"] = str(service_config)
     environ["ROEHUB_DISPOSABLE_STORAGE_PROOF"] = "1"
@@ -328,13 +291,27 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
     project = f"roehub-stage04-{secrets.token_hex(4)}"
     embedded_compose = repo_root / "infra/docker/storage-embedded.compose.yml"
     external_compose = repo_root / "infra/docker/storage-external.compose.yml"
-    fault_fixture = repo_root / "tests/fixtures/storage/clickhouse-interrupted"
     cache_root = Path.home() / ".cache"
     cache_root.mkdir(parents=True, exist_ok=True)
     cleanup_complete = False
 
     with tempfile.TemporaryDirectory(prefix="roehub-stage04-", dir=cache_root) as temp:
         temp_root = Path(temp)
+        fault_fixture = temp_root / "postgres-interrupted"
+        shutil.copytree(repo_root / "migrations/postgres", fault_fixture)
+        fault_manifest = json.loads((fault_fixture / "manifest.json").read_text())
+        phase = fault_manifest["phases"][-1]
+        failed_file = fault_fixture / phase["files"][-1]["path"]
+        failed_file.write_bytes(
+            failed_file.read_bytes() + b"\nCREATE TABLE s06_rollback_probe(n int); SELECT 1/0;\n"
+        )
+        digest = hashlib.sha256()
+        for file in phase["files"]:
+            content = (fault_fixture / file["path"]).read_bytes()
+            file["sha256"] = hashlib.sha256(content).hexdigest()
+            digest.update(file["path"].encode() + b"\0" + content + b"\0")
+        phase["sha256"] = digest.hexdigest()
+        (fault_fixture / "manifest.json").write_text(json.dumps(fault_manifest))
         embedded_config = _generate_config(repo_root, temp_root / "embedded", config=None)
         external_config = _generate_config(
             repo_root,
@@ -366,9 +343,30 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                     embedded_compose,
                     "up",
                     "-d",
+                    "--wait",
                     "postgresql",
-                    "clickhouse",
                     "redis",
+                ),
+                cwd=repo_root,
+                environ=environ,
+            )
+
+            _run(
+                _compose(
+                    project,
+                    embedded_compose,
+                    "exec",
+                    "-T",
+                    "postgresql",
+                    "psql",
+                    "-U",
+                    "roehub",
+                    "-d",
+                    "roehub",
+                    "-v",
+                    "ON_ERROR_STOP=1",
+                    "-c",
+                    "CREATE ROLE roehub_app; CREATE ROLE roehub_maintenance;",
                 ),
                 cwd=repo_root,
                 environ=environ,
@@ -386,7 +384,7 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                     "bootstrap",
                     "--service-config",
                     "/etc/roehub/service-config.json",
-                    "--clickhouse-manifest",
+                    "--postgres-manifest",
                     "/proof/manifest.json",
                 ),
                 cwd=repo_root,
@@ -416,29 +414,26 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
             ).stdout.strip()
             if not postgres_partial.startswith("20260711_0043|"):
                 raise RuntimeProofError("interrupted run lost PostgreSQL migration state")
-            clickhouse_partial = _run(
+            rolled_back = _run(
                 _compose(
                     project,
                     embedded_compose,
                     "exec",
                     "-T",
-                    "clickhouse",
-                    "sh",
-                    "-ec",
-                    (
-                        'clickhouse-client --user roehub --password "$CLICKHOUSE_PASSWORD" '
-                        '--query "SELECT '
-                        "(SELECT count() FROM system.tables WHERE database = 'roehub' "
-                        "AND name = 'interrupted_migration_probe'), "
-                        "(SELECT count() FROM roehub.roehub_schema_migrations) "
-                        'FORMAT TabSeparated"'
-                    ),
+                    "postgresql",
+                    "psql",
+                    "-U",
+                    "roehub",
+                    "-d",
+                    "roehub",
+                    "-Atc",
+                    "SELECT to_regclass('s06_rollback_probe') IS NULL",
                 ),
                 cwd=repo_root,
                 environ=environ,
             ).stdout.strip()
-            if clickhouse_partial != "1\t0":
-                raise RuntimeProofError("interrupted ClickHouse state was not observable")
+            if rolled_back != "t":
+                raise RuntimeProofError("interrupted PostgreSQL DDL was not rolled back")
 
             recovered = _run_storage(project, embedded_compose, repo_root, environ)
             _assert_versions(recovered, mode="embedded")
@@ -510,25 +505,6 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                     environ=environ,
                 ).stdout
             )
-            oidc_proof = _oidc_status(
-                _run(
-                    _compose(
-                        project,
-                        embedded_compose,
-                        "run",
-                        "--rm",
-                        "--entrypoint",
-                        "python",
-                        "-e",
-                        "IDENTITY_PG_DSN",
-                        "storage-migrations",
-                        "-m",
-                        "apps.migrations.oidc_runtime_probe",
-                    ),
-                    cwd=repo_root,
-                    environ=local_auth_environment,
-                ).stdout
-            )
             research_proof = _research_status(
                 _run(
                     _compose(
@@ -593,7 +569,6 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                     embedded_compose,
                     "stop",
                     "postgresql",
-                    "clickhouse",
                     "redis",
                 ),
                 cwd=repo_root,
@@ -605,8 +580,8 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                     embedded_compose,
                     "up",
                     "-d",
+                    "--wait",
                     "postgresql",
-                    "clickhouse",
                     "redis",
                 ),
                 cwd=repo_root,
@@ -629,41 +604,53 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
                 cwd=repo_root,
                 environ=environ,
             )
-            external = _status(
-                _run(
-                    [
-                        "docker",
-                        "run",
-                        "--rm",
-                        "--network",
-                        f"{project}_storage",
-                        "--read-only",
-                        "--cap-drop",
-                        "ALL",
-                        "--security-opt",
-                        "no-new-privileges",
-                        "--tmpfs",
-                        "/tmp:rw,noexec,nosuid,size=32m",
-                        "--user",
-                        "65534:65534",
-                        "-e",
-                        "ROEHUB_STORAGE_POSTGRES_DSN",
-                        "-e",
-                        "ROEHUB_STORAGE_CLICKHOUSE_DSN",
-                        "-e",
-                        "ROEHUB_STORAGE_REDIS_URL",
-                        "-v",
-                        f"{external_config}:/etc/roehub/service-config.json:ro",
-                        image_id,
-                        "readiness",
-                        "--service-config",
-                        "/etc/roehub/service-config.json",
-                    ],
-                    cwd=repo_root,
-                    environ=environ,
-                ).stdout
-            )
-            _assert_versions(external, mode="external")
+            profile_matrix = {}
+            for mode in ("embedded", "external"):
+                for profile in ("base", "trading", "ml"):
+                    matrix_config = _generate_config(
+                        repo_root,
+                        temp_root / "matrix" / mode,
+                        config=(repo_root / "tests/fixtures/installation/roehub-external.yaml")
+                        if mode == "external"
+                        else None,
+                        profile=profile,
+                    )
+                    for action in ("bootstrap", "readiness"):
+                        result = _status(
+                            _run(
+                                [
+                                    "docker",
+                                    "run",
+                                    "--rm",
+                                    "--network",
+                                    f"{project}_storage",
+                                    "--read-only",
+                                    "--cap-drop",
+                                    "ALL",
+                                    "--security-opt",
+                                    "no-new-privileges",
+                                    "--tmpfs",
+                                    "/tmp:rw,noexec,nosuid,size=32m",
+                                    "--user",
+                                    "65534:65534",
+                                    "-e",
+                                    "ROEHUB_STORAGE_POSTGRES_DSN",
+                                    "-e",
+                                    "ROEHUB_STORAGE_REDIS_URL",
+                                    "-v",
+                                    f"{matrix_config}:/etc/roehub/service-config.json:ro",
+                                    image_id,
+                                    action,
+                                    "--service-config",
+                                    "/etc/roehub/service-config.json",
+                                ],
+                                cwd=repo_root,
+                                environ=environ,
+                            ).stdout
+                        )
+                        _assert_versions(result, mode=mode)
+                    profile_matrix[f"{mode}/{profile}"] = "bootstrap/readiness passed"
+
         finally:
             cleanup = _run(
                 _compose(project, embedded_compose, "down", "-v", "--remove-orphans"),
@@ -686,6 +673,7 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
         "idempotent_rerun": "passed",
         "persistent_volume_restart": "passed",
         "external_readiness": "passed",
+        "profile_matrix": profile_matrix,
         "organization_isolation": "passed"
         if organization_proof.get("database_constraints")
         else "failed",
@@ -694,7 +682,6 @@ def run_runtime_proof(repo_root: Path) -> dict[str, object]:
         ),
         "organization_audit_events": organization_proof.get("audit_events", 0),
         "local_auth": local_auth_proof,
-        "oidc": oidc_proof,
         "research_tenancy": research_proof,
         "trading_tenancy": trading_proof,
         "notification_providers": notification_provider_proof,

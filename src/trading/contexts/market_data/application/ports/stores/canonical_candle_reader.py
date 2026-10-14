@@ -24,7 +24,7 @@ class CanonicalCandleReader(Protocol):
     Reader contract:
     - offline/precompute consumers may rely on duplicate-free deterministic reads for the whole
       requested range;
-    - concrete storage adapter chooses implementation strategy (`FINAL` or equivalent), without
+    - concrete storage adapter chooses implementation strategy (transactional canonical rows), without
       exposing dedup mechanics to application consumers.
     """  # noqa: E501
 

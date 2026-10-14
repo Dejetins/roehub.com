@@ -19,8 +19,6 @@ from trading.contexts.identity.domain.entities import (
     OrganizationMembership,
     OrganizationPermission,
     OrganizationRole,
-    PluginPermission,
-    PluginPermissionGrant,
     SupportAccessGrant,
     permissions_for_role,
 )
@@ -306,47 +304,6 @@ class OrganizationAccessService:
             )
         )
 
-    def set_plugin_permission(
-        self,
-        *,
-        principal: CurrentUserPrincipal,
-        organization_id: OrganizationId,
-        plugin_id: str,
-        user_id: UserId,
-        permission: PluginPermission,
-        now: datetime,
-    ) -> PluginPermissionGrant:
-        self._require_recent_auth(principal=principal, now=now)
-        self._require_permission(
-            principal=principal,
-            organization_id=organization_id,
-            permission="plugins.manage",
-        )
-        normalized_plugin_id = plugin_id.strip()
-        if not re.fullmatch(r"[a-z][a-z0-9._-]{2,127}", normalized_plugin_id):
-            raise OrganizationAccessError(
-                code="invalid_plugin_id",
-                message="Plugin id is invalid",
-            )
-        target = self._repository.get_membership(
-            organization_id=organization_id,
-            user_id=user_id,
-        )
-        if target is None or target.status != "active":
-            raise OrganizationAccessError(
-                code="membership_not_found",
-                message="Plugin grantee must be an active organization member",
-            )
-        return self._translate_invariant(
-            lambda: self._repository.set_plugin_permission(
-                organization_id=organization_id,
-                plugin_id=normalized_plugin_id,
-                user_id=user_id,
-                permission=permission,
-                actor_user_id=principal.user_id,
-                updated_at=_utc(now),
-            )
-        )
 
     def grant_support_access(
         self,

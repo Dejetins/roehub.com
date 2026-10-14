@@ -46,7 +46,7 @@ DEFAULT_RELEASE_MANIFEST = ROOT / "tools" / "release" / "release-metadata.json"
 DEFAULT_SCHEMA = ROOT / "schemas" / "release" / "offline-release-manifest.schema.json"
 MANIFEST_NAME = "offline-release-manifest.json"
 SIGNATURE_NAME = "offline-release-manifest.signature.json"
-SCHEMA_ID = "io.roehub.offline-release-bundle/v1alpha1"
+SCHEMA_ID = "io.roehub.offline-release-bundle/v1alpha2"
 SIGNATURE_SCHEMA_ID = "io.roehub.offline-release-signature/v1alpha1"
 SUPPORTED_PLATFORMS = frozenset({"linux/amd64", "linux/arm64"})
 SIGNATURE_NAMESPACE = "roehub.offline-release-manifest.v1"
@@ -84,6 +84,9 @@ STATIC_FILES = (
     "infra/docker/openbao/openbao-2.5.4-licensed-qr.NOTICE",
     "infra/docker/openbao/openbao-2.5.4-licensed-qr.patch",
     "infra/docker/runtime-entrypoint.py",
+    "infra/docker/postgres-init-roles.sh",
+    "tools/installation/postgres_native.py",
+    "tools/installation/postgres_budget_recovery.py",
     "infra/openbao/config/openbao.hcl",
     "tools/release/README.md",
     "tools/release/THIRD_PARTY_NOTICES.md",
@@ -101,7 +104,7 @@ STATIC_TREES = (
     "schemas",
     "src/trading/resources/artifacts/demo_bundle",
 )
-REQUIRED_CORRESPONDING_SOURCES = frozenset({"grafana", "loki", "openbao"})
+REQUIRED_CORRESPONDING_SOURCES = frozenset({"openbao"})
 
 
 class OfflineBundleError(RuntimeError):
@@ -434,9 +437,7 @@ def inspect_oci_archive(path: Path) -> OciArchiveDescriptor:
                 )
                 if not (
                     layer_media_type.startswith("application/vnd.oci.image.layer.")
-                    or layer_media_type.startswith(
-                        "application/vnd.docker.image.rootfs.diff."
-                    )
+                    or layer_media_type.startswith("application/vnd.docker.image.rootfs.diff.")
                 ):
                     raise OfflineBundleError(
                         f"OCI image layer has an unsupported media type: {layer_media_type}"
@@ -568,8 +569,7 @@ def _normalize_sbom(
     root = roots[0]
     old_root_id = str(root["SPDXID"])
     new_root_id = (
-        f"SPDXRef-DocumentRoot-Image-{name}-{platform_slug}-"
-        f"{digest.removeprefix('sha256:')}"
+        f"SPDXRef-DocumentRoot-Image-{name}-{platform_slug}-" f"{digest.removeprefix('sha256:')}"
     )
     root["SPDXID"] = new_root_id
     root["name"] = f"roehub/{name}:{version}-{platform_slug}"
@@ -716,10 +716,7 @@ def _verify_corresponding_source_archive(
     name: str,
 ) -> None:
     actual_sha256 = _sha256_path(path)
-    if (
-        record.get("sha256") != actual_sha256
-        or record.get("expected_sha256") != actual_sha256
-    ):
+    if record.get("sha256") != actual_sha256 or record.get("expected_sha256") != actual_sha256:
         raise OfflineBundleError(f"corresponding source digest mismatch: {name}")
     root = str(record.get("archive_root", ""))
     license_files = record.get("license_files")
@@ -740,9 +737,7 @@ def _verify_corresponding_source_archive(
                 member=member,
                 root=root,
             ):
-                raise OfflineBundleError(
-                    f"corresponding source link target is unsafe: {name}"
-                )
+                raise OfflineBundleError(f"corresponding source link target is unsafe: {name}")
             if member.name in required and member.isfile() and member.size > 0:
                 found.add(member.name)
     if count == 0 or found != required:
@@ -1286,11 +1281,9 @@ def verify_bundle(
             raise OfflineBundleError(f"corresponding source record is invalid: {name}")
         image_name = source_record.get("image")
         image_record = manifest["images"].get(image_name)
-        if (
-            not isinstance(image_record, dict)
-            or source_record.get("image_index_digest")
-            != image_record.get("index_digest")
-        ):
+        if not isinstance(image_record, dict) or source_record.get(
+            "image_index_digest"
+        ) != image_record.get("index_digest"):
             raise OfflineBundleError(f"corresponding source image binding is invalid: {name}")
         _verify_corresponding_source_archive(
             path=_safe_output(bundle, str(source_record["path"])),
@@ -1434,9 +1427,7 @@ def install_bundle(
                 )
                 image_id = inspected.stdout.strip()
                 if not image_id.startswith("sha256:") or len(image_id) != 71:
-                    raise OfflineBundleError(
-                        f"Docker returned invalid immutable image ID: {name}"
-                    )
+                    raise OfflineBundleError(f"Docker returned invalid immutable image ID: {name}")
                 imported_by_digest[digest] = image_id
                 imported_tags.append(tag)
             image_ids[name] = image_id

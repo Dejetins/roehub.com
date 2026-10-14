@@ -18,13 +18,9 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: E402
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (  # noqa: E402,E501
-    ClickHouseConnectGateway,
-    ClickHouseGateway,
+from apps.cli.wiring.db.postgres import market_gateway  # noqa: E402
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (  # noqa: E402
+    IngestionGateway,
 )
 from trading.contexts.rl_trading.domain.feature_contract import (  # noqa: E402
     FEATURE_CONTRACT_HASH_V1,
@@ -55,9 +51,7 @@ DEFAULT_STAGE04C_MANIFEST = (
 DEFAULT_STAGE04C_MANIFEST_SHA256 = (
     "9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344"
 )
-DEFAULT_OUTPUT_ROOT = Path(
-    "/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1"
-)
+DEFAULT_OUTPUT_ROOT = Path("/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1")
 DEFAULT_CHUNK_MINUTES = 7 * 24 * 60
 
 
@@ -78,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        manifest = build_raw_feature_dataset_from_clickhouse(
+        manifest = build_raw_feature_dataset_from_postgresql(
             refresh_manifest_path=args.refresh_manifest,
             expected_refresh_manifest_sha256=args.expected_refresh_manifest_sha256,
             output_root=args.output_root,
@@ -124,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def build_raw_feature_dataset_from_clickhouse(
+def build_raw_feature_dataset_from_postgresql(
     *,
     refresh_manifest_path: Path,
     expected_refresh_manifest_sha256: str,
@@ -174,8 +168,8 @@ def build_raw_feature_dataset_from_clickhouse(
     if not source_windows:
         raise RawFeatureDatasetError(reason="no_source_windows_selected")
 
-    settings = ClickHouseSettingsLoader(os.environ).load()
-    gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
+    settings = market_gateway(os.environ, workload="bulk")
+    gateway = settings
     output_root.mkdir(parents=True, exist_ok=True)
 
     slab_entries: list[dict[str, Any]] = []
@@ -187,7 +181,7 @@ def build_raw_feature_dataset_from_clickhouse(
         )
         entry, candidate_fixture = _materialize_slab(
             gateway=gateway,
-            database=settings.database,
+            database="market_data",
             source_window=window,
             output_root=output_root,
             chunk_minutes=chunk_minutes,
@@ -225,7 +219,7 @@ def build_raw_feature_dataset_from_clickhouse(
 
 def _materialize_slab(
     *,
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     source_window: RawFeatureSourceWindow,
     output_root: Path,
@@ -345,7 +339,7 @@ def _materialize_slab(
 
 def _read_candle_batch(
     *,
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     market_id: int,
     symbol: str,
@@ -353,33 +347,11 @@ def _read_candle_batch(
     end: datetime,
     expected_rows: int,
 ) -> RawFeatureCandleBatch:
-    q = f"""
-    SELECT
-        toUnixTimestamp64Milli(ts_open) AS open_time_ms,
-        toUnixTimestamp64Milli(ts_close) AS close_time_ms,
-        toFloat32(open) AS open_f32,
-        toFloat32(high) AS high_f32,
-        toFloat32(low) AS low_f32,
-        toFloat32(close) AS close_f32,
-        toFloat32(volume_base) AS volume_base_f32,
-        toFloat32(volume_quote) AS volume_quote_f32,
-        toInt64(trades_count) AS trades_count_i64
-    FROM {database}.canonical_candles_1m FINAL
-    WHERE market_id = %(market_id)s
-      AND symbol = %(symbol)s
-      AND ts_open >= %(start)s
-      AND ts_open < %(end)s
-    ORDER BY ts_open
-    """
-    rows = gateway.select(
-        q,
-        {
-            "end": end,
-            "market_id": market_id,
-            "start": start,
-            "symbol": symbol,
-        },
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.research_export import (  # noqa: E501
+        feature_rows,
     )
+
+    rows = feature_rows(gateway, market_id=market_id, symbol=symbol, start=start, end=end)
     if len(rows) != expected_rows:
         raise RawFeatureDatasetError(
             reason="candle_row_count_mismatch",

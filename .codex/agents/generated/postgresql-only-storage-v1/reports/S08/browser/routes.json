@@ -1,0 +1,56 @@
+{
+  "acceptedSurface": "apps/platform-web",
+  "routes": [
+    "/dashboard",
+    "/backtests",
+    "/strategies",
+    "/settings",
+    "/logout"
+  ],
+  "dataNavigation": "disabled",
+  "settings": {
+    "url": "/settings",
+    "surface": "apps/web integration template",
+    "scriptStatus": 404,
+    "marketOptions": 0
+  },
+  "monitoring": {
+    "url": "/monitoring",
+    "surface": "apps/web integration template",
+    "summaryStatus": 200
+  },
+  "noHistoryApi": {
+    "status": 200,
+    "state": "unavailable"
+  },
+  "noHistoryUI": {
+    "validationError": true,
+    "submitDisabled": true
+  },
+  "responses": [
+    {
+      "path": "/assets/css/pages/market-data-settings.css",
+      "status": 404
+    },
+    {
+      "path": "/assets/js/pages/market-data-settings.js",
+      "status": 404
+    },
+    {
+      "path": "/api/ui/account/limits",
+      "status": 503
+    },
+    {
+      "path": "/api/ui/account/exchange-connections",
+      "status": 503
+    },
+    {
+      "path": "/api/ui/account/notifications/scoped",
+      "status": 503
+    }
+  ],
+  "errors": [],
+  "requiredHistoryProgressJourney": "separate existing Navigator consumer; see navigator.json",
+  "requiredEventJournalJourney": "separate existing Navigator consumer; see navigator.json",
+  "proofBoundary": "Accepted platform no-history and integration monitoring; legacy settings missing assets recorded separately; Navigator consumer proof separate"
+}

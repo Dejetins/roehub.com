@@ -125,10 +125,14 @@ class EnrichRefInstrumentsFromExchangeUseCase:
             metadata_by_symbol = {
                 str(item.instrument_id.symbol).upper(): item for item in metadata_rows
             }
-            existing_by_symbol = self.writer.existing_latest_enrichment(
-                market_id=MarketId(market_id_int),
-                symbols=[instrument.symbol for instrument in instrument_rows],
-            )
+            existing_by_symbol = {}
+            symbols = [instrument.symbol for instrument in instrument_rows]
+            for offset in range(0, len(symbols), 1000):
+                existing_by_symbol.update(
+                    self.writer.existing_latest_enrichment(
+                        market_id=MarketId(market_id_int), symbols=symbols[offset : offset + 1000]
+                    )
+                )
 
             for instrument in instrument_rows:
                 symbol_key = str(instrument.symbol).upper()
@@ -157,7 +161,8 @@ class EnrichRefInstrumentsFromExchangeUseCase:
                     )
                 )
 
-        self.writer.upsert_enrichment(payload)
+        for offset in range(0, len(payload), 1000):
+            self.writer.upsert_enrichment(payload[offset : offset + 1000])
         return EnrichRefInstrumentsReport(
             instruments_total=len(instruments),
             markets_total=len(by_market),

@@ -376,8 +376,11 @@ class StrategyDashboardQueryService:
         chart = _build_unavailable_chart(symbol=selected_symbol)
         if selected_strategy is not None and self._operation_reads is not None:
             operations, chart = self._operation_reads.read(
-                organization_id=organization_id, user_id=principal.user_id,
-                strategy=selected_strategy, run=selected_run, profile=live_profile,
+                organization_id=organization_id,
+                user_id=principal.user_id,
+                strategy=selected_strategy,
+                run=selected_run,
+                profile=live_profile,
             )
         return StrategyDashboardResponse(
             operations=operations,
@@ -429,9 +432,7 @@ class StrategyDashboardQueryService:
                 profile=live_profile,
                 run=selected_run,
                 execution_outcomes=execution_outcomes,
-                rl_live_ticker_entitlement_service=(
-                    self._rl_live_ticker_entitlement_service
-                ),
+                rl_live_ticker_entitlement_service=(self._rl_live_ticker_entitlement_service),
                 rl_risk_sizing_policy_service=self._rl_risk_sizing_policy_service,
             ),
             footer_status=StrategyDashboardFooterStatusResponse(
@@ -695,9 +696,7 @@ class StrategyDashboardQueryService:
             )
         if self._account_projection_service is None:
             return (
-                _build_empty_exchange_account_readiness(
-                    reason="account_projection_not_configured"
-                ),
+                _build_empty_exchange_account_readiness(reason="account_projection_not_configured"),
                 _source(
                     name=_EXCHANGE_ACCOUNT_SOURCE,
                     status="unavailable",
@@ -855,9 +854,7 @@ class StrategyDashboardQueryService:
                     generated_at=generated_at,
                     observed_at=report.checked_at,
                 ),
-                detail=(
-                    f"{report.compatibility_state}; market data {report.market_data_state}"
-                ),
+                detail=(f"{report.compatibility_state}; market data {report.market_data_state}"),
             ),
         )
 
@@ -1146,9 +1143,7 @@ def build_strategy_dashboard_service(
     *,
     environ: Mapping[str, str],
 ) -> StrategyDashboardQueryService:
-    organization_scope_resolver = build_required_organization_scope_resolver(
-        environ=environ
-    )
+    organization_scope_resolver = build_required_organization_scope_resolver(environ=environ)
     if not is_strategy_api_enabled(environ=environ):
         return StrategyDashboardQueryService(
             strategy_repository=None,
@@ -1477,9 +1472,7 @@ def _build_live_profile(
         readiness_reason=profile.readiness_reason,
         updated_at=profile.updated_at,
         degradation_reason=(
-            None
-            if profile.readiness_status == "ready"
-            else profile.readiness_reason
+            None if profile.readiness_status == "ready" else profile.readiness_reason
         ),
     )
 
@@ -1495,9 +1488,7 @@ def _build_runtime_status(
     environment = _runtime_environment(profile=profile)
     latest_signal_at = _latest_signal_at(signal_journal=signal_journal)
     latest_source_event_at = _latest_source_event_at(execution_outcomes=execution_outcomes)
-    latest_execution_update_at = _latest_execution_update_at(
-        execution_outcomes=execution_outcomes
-    )
+    latest_execution_update_at = _latest_execution_update_at(execution_outcomes=execution_outcomes)
     observed_gap = _runtime_observed_gap_seconds(
         latest_source_event_at=latest_source_event_at,
         latest_execution_update_at=latest_execution_update_at,
@@ -1520,9 +1511,7 @@ def _build_runtime_status(
             latest_source_event_at=latest_source_event_at,
             latest_execution_update_at=latest_execution_update_at,
             observed_latency_gap_seconds=observed_gap,
-            observed_latency_gap_status=(
-                "observed" if observed_gap is not None else "unavailable"
-            ),
+            observed_latency_gap_status=("observed" if observed_gap is not None else "unavailable"),
             degradation_reason="selected_strategy_not_found",
         )
 
@@ -1558,9 +1547,7 @@ def _build_runtime_status(
         run_started_at=run.started_at if run is not None else None,
         run_updated_at=run.updated_at if run is not None else None,
         checkpoint_ts_open=run.checkpoint_ts_open if run is not None else None,
-        warmup_progress=(
-            _format_warmup_progress(run.metadata_json) if run is not None else None
-        ),
+        warmup_progress=(_format_warmup_progress(run.metadata_json) if run is not None else None),
         latest_signal_at=latest_signal_at,
         latest_source_event_at=latest_source_event_at,
         latest_execution_update_at=latest_execution_update_at,
@@ -1582,9 +1569,7 @@ def _runtime_environment(
     return "unknown"
 
 
-def _build_empty_compatibility(
-    *, reason: str
-) -> StrategyDashboardCompatibilityReadinessResponse:
+def _build_empty_compatibility(*, reason: str) -> StrategyDashboardCompatibilityReadinessResponse:
     return StrategyDashboardCompatibilityReadinessResponse(
         source=_COMPATIBILITY_SOURCE,
         state="empty",
@@ -1692,9 +1677,7 @@ def _rl_risk_policy_key(
     )
 
 
-def _latest_signal_at(
-    *, signal_journal: StrategySignalJournalResponse
-) -> datetime | None:
+def _latest_signal_at(*, signal_journal: StrategySignalJournalResponse) -> datetime | None:
     timestamps = [
         item.created_at or item.bar_ts_close
         for item in signal_journal.items
@@ -1852,7 +1835,6 @@ def _build_rl_ticker_slots(
     return StrategyRlMlTickerSlotsResponse(
         source=_RL_TICKER_SLOTS_SOURCE,
         state=state,
-        paid_level=snapshot.paid_level,
         product_label=snapshot.product_label,
         entitlement_source=snapshot.entitlement_source,
         live_slots_allowed=snapshot.live_slots_allowed,
@@ -2415,19 +2397,17 @@ def _build_operation_reads(*, settings, environ):
     if not settings.postgres_dsn:
         return None
     from apps.api.wiring.modules.strategy_operation_reads import StrategyOperationReads
-    from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+    from apps.cli.wiring.db.postgres import market_gateway
     from trading.contexts.live_execution.adapters.outbound.persistence.postgres.strategy_operation_reader import (  # noqa: E501
         PostgresStrategyOperationReader,
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-        ThreadLocalClickHouseConnectGateway,
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+        PostgresCanonicalCandleReader,
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
-        ClickHouseCanonicalCandleReader,
-    )
-    config = ClickHouseSettingsLoader(environ).load(workload="interactive")
-    gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: _clickhouse_client(config))
+
+    config = market_gateway(environ, workload="interactive")
+    gateway = config
     return StrategyOperationReads(
         PostgresStrategyOperationReader(_build_live_execution_gateway(settings=settings)),
-        ClickHouseCanonicalCandleReader(gateway, database=config.database),
+        PostgresCanonicalCandleReader(gateway),
     )

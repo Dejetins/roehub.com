@@ -40,6 +40,7 @@ from trading.contexts.notifications.domain import (
     NotificationProviderInstance,
     NotificationRoute,
 )
+from trading.platform.postgres_budget import admin_connect as budget_connect
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _TELEGRAM_PACKAGE_ID = UUID("00000000-0000-4000-8000-000000000103")
@@ -83,8 +84,7 @@ class _ControlledUpdateSource:
         return tuple(
             update
             for update in self.updates
-            if isinstance(update.get("update_id"), int)
-            and int(update["update_id"]) >= offset
+            if isinstance(update.get("update_id"), int) and int(update["update_id"]) >= offset
         )
 
 
@@ -221,15 +221,9 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
             ),
         )
         batch = dispatcher.drain_once()
-        rate_state = _delivery_state(
-            dsn=postgres_dsn, delivery_id=rate_delivery.delivery_id
-        )
-        slow_state = _delivery_state(
-            dsn=postgres_dsn, delivery_id=slow_delivery.delivery_id
-        )
-        shutdown_state = _delivery_state(
-            dsn=postgres_dsn, delivery_id=expired_claim.delivery_id
-        )
+        rate_state = _delivery_state(dsn=postgres_dsn, delivery_id=rate_delivery.delivery_id)
+        slow_state = _delivery_state(dsn=postgres_dsn, delivery_id=slow_delivery.delivery_id)
+        shutdown_state = _delivery_state(dsn=postgres_dsn, delivery_id=expired_claim.delivery_id)
         if batch.retry != 1 or batch.unknown != 2:
             raise NotificationProviderRuntimeProofError("dispatcher state matrix is incomplete")
         if rate_state[0] != "retry" or rate_state[1] != now + timedelta(seconds=2):
@@ -267,9 +261,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
         except asyncio.CancelledError:
             pass
         else:
-            raise NotificationProviderRuntimeProofError(
-                "provider cancellation was not propagated"
-            )
+            raise NotificationProviderRuntimeProofError("provider cancellation was not propagated")
         if _delivery_state(
             dsn=postgres_dsn,
             delivery_id=cancelled_delivery.delivery_id,
@@ -317,9 +309,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
                 retry_jitter_ratio=0.2,
             ),
         ).drain_once()
-        jitter_state = _delivery_state(
-            dsn=postgres_dsn, delivery_id=jitter_delivery.delivery_id
-        )
+        jitter_state = _delivery_state(dsn=postgres_dsn, delivery_id=jitter_delivery.delivery_id)
         if jitter_state[0] != "retry" or jitter_state[1] is None:
             raise NotificationProviderRuntimeProofError("bounded backoff was not persisted")
         jitter_delay = (jitter_state[1] - (now + timedelta(seconds=1))).total_seconds()
@@ -343,9 +333,10 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
             providers=(providers[0],),
             clock=_Clock(now + timedelta(seconds=2)),
         ).drain_once()
-        if _delivery_state(
-            dsn=postgres_dsn, delivery_id=no_fallback_delivery.delivery_id
-        )[0] != "dead_letter":
+        if (
+            _delivery_state(dsn=postgres_dsn, delivery_id=no_fallback_delivery.delivery_id)[0]
+            != "dead_letter"
+        ):
             raise NotificationProviderRuntimeProofError("missing provider used a fallback")
 
         duplicate_update, durable_cursor = _verify_worker_updates(
@@ -360,9 +351,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
         )
 
         replay_delivery_id = uuid4()
-        replayed = NotificationDeliveryReplayService(
-            repository=notification_repository
-        ).replay(
+        replayed = NotificationDeliveryReplayService(repository=notification_repository).replay(
             command=ReplayNotificationDeliveryCommand(
                 organization_id=fixture.organizations[1],
                 original_delivery_id=slow_delivery.delivery_id,
@@ -440,9 +429,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
         thread.join(timeout=3)
 
 
-def _start_stub(
-    *, state: _StubState
-) -> tuple[ThreadingHTTPServer, threading.Thread, str]:
+def _start_stub(*, state: _StubState) -> tuple[ThreadingHTTPServer, threading.Thread, str]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             _ = format, args
@@ -514,7 +501,7 @@ def _seed_fixture(
 ) -> _Fixture:
     organization_values = (uuid4(), uuid4())
     user_values = (uuid4(), uuid4())
-    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT installation_id FROM identity_installations WHERE singleton_key = TRUE"
         )
@@ -556,9 +543,7 @@ def _seed_fixture(
             """,
             tuple(
                 (organization_id, user_id, now, now)
-                for organization_id, user_id in zip(
-                    organization_values, user_values, strict=True
-                )
+                for organization_id, user_id in zip(organization_values, user_values, strict=True)
             ),
         )
 
@@ -773,7 +758,7 @@ def _expect_cross_scope_provider_secret_ref_rejection(
 ) -> None:
     instance_id = uuid4()
     try:
-        with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+        with budget_connect(dsn) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO notification_provider_instances (
@@ -804,10 +789,8 @@ def _expect_cross_scope_provider_secret_ref_rejection(
     )
 
 
-def _delivery_state(
-    *, dsn: str, delivery_id: UUID
-) -> tuple[str, datetime | None, str | None]:
-    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+def _delivery_state(*, dsn: str, delivery_id: UUID) -> tuple[str, datetime | None, str | None]:
+    with budget_connect(dsn) as connection, connection.cursor() as cursor:
         cursor.execute(
             """
             SELECT status, next_attempt_at, last_error_code
@@ -897,9 +880,7 @@ def _verify_worker_updates(
     return "worker_recovered_idempotently", "advanced_by_worker"
 
 
-def _raw_command_update(
-    *, update_id: int, chat_id: int, text: str
-) -> Mapping[str, Any]:
+def _raw_command_update(*, update_id: int, chat_id: int, text: str) -> Mapping[str, Any]:
     return {
         "update_id": update_id,
         "message": {
@@ -916,7 +897,7 @@ def _assert_database_secret_boundary(
     raw_recipients: tuple[str, str],
     fixture: _Fixture,
 ) -> None:
-    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn) as connection, connection.cursor() as cursor:
         cursor.execute(
             """
             SELECT organization_id, provider_instance_id, chat_id_ref, recipient_secret_ref
@@ -937,7 +918,7 @@ def _assert_database_secret_boundary(
 
 
 def _command_registry_count(*, dsn: str, instance_ids: tuple[UUID, ...]) -> int:
-    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn) as connection, connection.cursor() as cursor:
         cursor.execute(
             """
             SELECT count(*)

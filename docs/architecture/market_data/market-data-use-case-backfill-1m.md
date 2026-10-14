@@ -1,14 +1,31 @@
 # Market Data — Use-Case: Backfill 1m Candles (Walking Skeleton v1)
 
+## Consumer wiring — S05, 2026-10-14
+
+Запись raw/canonical/coverage выполняется транзакционно в PostgreSQL. REST/Parquet batches ограничены 8192 строками, metadata/funding — 1000. Месячные партиции заранее создаёт maintenance; application DDL не разрешён.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Backfill пишет ограниченными batch в транзакционный PG adapter; cursor/completed обновляются после durable receipt. Повтор batch сходится к тем же canonical/masks/revision.
+
+
 Этот документ фиксирует первый application use-case bounded context `market_data` для walking skeleton v1.
 
 Цель:
 - выполнить ingestion/backfill канонических 1m свечей из источников `ws/rest/file`;
-- записать данные в ClickHouse через `raw_*` таблицы (через port `RawKlineWriter`);
+- записать данные в PostgreSQL через `raw_*` таблицы (через port `RawKlineWriter`);
 - обеспечить потоковую обработку и ограниченное потребление памяти (batching).
 
 Источник правды по хранению 1m свечей:
-- `market_data.canonical_candles_1m` (заполняется автоматически через MV из `raw_*`).
+- `market_data.canonical_candles_1m` (обновляется атомарно вместе с `raw_*`).
 
 
 ## Контекст и границы
@@ -23,7 +40,7 @@
 ### Что use-case НЕ делает (осознанно)
 - не читает `canonical_candles_1m` для проверки записи (read-back) — это отдельный сценарий/проверка качества;
 - не пытается определить “какие свечи уже есть” и пропускать их (skip-existing);
-- не занимается дедупликацией на уровне canonical (ReplacingMergeTree — eventual dedup);
+- не занимается дедупликацией на уровне canonical (version-aware PostgreSQL upsert);
 - не реализует стратегический “live tail” и дедуп “на лету” в памяти — это будет частью Strategy Feed / ACL.
 
 
@@ -43,7 +60,7 @@ Use-case зависит только от application ports:
 - `Clock`
   - `now() -> UtcTimestamp`
 
-ClickHouse, Materialized Views, биржи, протоколы и форматы данных — детали адаптеров и wiring.
+PostgreSQL, транзакционные writers, биржи, протоколы и форматы данных — детали адаптеров и wiring.
 
 
 ## DTO (application)
@@ -81,7 +98,7 @@ DTO в application-слое — не Pydantic, не зависит от transpor
 
 **Notes**
 - отчёт не гарантирует количество уникальных свечей в `canonical_candles_1m`:
-  canonical использует `ReplacingMergeTree(ingested_at)`, дедуп является eventual.
+  canonical использует unique key и version-aware upsert; дубликатов нет после COMMIT.
 
 
 ## Алгоритм (поведение use-case)
@@ -102,24 +119,17 @@ Batching — обязательная часть walking skeleton v1 для эк
 - use-case принимает параметр `batch_size: int` при создании (через wiring).
 - алгоритм: буферизуем до `batch_size` строк и делаем `write_1m(...)`, затем очищаем буфер.
 
-Рекомендованный размер батча для CLI в v1:
-- `batch_size = 10_000`
-
-Пояснение:
-- batching ограничивает память процесса;
-- batching снижает риск ошибок ClickHouse на больших диапазонах (например, лимиты по числу партиций в одном INSERT-блоке);
-- throughput остаётся стабильным (несколько крупных вставок вместо одной гигантской).
-
-Примечание:
-- в v1 use-case допускает передачу `batch_size=None` (если wiring так решит),
-  но CLI по умолчанию использует batching (см. CLI-док).
+Текущий use-case ограничивает batch до 8 192 rows и разделяет его до достижения
+8 MiB accounted bytes. Размер должен быть положительным; gateway отвергает
+oversized direct writer batch. Ограничение применяется независимо от месячных
+partitions. CLI legacy `None` нормализуется wiring в bounded default.
 
 ### 4) Повторные прогоны (идемпотентность на уровне сценария)
 Use-case допускает повторный запуск на том же диапазоне:
 - он не вычисляет “что уже есть”;
 - он повторно пишет то, что выдаёт источник.
 
-Дубликаты возможны на raw/canonical уровне до merge, но downstream чтение и пайплайны не должны “ломаться”.
+Raw хранит наблюдения повторов; canonical PK и version-aware upsert не допускают дубликатов после COMMIT.
 Оптимизация “skip-existing” — отдельный следующий use-case/улучшение.
 
 ### 5) Ошибки

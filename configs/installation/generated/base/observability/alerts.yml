@@ -22,17 +22,6 @@ groups:
     labels:
       runbook_id: runtime.observability-unavailable
       severity: critical
-  - alert: RoehubOperationalLogPushFailed
-    annotations:
-      action_ref: diagnostics
-      description: The bounded transition sink is unavailable; do not treat missing logs as healthy state.
-      runbook: /runbooks/runtime.observability-unavailable
-      summary: Roehub operational transitions are not reaching Loki
-    expr: roehub_operational_log_push_success == 0
-    for: 0s
-    labels:
-      runbook_id: runtime.observability-unavailable
-      severity: warning
   - alert: RoehubOperationalSnapshotStale
     annotations:
       action_ref: diagnostics

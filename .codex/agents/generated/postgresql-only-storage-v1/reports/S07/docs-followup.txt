@@ -1,0 +1,37 @@
+docs/architecture/market_data/market-data-reference-data-sync-v2.md:48:Таблица `ref_market` использует `ReplacingMergeTree(updated_at)`.
+docs/architecture/market_data/market-data-reference-data-sync-v2.md:71:Таблица `ref_instruments` использует `ReplacingMergeTree(updated_at)` с ключом `(market_id, symbol)`.
+docs/architecture/market_data/market-data-reference-data-sync-v2.md:78:  (берём “последнюю” версию по `updated_at`, без FINAL);
+docs/architecture/market_data/market-data-reference-data-sync-v2.md:112:Команда на запись “новой версии” строки `ref_instruments` (ReplacingMergeTree).
+docs/architecture/market_data/market-data-reference-api-v1.md:40:- Keep responses deterministic (stable ordering) and storage reads explicit (no ORM, no hidden FINAL).
+docs/architecture/market_data/market-data-reference-api-v1.md:48:    - `market_data.ref_market` (ReplacingMergeTree(updated_at), key `market_id`)
+docs/architecture/market_data/market-data-reference-api-v1.md:49:    - `market_data.ref_instruments` (ReplacingMergeTree(updated_at), key `(market_id, symbol)`)
+docs/architecture/market_data/market-data-reference-api-v1.md:81:- implement latest-state reads without `FINAL` via:
+docs/architecture/market_data/market-data-reference-api-v1.md:324:### 3) Latest-state reads without PostgreSQL `FINAL`
+docs/architecture/market_data/market-data-reference-api-v1.md:331:- avoids expensive `FINAL` on ReplacingMergeTree.
+docs/architecture/market_data/market-data-application-ports.md:57:Таблица `canonical_candles_1m` использует `ReplacingMergeTree(ingested_at)`, что означает eventual dedup
+docs/architecture/market_data/market-data-application-ports.md:65:Текущая реализация использует один `SELECT ... FINAL` по всему диапазону. Это дороже, чем selective tail dedup,
+docs/architecture/market_data/market-data-application-ports.md:160:- конкретная техника дедупа (`FINAL` или эквивалент) скрыта внутри адаптера
+docs/architecture/market_data/market-data-live-tail-repair-v1.md:61:| Текущий repair | `_repair_gap` в `StrategyLiveRunner` читает только `market_data.canonical_candles_1m FINAL` через PostgreSQL. |
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:69:- Mac Studio may not have `rg` or `clickhouse` CLI. Runtime probes should use
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:247:ENGINE = ReplacingMergeTree(updated_at)
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:267:ENGINE = ReplacingMergeTree(ingested_at)
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:290:ENGINE = ReplacingMergeTree(ingested_at)
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:310:ENGINE = ReplacingMergeTree(ingested_at)
+docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md:477:| Funding use case | PostgreSQL raw/canonical funding store | PostgreSQL env config; do not print secrets | Bounded insert batches; retry only through idempotent rerun path, not blind infinite loops. | `ReplacingMergeTree(ingested_at)` plus stable `(market_id, symbol, funding_time)` ordering makes window replays safe. | Store errors mark instrument failed for this cycle and raise scheduler job error if systemic. |
+docs/architecture/strategy/strategy-runtime-config-v1.md:69:  - секреты через env: `STRATEGY_PG_DSN`, `TELEGRAM_BOT_TOKEN`, `ROEHUB_REDIS_PASSWORD`, `CH_HOST/CH_PORT/...`.
+docs/architecture/strategy/strategy-runtime-config-v1.md:172:- PostgreSQL: `CH_HOST/CH_PORT/CH_USER/CH_PASSWORD/CH_DATABASE/CH_SECURE/CH_VERIFY` (см. `apps/cli/wiring/db/postgres.py`)
+docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md:420:- Дубликаты в raw допустимы; canonical dedup — ReplacingMergeTree(ingested_at).
+docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md:422:- Для worker/scheduler runtime используется thread-local PostgreSQL gateway (один CH client на поток), чтобы при `rest_concurrency_instruments > 1` не ловить session-конфликт `Attempt to execute concurrent queries within the same session`.
+docs/architecture/market_data/market-data-use-case-backfill-1m.md:47:- не занимается дедупликацией на уровне canonical (ReplacingMergeTree — eventual dedup);
+docs/architecture/market_data/market-data-use-case-backfill-1m.md:105:  canonical использует `ReplacingMergeTree(ingested_at)`, дедуп является eventual.
+docs/architecture/market_data/market-data-runtime-config-invariants-v2.md:76:PostgreSQL raw таблицы партиционированы по дню (`toYYYYMMDD` по времени открытия свечи).
+docs/architecture/market_data/market-data-runtime-config-invariants-v2.md:204:- один чанк не пересекает >7 партиций `toYYYYMMDD(ts_open)`.
+docs/architecture/market_data/market-data-runtime-config-invariants-v2.md:212:- Для конкурентных `asyncio.to_thread(...)` путей worker/scheduler используют thread-local CH gateway
+docs/architecture/market_data/market-data-rest-historical-catchup-1m-v2.md:151:- `last_ts_open`/`first_ts_open` относятся к canonical (источник правды), без FINAL;
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:6:target in [the earlier adapter document](market-data-real-adapters-clickhouse-parquet.md).
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:131:Do not mechanically translate FINAL, argMax, bitmap states or MergeTree syntax.
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:162:clickhouse workload profile, executable migration, SQL adapter, fallback query or runnable
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:173:| repair source enum, circuit/timeout names, metrics/UI/errors | clickhouse → canonical_store or postgresql as appropriate | `breaking-change`; all producers/validators/UI/alerts together; migrate affected persisted source values with append-only migration |
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:260:`argMax(nullable_field, updated_at)` expressions may keep an older non-null value
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:368:| Backup owner set | Eight owners including clickhouse -> seven, removing only clickhouse | Preserve release_config, postgresql, redis_checkpoint, openbao, artifacts, plugin_operation_audit, observability; existing unrelated retirement work is not authority to drop another owner here |
+docs/architecture/market_data/market-data-real-adapters-postgresql-parquet-v1.md:370:| Repair source | `clickhouse` -> `canonical_store`; timeout/circuit/metrics use canonical_store | S05 strict DTO, policy/config, stored repair attempts, events, UI/alerts in same rollout; additive data migration for stored enum, not deletion of user/audit history |

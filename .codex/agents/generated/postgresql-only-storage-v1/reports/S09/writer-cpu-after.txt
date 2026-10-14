@@ -1,0 +1,53 @@
+         1184844 function calls (1183188 primitive calls) in 0.268 seconds
+
+   Ordered by: internal time
+   List reduced from 444 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     3000    0.043    0.000    0.092    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:36(payload_order)
+      158    0.041    0.000    0.046    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/connection.py:401(wait)
+    96000    0.019    0.000    0.041    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:26(normalized)
+    54000    0.018    0.000    0.026    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:70(<genexpr>)
+     6000    0.018    0.000    0.021    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_copy_base.py:230(write_row)
+   304637    0.017    0.000    0.017    0.000 {built-in method builtins.isinstance}
+        2    0.013    0.006    0.013    0.006 {method 'poll' of 'select.poll' objects}
+        3    0.008    0.003    0.071    0.024 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:62(bounded)
+    90000    0.008    0.000    0.008    0.000 {method 'extend' of 'bytearray' objects}
+    24000    0.007    0.000    0.007    0.000 {method 'replace' of 'datetime.datetime' objects}
+        6    0.007    0.001    0.044    0.007 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:77(stage)
+    81000    0.007    0.000    0.007    0.000 {built-in method _struct.pack}
+    24000    0.006    0.000    0.016    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:17(utc_ms)
+   111000    0.006    0.000    0.006    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:90(<genexpr>)
+   105413    0.005    0.000    0.005    0.000 {built-in method builtins.len}
+    67046    0.005    0.000    0.005    0.000 {method 'encode' of 'str' objects}
+     3000    0.005    0.000    0.011    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py:139(_canonical)
+    72000    0.004    0.000    0.004    0.000 {built-in method math.isnan}
+    48000    0.004    0.000    0.004    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py:44(<genexpr>)
+     3000    0.003    0.000    0.029    0.000 {built-in method builtins.sum}
+    24000    0.002    0.000    0.002    0.000 {method 'astimezone' of 'datetime.datetime' objects}
+        3    0.002    0.001    0.175    0.058 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py:24(_write)
+     3000    0.002    0.000    0.002    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py:166(_raw)
+     3000    0.001    0.000    0.001    0.000 /usr/local/lib/python3.12/uuid.py:280(__str__)
+     6000    0.001    0.000    0.002    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/types/uuid.py:26(dump)
+        2    0.001    0.001    0.001    0.001 {built-in method posix.fsync}
+        3    0.001    0.000    0.001    0.000 {built-in method select.select}
+       75    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/generators.py:351(copy_to)
+       70    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_cursor_base.py:406(_execute_send)
+     6000    0.001    0.000    0.023    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_copy.py:132(write_row)
+     6001    0.001    0.000    0.001    0.000 /usr/local/lib/python3.12/uuid.py:334(hex)
+     6015    0.001    0.000    0.001    0.000 {method 'items' of 'dict' objects}
+     3003    0.001    0.000    0.001    0.000 {method 'update' of 'dict' objects}
+      128    0.000    0.000    0.002    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_cursor_base.py:265(_maybe_prepare_gen)
+     4040    0.000    0.000    0.000    0.000 {method 'append' of 'list' objects}
+     6010    0.000    0.000    0.000    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/adapt.py:97(get_key)
+      480    0.000    0.000    0.000    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:375(as_bytes)
+     3000    0.000    0.000    0.000    0.000 {method 'values' of 'dict' objects}
+       76    0.000    0.000    0.000    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_cursor_base.py:491(_select_current_result)
+        3    0.000    0.000    0.002    0.001 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py:157(lock_generations)
+     3003    0.000    0.000    0.000    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py:25(<genexpr>)
+       70    0.000    0.000    0.000    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_queries.py:98(dump)
+    75/25    0.000    0.000    0.181    0.007 {method 'acquire' of '_thread.lock' objects}
+     3000    0.000    0.000    0.000    0.000 /workspace/src/trading/shared_kernel/primitives/symbol.py:27(__str__)
+        5    0.000    0.000    0.000    0.000 {built-in method _thread.start_new_thread}
+
+

@@ -1,0 +1,201 @@
+[
+  {
+    "source": "migrations/clickhouse/funding_rates_ddl.sql",
+    "table": "market_data.funding_instrument_universe",
+    "fields": [
+      "market_id UInt16",
+      "symbol LowCardinality(String)",
+      "instrument_key String",
+      "exchange LowCardinality(String)",
+      "market_type LowCardinality(String)",
+      "status LowCardinality(String)",
+      "is_tradable UInt8",
+      "base_asset LowCardinality(Nullable(String))",
+      "quote_asset LowCardinality(Nullable(String))",
+      "funding_interval_minutes Nullable(UInt16)",
+      "funding_interval_source LowCardinality(Nullable(String))",
+      "funding_cap Nullable(Float64)",
+      "funding_floor Nullable(Float64)",
+      "updated_at DateTime64(3, 'UTC') DEFAULT now64(3)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/funding_rates_ddl.sql",
+    "table": "market_data.raw_binance_funding_rates",
+    "fields": [
+      "market_id UInt16",
+      "symbol LowCardinality(String)",
+      "instrument_key String",
+      "funding_time DateTime64(3, 'UTC')",
+      "funding_rate Float64",
+      "funding_interval_minutes UInt16",
+      "funding_interval_source LowCardinality(String)",
+      "mark_price Nullable(Float64)",
+      "source LowCardinality(String) DEFAULT 'rest'",
+      "ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)",
+      "ingest_id Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/funding_rates_ddl.sql",
+    "table": "market_data.raw_bybit_funding_rates",
+    "fields": [
+      "market_id UInt16",
+      "symbol LowCardinality(String)",
+      "instrument_key String",
+      "category LowCardinality(String)",
+      "funding_time DateTime64(3, 'UTC')",
+      "funding_rate Float64",
+      "funding_interval_minutes UInt16",
+      "funding_interval_source LowCardinality(String)",
+      "source LowCardinality(String) DEFAULT 'rest'",
+      "ingested_at DateTime64(3, 'UTC') DEFAULT now64(3)",
+      "ingest_id Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/funding_rates_ddl.sql",
+    "table": "market_data.canonical_funding_rates",
+    "fields": [
+      "market_id UInt16",
+      "symbol LowCardinality(String)",
+      "instrument_key String",
+      "funding_time DateTime64(3, 'UTC')",
+      "funding_rate Float64",
+      "funding_interval_minutes UInt16",
+      "funding_interval_source LowCardinality(String)",
+      "source LowCardinality(String)",
+      "ingested_at DateTime64(3, 'UTC')",
+      "ingest_id Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/history_source_absences_ddl.sql",
+    "table": "market_data.source_absent_candles_1m",
+    "fields": [
+      "market_id UInt16",
+      "symbol LowCardinality(String)",
+      "minute_key UInt32",
+      "observed_at DateTime64(3, 'UTC')"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.ref_market",
+    "fields": [
+      "market_id      UInt16",
+      "exchange_name  LowCardinality(String)",
+      "market_type    LowCardinality(String)",
+      "market_code    LowCardinality(String)",
+      "is_enabled     UInt8 DEFAULT 1",
+      "count_symbols  UInt32 DEFAULT 0",
+      "updated_at     DateTime64(3, 'UTC') DEFAULT now64(3)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.ref_instruments",
+    "fields": [
+      "market_id     UInt16",
+      "symbol        LowCardinality(String)",
+      "status        LowCardinality(String) DEFAULT 'UNKNOWN'",
+      "is_tradable   UInt8 DEFAULT 1",
+      "base_asset    LowCardinality(Nullable(String))",
+      "quote_asset   LowCardinality(Nullable(String))",
+      "price_step    Nullable(Float64)",
+      "qty_step      Nullable(Float64)",
+      "min_notional  Nullable(Float64)",
+      "updated_at    DateTime64(3, 'UTC') DEFAULT now64(3)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.raw_binance_klines_1m",
+    "fields": [
+      "market_id      UInt16",
+      "symbol         LowCardinality(String)",
+      "instrument_key String",
+      "open_time      DateTime64(3, 'UTC')",
+      "open           Float64",
+      "high           Float64",
+      "low            Float64",
+      "close          Float64",
+      "volume         Float64",
+      "close_time     DateTime64(3, 'UTC')",
+      "quote_asset_volume            Float64",
+      "number_of_trades              UInt32",
+      "taker_buy_base_asset_volume   Float64",
+      "taker_buy_quote_asset_volume  Float64",
+      "source         LowCardinality(String) DEFAULT 'unknown'",
+      "ingested_at    DateTime64(3, 'UTC') DEFAULT now64(3)",
+      "ingest_id      Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.raw_bybit_klines_1m",
+    "fields": [
+      "market_id      UInt16",
+      "symbol         LowCardinality(String)",
+      "instrument_key String",
+      "interval_min   UInt16",
+      "start_time_ms  UInt64",
+      "start_time_utc DateTime64(3, 'UTC')",
+      "open           Float64",
+      "high           Float64",
+      "low            Float64",
+      "close          Float64",
+      "volume         Float64",
+      "turnover       Float64",
+      "source         LowCardinality(String) DEFAULT 'unknown'",
+      "ingested_at    DateTime64(3, 'UTC') DEFAULT now64(3)",
+      "ingest_id      Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.canonical_candles_1m",
+    "fields": [
+      "market_id      UInt16",
+      "symbol         LowCardinality(String)",
+      "instrument_key String",
+      "ts_open        DateTime64(3, 'UTC')",
+      "ts_close       DateTime64(3, 'UTC')",
+      "open           Float64",
+      "high           Float64",
+      "low            Float64",
+      "close          Float64",
+      "volume_base    Float64",
+      "volume_quote   Nullable(Float64)",
+      "trades_count            Nullable(UInt32)",
+      "taker_buy_volume_base   Nullable(Float64)",
+      "taker_buy_volume_quote  Nullable(Float64)",
+      "source         LowCardinality(String)",
+      "ingested_at    DateTime64(3, 'UTC')",
+      "ingest_id      Nullable(UUID)"
+    ],
+    "owner": "S02/S03/S04"
+  },
+  {
+    "source": "migrations/clickhouse/market_data_ddl.sql",
+    "table": "market_data.canonical_candles_1m_stats",
+    "fields": [
+      "market_id            UInt16",
+      "symbol               LowCardinality(String)",
+      "rows_state           AggregateFunction(sum, UInt64)",
+      "first_ts_state       AggregateFunction(min, DateTime64(3, 'UTC'))",
+      "last_ts_state        AggregateFunction(max, DateTime64(3, 'UTC'))",
+      "minute_bitmap_state  AggregateFunction(groupBitmap, UInt32)"
+    ],
+    "owner": "S02/S03/S04"
+  }
+]

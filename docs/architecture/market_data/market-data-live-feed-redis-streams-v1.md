@@ -1,12 +1,29 @@
 # Market Data — Live Feed to Strategies via Redis Streams (v1)
 
+## Consumer wiring — S05, 2026-10-14
+
+Активная цепочка repair: Redis hot cache → canonical PostgreSQL → REST. Source enum, circuit hooks и метрика используют `canonical_store` (`market_data_canonical_store_repair_circuit_state`). Миграция 0039 сохраняет audit IDs/timestamps и заменяет прежние source/error labels; ACK ordering и provider admission сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 ## Purpose
 This document defines EPIC 4 live feed delivery for Market Data v2:
 - source events: only WebSocket **closed 1m** candles from `market-data-ws-worker`;
 - transport: Redis Streams;
-- semantics: **best-effort** publishing (Redis failures must not break raw ingestion into ClickHouse and must not stop worker runtime).
+- semantics: **best-effort** publishing (Redis failures must not break raw ingestion into PostgreSQL and must not stop worker runtime).
 
-ClickHouse remains the historical source of truth (`canonical_candles_1m`).
+PostgreSQL remains the historical source of truth (`canonical_candles_1m`).
 Redis Streams is an online fan-out channel for strategies.
 
 ## Redis Streams vs Hot Cache
@@ -33,7 +50,7 @@ Consumer group state is not used as a range-store. A strategy gap repair path mu
 | WS worker -> Redis Streams | Best-effort `XADD` в `md.candles.1m.<instrument_key>`; failure метрикуется и не должен останавливать raw ingestion. |
 | WS worker -> Redis hot cache | Best-effort hash/zset write в `md:hot:1m:<instrument_key>:h` и `md:hot:1m:<instrument_key>:z`; failure метрикуется и не должен останавливать raw ingestion. |
 | Strategy -> Redis hot cache | `N/A` в этом документе; Strategy должна использовать будущую цепочку `ClosedCandleTailProvider`, а не прямой Redis access. |
-| Exchange REST / ClickHouse repair | `N/A`; документ описывает только Redis live-feed surfaces. |
+| Exchange REST / PostgreSQL repair | `N/A`; документ описывает только Redis live-feed surfaces. |
 | Timeout / auth source | Redis socket/connect timeout и имя optional auth env var берутся из `market_data.live_feed.redis_streams`; значения секретов не документируются. |
 
 ## Logging / Redaction Coverage
@@ -65,7 +82,7 @@ Pattern:
 Example:
 - `md.candles.1m.binance:spot:BTCUSDT`
 
-`instrument_key` must match canonical key used in ingestion metadata and ClickHouse canonical tables.
+`instrument_key` must match canonical key used in ingestion metadata and PostgreSQL canonical tables.
 
 ## Message ID and Ordering
 Publisher uses deterministic stream IDs derived from candle open time:
@@ -149,7 +166,7 @@ The hot cache reuses the same Redis connection settings as `redis_streams` in v1
 On Redis failure (connection timeout/unreachable/other):
 - worker logs error;
 - increments `redis_publish_errors_total`;
-- continues normal WS ingestion (`insert_buffer -> raw ClickHouse`) without restart.
+- continues normal WS ingestion (`insert_buffer -> raw PostgreSQL`) without restart.
 
 On duplicate/out-of-order XADD ID:
 - increments `redis_publish_duplicates_total`;
@@ -171,7 +188,7 @@ On duplicate/out-of-order XADD ID:
 
 Benchmark evidence: `N/A` for this document. These metrics define observability fields and do not claim a baseline, candidate measurement, latency target, or throughput improvement.
 
-Hot-cache write failures are best-effort: they must be logged and counted, but must not stop WS ingestion into the raw/canonical pipeline. Range-read errors are surfaced to the later repair provider chain so it can continue to ClickHouse/REST according to policy.
+Hot-cache write failures are best-effort: they must be logged and counted, but must not stop WS ingestion into the raw/canonical pipeline. Range-read errors are surfaced to the later repair provider chain so it can continue to PostgreSQL/REST according to policy.
 
 ## Consumer Group Conventions
 Recommended names:

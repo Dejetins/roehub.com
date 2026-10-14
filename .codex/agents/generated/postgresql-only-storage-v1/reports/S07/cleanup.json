@@ -1,0 +1,6 @@
+{
+  "removed_owned_container": "roehub-s07-pg-proof",
+  "ownership_label": "roehub.s07=disposable",
+  "exit": 0,
+  "scope": "Only named disposable S07 proof container and its current anonymous volumes. No installation/foreign container/volume cleanup. Prior disposed proof anonymous volume may remain; no broad prune."
+}

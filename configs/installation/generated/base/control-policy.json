@@ -4,14 +4,11 @@
     "api",
     "blackbox",
     "domain-cli",
-    "grafana",
     "job-runtime",
-    "loki",
     "notification-dispatcher",
     "notification-report-scheduler",
     "openbao",
     "operational-health",
-    "plugin-gateway",
     "postgresql",
     "prometheus",
     "redis",
@@ -24,13 +21,10 @@
     "alertmanager",
     "api",
     "blackbox",
-    "grafana",
-    "loki",
     "notification-dispatcher",
     "notification-report-scheduler",
     "openbao",
     "operational-health",
-    "plugin-gateway",
     "postgresql",
     "prometheus",
     "redis",
@@ -59,7 +53,6 @@
     "api": {
       "command_sha256": "e6c06d82f5458d4fb194997aa09a3e3ee01d24a6acfcb514bc9b849d7c3156be",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -84,10 +77,8 @@
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
         "ROEHUB_OPERATIONAL_HEALTH_URL",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -101,11 +92,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
-        "./service-configs/plugin-publisher-keys.json:/etc/roehub/plugin-publisher-keys.json:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
         "./service-configs/strategy.yaml:/etc/roehub/strategy.yaml:ro",
         "artifacts:/var/lib/roehub/artifacts"
       ],
@@ -133,7 +125,6 @@
     "domain-cli": {
       "command_sha256": "7c07e785bde65c988be6078a7a3408f7d8c8db8be7c0c9b340e5f76249d66206",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -156,10 +147,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -173,10 +162,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
-        "runtime-secrets:/run/roehub-secrets:ro"
+        "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "resources": {
@@ -185,37 +176,9 @@
       },
       "restart_allowed": false
     },
-    "grafana": {
-      "command_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "environment_names": [
-        "GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES",
-        "GF_ANALYTICS_CHECK_FOR_UPDATES",
-        "GF_ANALYTICS_REPORTING_ENABLED",
-        "GF_AUTH_ANONYMOUS_ENABLED",
-        "GF_PLUGINS_PREINSTALL_DISABLED",
-        "GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED",
-        "GF_SECURITY_ADMIN_PASSWORD__FILE",
-        "GF_USERS_ALLOW_SIGN_UP"
-      ],
-      "image": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
-      "mounts": [
-        "./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/roehub.yml:ro",
-        "./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/roehub.yml:ro",
-        "./observability/grafana-dashboard.json:/var/lib/grafana/dashboards/roehub/operational.json:ro",
-        "grafana-data:/var/lib/grafana",
-        "grafana-secrets:/run/grafana-secrets:ro"
-      ],
-      "release_reference": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
-      "resources": {
-        "cpus": "0.5",
-        "memory": "512M"
-      },
-      "restart_allowed": false
-    },
     "job-runtime": {
       "command_sha256": "9f4a0d141d53bd04b7f31a654625c8d9262c47a266782290c61f6b130b833c6b",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -238,10 +201,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -255,10 +216,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
         "artifacts:/var/lib/roehub/artifacts"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
@@ -268,25 +231,9 @@
       },
       "restart_allowed": false
     },
-    "loki": {
-      "command_sha256": "b45b2fe24a3f3a2dbd30a6c13ce3ac78930eba2f8e8f395e8fdd6c855c12c5c0",
-      "environment_names": [],
-      "image": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
-      "mounts": [
-        "./observability/loki.yml:/etc/loki/local-config.yaml:ro",
-        "loki-data:/loki"
-      ],
-      "release_reference": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
-      "resources": {
-        "cpus": "0.5",
-        "memory": "512M"
-      },
-      "restart_allowed": false
-    },
     "notification-dispatcher": {
       "command_sha256": "002318a20eba705992943b2ae66ccd56bfb2943cf20c60812910f03c2aa8abf2",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -309,10 +256,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -326,10 +271,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
         "./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
@@ -342,7 +289,6 @@
     "notification-report-scheduler": {
       "command_sha256": "74214786e005fe498cd9c1d53a9a87afc0a96ca919be371aa5bb7f11837590ec",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -365,10 +311,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -382,10 +326,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
         "./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
@@ -412,14 +358,23 @@
       "restart_allowed": false
     },
     "operational-health": {
-      "command_sha256": "d99734ffdad201ba91d1942add78494991ffb16867835172d34628054846fa90",
+      "command_sha256": "d3f501e672fdbeeb53e727bd639ea296aaecea43234fb311bc556082b58462ce",
       "environment_names": [
+        "PGPASSFILE",
         "PYTHONUNBUFFERED",
         "ROEHUB_ENV",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
+        "ROEHUB_PG_MAINTENANCE_DSN",
+        "ROEHUB_PG_MONITOR_DSN",
         "ROEHUB_PROFILE"
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
+        "pg-trust:/run/roehub-pg-trust:ro",
+        "pg-monitor-secrets:/run/roehub-pg-monitor:ro",
+        "pg-maintenance-secrets:/run/roehub-pg-maintenance:ro",
         "./observability/operational-manifest.json:/etc/roehub/operational-manifest.json:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
@@ -429,63 +384,8 @@
       },
       "restart_allowed": false
     },
-    "plugin-gateway": {
-      "command_sha256": "fdeed4fdc1d650c8f781bb20d4a299ae9646a74680748c135ef1cb2549c07fac",
-      "environment_names": [
-        "EXTENSIONS_PG_DSN",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
-        "IDENTITY_FAIL_FAST",
-        "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
-        "IDENTITY_LOCAL_ORIGIN",
-        "IDENTITY_LOCAL_RP_ID",
-        "IDENTITY_LOCAL_RP_NAME",
-        "IDENTITY_PG_DSN",
-        "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS",
-        "IDENTITY_SESSION_IDLE_TTL_SECONDS",
-        "NOTIFICATIONS_PG_DSN",
-        "NUMBA_CACHE_DIR",
-        "PGPASSFILE",
-        "POSTGRES_DSN",
-        "PYTHONUNBUFFERED",
-        "ROEHUB_ENV",
-        "ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED",
-        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE",
-        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL",
-        "ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED",
-        "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
-        "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
-        "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
-        "ROEHUB_PROFILE",
-        "ROEHUB_REDIS_HOST",
-        "ROEHUB_REDIS_PASSWORD_FILE",
-        "ROEHUB_REDIS_PORT",
-        "ROEHUB_STORAGE_POSTGRES_DSN",
-        "ROEHUB_STORAGE_REDIS_URL",
-        "ROEHUB_STRATEGY_CONFIG",
-        "STRATEGY_PG_DSN",
-        "WEB_API_BASE_URL",
-        "WEB_API_UPSTREAM_URL"
-      ],
-      "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
-      "mounts": [
-        "./service-config.json:/etc/roehub/service-config.json:ro",
-        "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
-        "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
-        "runtime-secrets:/run/roehub-secrets:ro"
-      ],
-      "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
-      "resources": {
-        "cpus": "0.5",
-        "memory": "384M"
-      },
-      "restart_allowed": true
-    },
     "postgresql": {
-      "command_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "command_sha256": "1d3f38b676842fcc64e9d00276cb60444e2bc2af1707f528516829d1fb0df0fb",
       "environment_names": [
         "POSTGRES_DB",
         "POSTGRES_PASSWORD_FILE",
@@ -494,6 +394,10 @@
       "image": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
       "mounts": [
         "postgres-data:/var/lib/postgresql/data",
+        "pg-admin-secrets:/run/roehub-pg-admin:ro",
+        "pg-monitor-secrets:/run/roehub-pg-monitor:ro",
+        "pg-maintenance-secrets:/run/roehub-pg-maintenance:ro",
+        "pg-init:/docker-entrypoint-initdb.d:ro",
         "runtime-secrets:/run/roehub-secrets:ro"
       ],
       "release_reference": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
@@ -535,12 +439,17 @@
       "restart_allowed": false
     },
     "secret-init": {
-      "command_sha256": "fa0b9fa166655e268630c9f856c21947049908716f44f2aec3cde8eb44ae99da",
+      "command_sha256": "e6ff7879ae49cdf50956bfc09c451ae546f4894d5ab35485063c8766064ec525",
       "environment_names": [],
       "image": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
       "mounts": [
         "runtime-secrets:/run/roehub-secrets",
-        "grafana-secrets:/run/grafana-secrets"
+        "pg-admin-secrets:/run/roehub-pg-admin",
+        "pg-monitor-secrets:/run/roehub-pg-monitor",
+        "pg-maintenance-secrets:/run/roehub-pg-maintenance",
+        "pg-budget:/run/roehub-pg-budget",
+        "pg-init:/run/roehub-pg-init",
+        "../../../../infra/docker/postgres-init-roles.sh:/input/roles.sh:ro"
       ],
       "release_reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
       "resources": {
@@ -552,7 +461,6 @@
     "storage-migrations": {
       "command_sha256": "49ac2ca89d2beda3685ceb6ec52602677766300e25b87afba62c1604ae386257",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -575,10 +483,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -592,10 +498,13 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
-        "runtime-secrets:/run/roehub-secrets:ro"
+        "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
+        "pg-admin-secrets:/run/roehub-pg-admin:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "resources": {
@@ -607,7 +516,6 @@
     "telegram-bot-worker": {
       "command_sha256": "4f0bdba1c72e2b0d2b31cc1456eb0e93065cf1c90c266fa70b49b7abdef3b7b4",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -630,10 +538,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -647,10 +553,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro",
         "./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
@@ -663,7 +571,6 @@
     "web": {
       "command_sha256": "48b9c385e59dd10f73763fcb8a4f8701b3ff5bee28d00c5b0f07566ed1ad8f5a",
       "environment_names": [
-        "EXTENSIONS_PG_DSN",
         "IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE",
         "IDENTITY_FAIL_FAST",
         "IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST",
@@ -686,10 +593,8 @@
         "ROEHUB_EXCHANGE_EXECUTION_CONFIG",
         "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED",
         "ROEHUB_NUMBA_CACHE_DIR",
-        "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-        "ROEHUB_PLUGIN_GATEWAY_URL",
-        "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
-        "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
+        "ROEHUB_PG_BUDGET_REQUIRED",
+        "ROEHUB_PG_BUDGET_ROOT",
         "ROEHUB_PROFILE",
         "ROEHUB_REDIS_HOST",
         "ROEHUB_REDIS_PASSWORD_FILE",
@@ -703,10 +608,12 @@
       ],
       "image": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "mounts": [
+        "pg-budget:/run/roehub-pg-budget",
         "./service-config.json:/etc/roehub/service-config.json:ro",
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
-        "runtime-secrets:/run/roehub-secrets:ro"
+        "runtime-secrets:/run/roehub-secrets:ro",
+        "pg-trust:/run/roehub-pg-trust:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "resources": {

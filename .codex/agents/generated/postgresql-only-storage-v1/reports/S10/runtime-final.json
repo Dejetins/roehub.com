@@ -1,0 +1,299 @@
+[
+  {
+    "name": "/roehub-local-postgresql-1",
+    "id": "d2e961204d7f43dc0cb3a46105d675abc9b0973f31e39bef25b683db883f9ab2",
+    "image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 2000000000,
+    "memory_bytes": 4294967296,
+    "restart": {
+      "Name": "no",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/var/lib/postgresql/data",
+        "name": "roehub-navigator-pg",
+        "type": "volume"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {}
+    }
+  },
+  {
+    "name": "/roehub-control-control-agent-1",
+    "id": "bd069d3f4866c3454eec9c580d305baa06422a699b639eced88e3257dc036861",
+    "image": "sha256:b3f133e58e3f5ce16b41182fe0a87170131d4bb9a8f87fee5d4a2ea9cd9b352e",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 0,
+    "memory_bytes": 0,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      },
+      {
+        "destination": "/var/run/docker.sock",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/var/run/roehub",
+        "name": "roehub-local-control-socket",
+        "type": "volume"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/control-state",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "name": null,
+        "type": "bind"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-api-1",
+    "id": "8df8ecd44bb6ad428bbff6cac039f979e11486b317628e2bf4560957780c5e2d",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 1000000000,
+    "memory_bytes": 536870912,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/etc/roehub-api-identity",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      },
+      {
+        "destination": "/var/run/roehub",
+        "name": "roehub-local-control-socket",
+        "type": "volume"
+      },
+      {
+        "destination": "/var/lib/roehub/trades-cache",
+        "name": "roehub-local_trades-cache",
+        "type": "volume"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "name": null,
+        "type": "bind"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-web-1",
+    "id": "f2682eea527c2aa0cecfe0b7c78735e0bb75465f9529c3f91e998417ec7a8544",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 500000000,
+    "memory_bytes": 268435456,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-operational-health-1",
+    "id": "7d2fcdd1f462fbb64e1225aecebb9f9120503708c0a07b7a094b8ee28c8eb259",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 500000000,
+    "memory_bytes": 134217728,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-market-data-ws-1",
+    "id": "288240771a80d73c34cafa94ea11474aff2c38162bf7fa2f2d76cd3bcfeb605a",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 1000000000,
+    "memory_bytes": 1073741824,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "name": null,
+        "type": "bind"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-market-data-scheduler-1",
+    "id": "b9d0e529291392e06756a497b0fa95ea5e59332eef7db53f3528846c11e774c4",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 1000000000,
+    "memory_bytes": 402653184,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "name": null,
+        "type": "bind"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  },
+  {
+    "name": "/roehub-local-backtest-artifact-publisher-1",
+    "id": "50a2ec47ff75e02edb562d25d3bcaef02af9016a2b89d622bdddb6a9626a1eea",
+    "image": "sha256:fb6bed71b5b909c39a03f12d69ac0abbe3bcc18edcdceb78b79a1b4596962478",
+    "state": "running",
+    "health": "healthy",
+    "cpu_nanos": 1000000000,
+    "memory_bytes": 805306368,
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    },
+    "mounts": [
+      {
+        "destination": "/etc/roehub",
+        "name": null,
+        "type": "bind"
+      },
+      {
+        "destination": "/run/roehub-pg-budget",
+        "name": "roehub-local-pg-budget",
+        "type": "volume"
+      },
+      {
+        "destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "name": null,
+        "type": "bind"
+      }
+    ],
+    "log_config": {
+      "Type": "json-file",
+      "Config": {
+        "max-file": "3",
+        "max-size": "10m"
+      }
+    }
+  }
+]

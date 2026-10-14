@@ -328,24 +328,21 @@ def test_async_network_reply_blackhole_is_bounded(store):
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize('boundary', ['before_ch', 'after_ch', 'before_completion'])
-def test_async_real_ch_fault_restart_requires_actual_candle(store, boundary):
+@pytest.mark.parametrize('boundary', ['before_store', 'after_store', 'before_completion'])
+def test_async_real_pg_fault_restart_requires_actual_candle(store, boundary):
     import asyncio
 
-    import clickhouse_connect
-
-    from apps.migrations.storage import split_clickhouse_sql
     from apps.worker.market_data_ws.wiring.io_process import verify_received_range
-    from tools.qa.market_data_recovery_comparison import row
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-        ClickHouseCanonicalCandleIndexReader,
-        ClickHouseRawKlineWriter,
-    )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-        ClickHouseConnectGateway,
-    )
+    from tests.real_infra.market_data.pg_source_fixture import market_source
+    from tests.real_infra.market_data.test_postgres_readers_frontier import candle
     from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
         AsyncPostgresStreamRecoveryStore,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+        PostgresCanonicalCandleIndexReader,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
     )
     from trading.contexts.market_data.application.services.batched_recovery import (
         BatchedRecoveryAdmission,
@@ -356,22 +353,9 @@ def test_async_real_ch_fault_restart_requires_actual_candle(store, boundary):
     )
     from trading.platform.time.system_clock import SystemClock
 
-    password = os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PASSWORD')
-    if password is None:
-        pytest.skip('explicit disposable ClickHouse target required')
-    client = clickhouse_connect.get_client(host='127.0.0.1',
-        port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
-        username=os.environ['ROEHUB_MARKET_DATA_TEST_CH_USER'], password=password)
-    db = 's04_fault_' + uuid4().hex
-    client.command(f'CREATE DATABASE {db}')
-    try:
-        for statement in split_clickhouse_sql(Path(
-                'migrations/clickhouse/market_data_ddl.sql'
-        ).read_text().replace('market_data', db)):
-            client.command(statement)
-        gateway = ClickHouseConnectGateway(client)
-        writer = ClickHouseRawKlineWriter(gateway, db)
-        index = ClickHouseCanonicalCandleIndexReader(gateway, db)
+    with market_source(DSN) as gateway:
+        writer = PostgresRawKlineWriter(gateway)
+        index = PostgresCanonicalCandleIndexReader(gateway)
         async def scenario():
             class FailingCompletion(AsyncPostgresStreamRecoveryStore):
                 async def complete_many(self, entries):
@@ -381,36 +365,37 @@ def test_async_real_ch_fault_restart_requires_actual_candle(store, boundary):
             async with repo.lease():
                 admission = BatchedRecoveryAdmission(repo)
                 async def write(rows):
-                    if boundary != 'before_ch':
+                    if boundary != 'before_store':
                         await asyncio.to_thread(writer.write_1m, rows)
                     if boundary != 'before_completion':
-                        raise ConnectionError('injected CH boundary')
+                        raise ConnectionError('injected canonical commit boundary')
                 buffer = AsyncRawInsertBuffer(writer=writer, clock=SystemClock(),
                     flush_interval_ms=100, max_buffer_rows=2, async_store=repo,
                     admission=admission, async_writer=write, retry_base_s=10)
                 await buffer.start()
-                await buffer.submit_wait(row(0, 0))
+                await buffer.submit_wait(candle("S0000USDT", 0))
                 with pytest.raises(UnflushedBufferError):
                     await buffer.close()
                 await admission.close()
             pending = store.pending()
             assert len(pending) == 1
             # An empty source response/absence alone cannot satisfy received-candle repair.
-            if boundary == 'before_ch':
-                with pytest.raises(Exception, match='source_incomplete'):
+            if boundary == 'before_store':
+                with pytest.raises(Exception, match='source_incomplete|canonical_coverage_unknown'):
                     verify_received_range(pending[0].task, index)
-                writer.write_1m([row(0, 0)])
+                writer.write_1m([candle("S0000USDT", 0)])
             verify_received_range(pending[0].task, index)
             reopened = AsyncPostgresStreamRecoveryStore(store.dsn)
             async with reopened.lease():
                 assert await reopened.remember_many([pending[0].task]) == pending
                 await reopened.complete_many(pending)
                 assert not await reopened.pending()
-            assert client.command(f'SELECT count() FROM {db}.canonical_candles_1m') == 1
+            assert gateway.run(
+                lambda c: c.execute(
+                    "SELECT count(*) FROM market_data.canonical_candles_1m"
+                ).fetchone()
+            )[0] == 1
         asyncio.run(scenario())
-    finally:
-        client.command(f'DROP DATABASE {db} SYNC')
-        client.close()
 
 
 def test_real_pg_shared_batch_survives_repeated_producer_cancel(store):

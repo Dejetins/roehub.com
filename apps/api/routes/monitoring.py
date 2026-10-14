@@ -31,7 +31,7 @@ def _group(item: OperationalStatus) -> str:
     capability = item.capability
     if capability.startswith(("secrets.", "identity.", "auth.")):
         return "security"
-    if capability.startswith(("market_data.", "storage.clickhouse")):
+    if capability.startswith(("market_data.", "storage.postgresql")):
         return "data"
     if capability.startswith(("research.", "ml.")):
         return "compute"

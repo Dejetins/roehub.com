@@ -10,10 +10,8 @@ from trading.shared_kernel.primitives import InstrumentId, TimeRange, UtcTimesta
 
 from .candle_with_meta import CandleWithMeta
 
-CandleRepairSource = Literal["redis_hot_cache", "clickhouse", "rest"]
-CANDLE_REPAIR_SOURCES: frozenset[str] = frozenset(
-    {"redis_hot_cache", "clickhouse", "rest"}
-)
+CandleRepairSource = Literal["redis_hot_cache", "canonical_store", "rest"]
+CANDLE_REPAIR_SOURCES: frozenset[str] = frozenset({"redis_hot_cache", "canonical_store", "rest"})
 
 CandleRepairStatus = Literal[
     "attempted",
@@ -82,11 +80,11 @@ class ClosedCandleTailRepairPolicy:
 
     source_order: tuple[CandleRepairSource, ...] = (
         "redis_hot_cache",
-        "clickhouse",
+        "canonical_store",
         "rest",
     )
     rest_tail_limit_minutes: int = 15
-    clickhouse_timeout_seconds: float = 1.0
+    canonical_store_timeout_seconds: float = 1.0
     fail_closed_on_audit_write: bool = True
 
     def __post_init__(self) -> None:
@@ -100,12 +98,10 @@ class ClosedCandleTailRepairPolicy:
         if len(set(self.source_order)) != len(self.source_order):
             raise ValueError("ClosedCandleTailRepairPolicy.source_order must be unique")
         if self.rest_tail_limit_minutes <= 0:
+            raise ValueError("ClosedCandleTailRepairPolicy.rest_tail_limit_minutes must be > 0")
+        if self.canonical_store_timeout_seconds <= 0:
             raise ValueError(
-                "ClosedCandleTailRepairPolicy.rest_tail_limit_minutes must be > 0"
-            )
-        if self.clickhouse_timeout_seconds <= 0:
-            raise ValueError(
-                "ClosedCandleTailRepairPolicy.clickhouse_timeout_seconds must be > 0"
+                "ClosedCandleTailRepairPolicy.canonical_store_timeout_seconds must be > 0"
             )
 
 
@@ -203,17 +199,13 @@ class MarketDataCandleRepairAuditEvent:
             raise ValueError("MarketDataCandleRepairAuditEvent requires event_id")
         correlation_id = self.correlation_id.strip()
         if not correlation_id:
-            raise ValueError(
-                "MarketDataCandleRepairAuditEvent requires non-empty correlation_id"
-            )
+            raise ValueError("MarketDataCandleRepairAuditEvent requires non-empty correlation_id")
         object.__setattr__(self, "correlation_id", correlation_id)
         if self.instrument_id is None:  # type: ignore[truthy-bool]
             raise ValueError("MarketDataCandleRepairAuditEvent requires instrument_id")
         instrument_key = self.instrument_key.strip()
         if not instrument_key:
-            raise ValueError(
-                "MarketDataCandleRepairAuditEvent requires non-empty instrument_key"
-            )
+            raise ValueError("MarketDataCandleRepairAuditEvent requires non-empty instrument_key")
         object.__setattr__(self, "instrument_key", instrument_key)
         _validate_1m_range(self.time_range)
         object.__setattr__(self, "status", _validated_status(self.status))
@@ -231,9 +223,7 @@ class MarketDataCandleRepairAuditEvent:
         for ts_open in (*self.restored_ts_opens, *self.missing_ts_opens):
             _validate_minute_aligned(ts_open, field="ts_open")
             if not self.time_range.contains(ts_open):
-                raise ValueError(
-                    "MarketDataCandleRepairAuditEvent ts_open outside audited range"
-                )
+                raise ValueError("MarketDataCandleRepairAuditEvent ts_open outside audited range")
         if self.created_at is None:  # type: ignore[truthy-bool]
             raise ValueError("MarketDataCandleRepairAuditEvent requires created_at")
         object.__setattr__(

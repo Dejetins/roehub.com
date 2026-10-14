@@ -51,7 +51,10 @@ def _git_files(repo_root: Path) -> list[str]:
             if path.is_file() and ".git" not in path.parts
         ]
     generated = {path.as_posix() for path in OUTPUT_PATHS}
-    paths = [path for path in paths if path not in generated]
+    paths = [
+        path for path in paths
+        if path not in generated and (repo_root / path).is_file()
+    ]
     paths.extend(
         path.as_posix()
         for path in OWNED_DISCOVERY_PATHS
@@ -382,10 +385,10 @@ def render_markdown(data: dict[str, Any], mermaid: str, component_mermaid: str) 
 ## Данные, интеграции и runtime
 
 - PostgreSQL: пользовательские, конфигурационные и операционные записи; миграции в `alembic/` и `migrations/postgres/`.
-- ClickHouse: рыночные ряды, вычислительные и аналитические данные; миграции в `migrations/clickhouse/`.
+- PostgreSQL: durable market_data schema, canonical candles, funding, coverage and revisions; append-only migrations in `migrations/postgres/`.
 - Redis: streams, команды, runtime coordination и cache; точные контракты ищутся в соответствующем контексте и runbook.
 - Binance/Bybit: внешняя trust boundary; ключи и приватные payload не включаются в карту.
-- Prometheus/Grafana/OpenTelemetry: метрики, dashboards и traces; эксплуатационные действия определяются runbooks.
+- Prometheus/OpenTelemetry: метрики и traces; интерфейс мониторинга внутри платформы; эксплуатационные действия определяются runbooks.
 
 ## Как поддерживается актуальность
 

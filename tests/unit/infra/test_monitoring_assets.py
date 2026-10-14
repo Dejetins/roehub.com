@@ -18,7 +18,7 @@ def _load_yaml(*, relative_path: str) -> dict[str, Any]:
     return cast(dict[str, Any], payload)
 
 
-def test_oidc_provider_alert_covers_transport_deadline_and_validation_failures() -> None:
+def test_removed_oidc_provider_has_no_active_alert() -> None:
     payload = _load_yaml(relative_path=("infra/monitoring/rules/" "platform-monitoring.rules.yml"))
     alerts = {
         rule["alert"]: rule
@@ -26,14 +26,7 @@ def test_oidc_provider_alert_covers_transport_deadline_and_validation_failures()
         for rule in group["rules"]
         if "alert" in rule
     }
-    expression = alerts["OidcProviderUnavailable"]["expr"]
-    for outcome in (
-        "transport_error",
-        "result_unknown",
-        "deadline_exceeded",
-        "validation_error",
-    ):
-        assert outcome in expression
+    assert "OidcProviderUnavailable" not in alerts
 
 
 def test_prometheus_stage17_rules_are_repo_managed() -> None:
@@ -175,7 +168,7 @@ def test_prometheus_live_tail_repair_rules_are_repo_managed() -> None:
     alerts = {rule["alert"]: rule for rule in rules}
     assert set(alerts) == {
         "MarketDataLiveTailUnrepairedGapBeyondPolicy",
-        "MarketDataClickHouseRepairCircuitOpenTooLong",
+        "MarketDataCanonicalStoreRepairCircuitOpenTooLong",
         "MarketDataRestTailRepairErrors",
         "MarketDataHotCacheShortTailMiss",
         "StrategyProducerNoSignalGrowth",

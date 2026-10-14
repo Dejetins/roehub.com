@@ -1,0 +1,618 @@
+{
+  "alembic_version": {
+    "count": 1,
+    "md5": "def0121b8f01089ddd7ce029a25482fd"
+  },
+  "artifact_store_gc_candidates": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_leases": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_manifest_entries": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_manifests": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_object_locations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_objects": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_org_blobs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_pins": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "artifact_store_quotas": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backtest_artifact_attempts": {
+    "count": 391,
+    "md5": "6d6c0829938172cc1b8cc0a9091b7add"
+  },
+  "backtest_artifact_build_requests": {
+    "count": 399,
+    "md5": "4955a5726d2faec1d8ebbee5699fd297"
+  },
+  "backtest_artifact_builds": {
+    "count": 391,
+    "md5": "8b9e403e6a54d1ec1a7af3e3e9351ccc"
+  },
+  "backtest_artifact_cadence": {
+    "count": 105,
+    "md5": "b865ac8df851f8003fbcb2bf3f4ccfe3"
+  },
+  "backtest_artifact_commands": {
+    "count": 5,
+    "md5": "8e0661688d673ebb0283e2d292271e94"
+  },
+  "backtest_artifact_dispatch_state": {
+    "count": 1,
+    "md5": "dece469b9163240f92f768ad07980ccd"
+  },
+  "backtest_artifact_events": {
+    "count": 16749,
+    "md5": "a6ba76d36516c5bd7665384db3f98bc1"
+  },
+  "backtest_artifact_installation_settings": {
+    "count": 1,
+    "md5": "0236415e0058b90e5a357ce85d037581"
+  },
+  "backtest_artifact_legacy_demands": {
+    "count": 101,
+    "md5": "9942e1c0c1c73921b9848fb730206168"
+  },
+  "backtest_artifact_policies": {
+    "count": 3,
+    "md5": "93a93d2e52d70e18ad73805b7483360b"
+  },
+  "backtest_artifact_profiles": {
+    "count": 3,
+    "md5": "5afe6d206d8eaf18871e6a49499a03c8"
+  },
+  "backtest_artifact_requests": {
+    "count": 737,
+    "md5": "41b98b7190771ee12fc4fd3c08a9078e"
+  },
+  "backtest_artifact_slot_ownership": {
+    "count": 202,
+    "md5": "b2f993683833be3770926396b21249b1"
+  },
+  "backtest_artifact_slot_readers": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backtest_artifact_source_state": {
+    "count": 102,
+    "md5": "fb14e349dd0751e641debf1df337c3ca"
+  },
+  "backtest_artifact_storage_commands": {
+    "count": 2,
+    "md5": "153bc751c8401e6d7202b434a41f1b9e"
+  },
+  "backtest_artifact_storage_previews": {
+    "count": 1,
+    "md5": "0b542e662e8036f4150703005a109226"
+  },
+  "backtest_job_stage_a_shortlist": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "backtest_job_top_variants": {
+    "count": 12,
+    "md5": "1f758aa74127e441b2ece365c5ac8bde"
+  },
+  "backtest_jobs": {
+    "count": 3,
+    "md5": "d1ab2488286671136816fae6585d9394"
+  },
+  "backtest_lazy_trades_materializations": {
+    "count": 12,
+    "md5": "1acb0d5c9f49f85520f1999c6c139a3f"
+  },
+  "control_operation_audit_cursor": {
+    "count": 1,
+    "md5": "873943311b403b3cfbe6c51c0d4762fe"
+  },
+  "control_operation_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_account_config_guard_results": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_account_snapshots": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_balance_snapshots": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_connections": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_credential_versions": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_execution_process_heartbeats": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_execution_request_observations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_instrument_filter_snapshots": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_open_order_snapshots": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_position_snapshots": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "exchange_private_stream_sessions": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_account_safety_state": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_fills": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_funding_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_gateway_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_intents": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_kill_switch_state": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_ledger_pitr_drills": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_ledger_retention_policies": {
+    "count": 5,
+    "md5": "2b826e901b9d069e7d47c2a47a5a0214"
+  },
+  "execution_mainnet_approvals": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_notification_outbox": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_order_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_orders": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_provider_allowlist": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_reconciliation_runs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_risk_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "execution_source_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_plugin_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_plugin_installations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_plugin_instances": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_plugin_operations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_plugin_packages": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "extensions_publisher_keys": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_administrative_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_audit_events": {
+    "count": 11,
+    "md5": "a3afdc1bd0861a5e37d2e4332a11252d"
+  },
+  "identity_browser_devices": {
+    "count": 8,
+    "md5": "e1557464790879568e2a86f692d5df59"
+  },
+  "identity_exchange_keys": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_external_identities": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_installation_owners": {
+    "count": 1,
+    "md5": "0ffcd0ce64634c2df6284a6c25f54355"
+  },
+  "identity_installations": {
+    "count": 1,
+    "md5": "a0ef4638b2cc7577afe2da666da549e2"
+  },
+  "identity_integrations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_invitations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_local_accounts": {
+    "count": 1,
+    "md5": "7853b9fc9242c6f4ad8d0188c6bb29d1"
+  },
+  "identity_local_auth_challenges": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_local_auth_events": {
+    "count": 19,
+    "md5": "f8ba6db6acbb91aec775b8c0c3afcc1f"
+  },
+  "identity_local_auth_rate_limits": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_local_bootstrap_tickets": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_local_recovery_codes": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_memberships": {
+    "count": 1,
+    "md5": "fddab1b3d767a9e587c959e0c728be12"
+  },
+  "identity_notification_preferences": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_oidc_auth_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_oidc_login_attempts": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_organizations": {
+    "count": 1,
+    "md5": "5e25d3725c4cddd7b7fe952ee4f6121b"
+  },
+  "identity_plugin_permissions": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_sessions": {
+    "count": 19,
+    "md5": "98737f4efd4f5e91b887bbc6c5ac9463"
+  },
+  "identity_support_access_grants": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_telegram_channels": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "identity_user_preferences": {
+    "count": 1,
+    "md5": "ff564a044ea400707797b3a2121cf44f"
+  },
+  "identity_user_profile_overrides": {
+    "count": 1,
+    "md5": "ab0ae2ad7c181f7a41f45d364a6087f0"
+  },
+  "identity_users": {
+    "count": 1,
+    "md5": "8d2ec6cf9ab1987eace7c83ed19d6abe"
+  },
+  "identity_webauthn_credentials": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "job_runtime_attempts": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "job_runtime_jobs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_candle_repair_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_catalog_refresh_state": {
+    "count": 4,
+    "md5": "42353d5db6433558f847c6e4206a66bb"
+  },
+  "market_data_catalog_snapshots": {
+    "count": 6,
+    "md5": "37fd479a09ffc75ee9c21021463ac128"
+  },
+  "market_data_coordinator_owners": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_history_bounds": {
+    "count": 29,
+    "md5": "bed96e7b821c96507dc2e5305d601af6"
+  },
+  "market_data_instrument_history_bounds": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_instrument_selection_audit_events": {
+    "count": 37,
+    "md5": "db2ffc8caea14b17ca3ecd6951eedd4f"
+  },
+  "market_data_instrument_selections": {
+    "count": 5,
+    "md5": "ccc619cd81c64e1d8987b1334430c581"
+  },
+  "market_data_provider_permits": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_provider_scopes": {
+    "count": 1,
+    "md5": "7fb90bb3f2f3529e4f3624e3747adfd0"
+  },
+  "market_data_provider_windows": {
+    "count": 4,
+    "md5": "3293210c3605cae27aae5c5c257855ea"
+  },
+  "market_data_storage_cooldown": {
+    "count": 1,
+    "md5": "361049473f5cf824cdc1861c8cea00e7"
+  },
+  "market_data_stream_connections": {
+    "count": 5,
+    "md5": "a6e3bf0dfcb06b774a690b992cf7241a"
+  },
+  "market_data_stream_events": {
+    "count": 312,
+    "md5": "aa98a230e425800872404935c808f793"
+  },
+  "market_data_stream_recovery": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "market_data_subscription_requirements": {
+    "count": 1341,
+    "md5": "5b0a9e528cdc1a9096e8f51785d3686d"
+  },
+  "market_data_work_batches": {
+    "count": 3,
+    "md5": "2a2d9be44b46c1fb1a7dea34fe35aca1"
+  },
+  "market_data_work_events": {
+    "count": 2755,
+    "md5": "ebb16aa1bdf2a16effcf85a6050ce026"
+  },
+  "market_data_work_requests": {
+    "count": 141,
+    "md5": "cb02e5bfdd2e4bb7e7e66966282b27d4"
+  },
+  "notification_deliveries": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_delivery_attempts": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_provider_instances": {
+    "count": 2,
+    "md5": "83f7343b8bc5743b10bede334470f0d2"
+  },
+  "notification_provider_packages": {
+    "count": 3,
+    "md5": "c49b7beb8e4e194d80d761b6b100ea3f"
+  },
+  "notification_report_runs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_routes": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_telegram_binding_codes": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_telegram_command_registry": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_telegram_recipient_bindings": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_telegram_update_cursors": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "notification_telegram_updates": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "paper_fills": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "paper_orders": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_live_ticker_activations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_live_ticker_entitlement_overrides": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_risk_sizing_policies": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_risk_sizing_policy_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_artifact_lifecycle_policies": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_calibration_packs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_dataset_versions": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_model_activations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_model_registry_audit_events": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_model_versions": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "rl_trading_training_runs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "roehub_storage_migrations": {
+    "count": 56,
+    "md5": "2baa99a27d7b149a45d37ba797b69884"
+  },
+  "strategy_backtest_variant_provenance": {
+    "count": 2,
+    "md5": "0b73bdbc5746bed06608f8bcce24ee1a"
+  },
+  "strategy_capital_reservations": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_events": {
+    "count": 3,
+    "md5": "579ea3889a4ba55f48113ed37cfaf28c"
+  },
+  "strategy_exchange_bindings": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_live_profiles": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_paper_accounting": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_paper_scenario_coverage_results": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_position_ownership": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_runs": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_signals": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "strategy_strategies": {
+    "count": 3,
+    "md5": "a3f10c30ff3e61f486260bb01c0102f1"
+  },
+  "strategy_variant_compatibility_checks": {
+    "count": 1341,
+    "md5": "f5c678c63867ea73bea989c19c63a2fc"
+  },
+  "strategy_variant_scenario_matrix_rows": {
+    "count": 0,
+    "md5": "d41d8cd98f00b204e9800998ecf8427e"
+  }
+}

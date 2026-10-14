@@ -1,24 +1,41 @@
 # Market Data — REST Historical Catch-up + Gap Fill 1m (v2)
 
+## Consumer wiring — S05, 2026-10-14
+
+Запись raw/canonical/coverage выполняется транзакционно в PostgreSQL. REST/Parquet batches ограничены 8192 строками, metadata/funding — 1000. Месячные партиции заранее создаёт maintenance; application DDL не разрешён.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Provider admission и lease проверки сохраняются. Только полностью успешно прочитанный response и durable запись разрешают accepted absence/frontier; HTTP failure, partial response и stale lease этого права не дают.
+
+
 Этот документ фиксирует правила и минимальные механизмы **REST-догонки** и **автоматического gap fill**
 для bounded context `market_data` на этапе v2.
 
 Цель:
 - уметь **догонять хвост** 1m свечей до “последней закрытой минуты” (per instrument);
 - уметь **находить и чинить гэпы** 1m свечей по всей доступной истории инструмента;
-- писать только в `raw_*`, canonical формируется MV;
+- вызывать `RawKlineWriter`: raw/canonical/coverage/revision commit атомарен;
 - быть совместимыми с автоматическим пайплайном: `REST catch-up → WS live → Redis Streams для стратегий`.
 
-Источник правды по хранению свечей: ClickHouse DDL:
+Источник правды по хранению свечей: PostgreSQL DDL:
 - `market_data.raw_binance_klines_1m`
 - `market_data.raw_bybit_klines_1m`
 - `market_data.canonical_candles_1m`
-- MV `mv_raw_*_to_canonical_1m` (raw → canonical)
+- transactional raw/canonical/coverage writer
 
 Связанные документы:
 - `Market Data — Runtime Config & Invariants (v2)` (market_data.yaml + whitelist.csv + time slicing ≤ 7d)
 - `Market Data — Application Ports (Walking Skeleton v1)` (ports ingestion/writer/reader)
-- `Market Data — Reference Data Sync (Whitelist -> ClickHouse) (v2)` (ref_market/ref_instruments)
+- `Market Data — Reference Data Sync (Whitelist -> PostgreSQL) (v2)` (ref_market/ref_instruments)
 
 
 ## Ключевые решения
@@ -36,11 +53,11 @@ REST ingestion не пишет “текущую незакрытую минут
 
 ### 3) Canonical остаётся “источником правды” для определения хвоста и анализа покрытия
 - “Хвост” определяется по `canonical_candles_1m` (как по источнику правды).
-- Gap fill тоже основан на canonical, потому что raw может содержать дубликаты до merge.
+- Gap fill тоже основан на canonical, потому что raw сохраняет повторные наблюдения.
 
-### 4) Защита от Code 252: time slicing по UTC-дням (≤ 7 дней на insert)
+### 4) Ограничение транзакции: time slicing по UTC-дням (≤ 7 дней)
 Любой исторический диапазон режется на чанки по `max_days_per_insert` из runtime config (≤ 7).
-Это гарантирует, что один insert не пересекает > 7 дневных партиций.
+Физические partitions месячные. Семь дней ограничивают работу и проверку, а row/byte budgets дополнительно ограничивают каждый writer batch.
 
 ### 5) Up-to-date rate limits: autodetect по response headers (без “хардкода” лимитов)
 Мы **не храним** “точные rate limits” в `market_data.yaml`, потому что:
@@ -55,8 +72,8 @@ REST ingestion не пишет “текущую незакрытую минут
 REST catch-up и gap fill не изобретают новую “батч-логику записи”.
 Они переиспользуют:
 - `CandleIngestSource.stream_1m(...)` (REST реализация)
-- `RawKlineWriter.write_1m(...)` (ClickHouse raw writer)
-- `Backfill1mCandlesUseCase(batch_size=10k/20k)` как “выполнятор” ingestion в ClickHouse.
+- `RawKlineWriter.write_1m(...)` (PostgreSQL raw writer)
+- `Backfill1mCandlesUseCase(batch_size<=8192)` как “выполнятор” ingestion в PostgreSQL.
 
 ### 7) Отчётность: stdout/logs + метрики Prometheus
 В v2 “отчёт” не пишется в отдельную БД-таблицу.
@@ -127,7 +144,7 @@ REST catch-up и gap fill не изобретают новую “батч-ло�
 
 **Semantics**
 - все операции трактуют время как UTC;
-- `last_ts_open`/`first_ts_open` относятся к canonical (источник правды), без FINAL;
+- `last_ts_open`/`first_ts_open` относятся к canonical (источник правды) с unique key;
 - индекс reader не обязан повторять поведение full-range `CanonicalCandleReader`,
   потому что dedup safety в REST fill обеспечивается отдельной minute-key проверкой перед записью.
 
@@ -144,7 +161,7 @@ REST catch-up и gap fill не изобретают новую “батч-ло�
 - `index_reader: CanonicalCandleIndexReader`
 - `source: CandleIngestSource` (REST реализация)
 - `writer: RawKlineWriter`
-- `batch_size: int` (10k/20k)
+- `batch_size: int` (не более 8192 rows и 8 MiB accounted bytes)
 - `max_days_per_insert: int` (из runtime config, ≤ 7)
 
 ### Semantics (tail catch-up)
@@ -215,63 +232,33 @@ Gap fill выполняется автоматически, без ручных 
 
 
 ## Verification SQL (post-run)
-Проверка глобальной динамики missing/duplicates:
+
+Диагностика ограничивается одним инструментом и окном до семи дней. Пример
+для явной disposable/операторской цели (даты и symbol задаются оператором):
 
 ```sql
--- global duplicates/missing
-SELECT
-  first_m,
-  last_m,
-  dateDiff('minute', first_m, last_m) + 1 AS candles_expected,
-  candles_actual,
-  (dateDiff('minute', first_m, last_m) + 1) - candles_actual AS candles_missing,
-  rows_total - candles_actual AS duplicate_rows
-FROM
-(
-  SELECT
-    min(m) AS first_m,
-    max(m) AS last_m,
-    count() AS rows_total,
-    uniqExact(m) AS candles_actual
-  FROM
-  (
-    SELECT toStartOfMinute(ts_open) AS m
-    FROM market_data.canonical_candles_1m
-  )
-);
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '3s';
+SELECT d.day, d.actual_count, d.absent_count, d.policy_version,
+       g.index_state, g.content_revision
+FROM market_data.candle_coverage_days d
+JOIN market_data.instrument_generations g
+  ON (g.market_id, g.symbol, g.generation) = (d.market_id, d.symbol, d.generation)
+WHERE d.market_id = 1 AND d.symbol = 'BTCUSDT'
+  AND d.day >= DATE '2026-02-01' AND d.day < DATE '2026-02-08'
+ORDER BY d.day;
+COMMIT;
 ```
 
-Диагностика дней с остаточными gap-минутами:
-
-```sql
-SELECT
-  day,
-  expected,
-  actual,
-  expected - actual AS missing
-FROM
-(
-  SELECT
-    toDate(ts_open) AS day,
-    uniqExact(toStartOfMinute(ts_open)) AS actual,
-    1440 AS expected
-  FROM market_data.canonical_candles_1m
-  GROUP BY day
-)
-WHERE missing > 0
-ORDER BY missing DESC
-LIMIT 50;
-```
-
-Проверка дубликатов по конкретному инструменту:
-
-```sql
-SELECT
-  count() - uniqExact(toStartOfMinute(ts_open)) AS dup
-FROM market_data.canonical_candles_1m
-WHERE instrument_key = 'binance:spot:BTCUSDT';
-```
-
+Отсутствующая строка или `index_state != 'ready'` не означает пустую историю.
+Для partial-day coverage reader обрезает actual/source-absent masks по `[start,end)`;
+`expected` для actual coverage — все календарные минуты окна; actual/expected
+не увеличивается от absence. Verified completeness учитывает actual + accepted
+absence и может быть полной при actual coverage ниже 100%. Поздняя свеча
+замещает absence атомарно. Полный history scan и неявный rebuild запрещены в API.
+Canonical primary key гарантирует отсутствие duplicate rows; raw observations
+могут содержать повторы. Bounded verifier проверяет canonical/masks и certificate;
+выявленный drift требует явного generation-fenced rebuild.
 
 ## Адаптер: REST CandleIngestSource (routing по market_id)
 

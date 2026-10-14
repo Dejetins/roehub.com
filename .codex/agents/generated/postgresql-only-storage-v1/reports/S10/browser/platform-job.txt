@@ -1,0 +1,117 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f4e8]:
+  - link "Skip to content" [ref=f4e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f4e10]:
+    - generic [ref=f4e11]: RoeHub
+    - navigation "Language" [ref=f4e12]:
+      - link "Русский" [ref=f4e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests%2Fad277dfd-bc79-41c4-a3e7-03c40df5e18f
+      - link "English" [ref=f4e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests%2Fad277dfd-bc79-41c4-a3e7-03c40df5e18f
+  - complementary [ref=f4e15]:
+    - navigation "Navigation" [ref=f4e16]:
+      - link "Overview" [ref=f4e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f4e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f4e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f4e29]:
+        - text: Data
+        - generic [ref=f4e34]: Unavailable
+      - link "Settings" [ref=f4e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f4e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f4e43]:
+    - generic [ref=f4e44]:
+      - heading "Backtests" [level=1] [ref=f4e45]
+      - generic [ref=f4e47]:
+        - button "Hide history" [expanded] [ref=f4e347] [cursor=pointer]
+        - region [ref=f4e48]:
+          - generic [ref=f4e49]:
+            - heading "Jobs" [level=2] [ref=f4e50]
+            - generic "Jobs on this page" [ref=f4e51]: "4"
+            - link "New backtest" [ref=f4e52] [cursor=pointer]:
+              - /url: /backtests/new
+            - generic [ref=f4e348]:
+              - button "Refresh" [disabled] [ref=f4e349]
+              - button "Filters" [ref=f4e356] [cursor=pointer]
+          - tablist "Jobs" [ref=f4e65]:
+            - tab "New backtest" [ref=f4e66] [cursor=pointer]
+            - tab "History" [active] [selected] [ref=f4e67] [cursor=pointer]
+          - tabpanel "History" [ref=f4e68]:
+            - paragraph [ref=f4e69]: All states · All risk modes
+            - status [ref=f4e70]: Last read · Oct 14, 2026, 7:49 AM UTC
+            - region "Job history table" [ref=f4e71]:
+              - table [ref=f4e72]:
+                - caption [ref=f4e73]: Jobs on this page
+                - rowgroup [ref=f4e74]:
+                  - row [ref=f4e359]:
+                    - columnheader "Backtest" [ref=f4e76]
+                    - columnheader "State" [ref=f4e77]
+                - rowgroup [ref=f4e79]:
+                  - row [ref=f4e360]:
+                    - cell "S10 PG-only retained history proof ACTUSDT · spot · 15m" [ref=f4e361]:
+                      - link "S10 PG-only retained history proof" [ref=f4e362] [cursor=pointer]:
+                        - /url: /backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f
+                      - generic [ref=f4e363]: ACTUSDT · spot · 15m
+                    - cell "Queued" [ref=f4e364]
+                  - row [ref=f4e365]:
+                    - cell "Binance historical · BTCUSDT · EMA 5–50 BTCUSDT · spot · 15m" [ref=f4e81]:
+                      - link "Binance historical · BTCUSDT · EMA 5–50" [ref=f4e82] [cursor=pointer]:
+                        - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c
+                      - generic [ref=f4e83]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e84]
+                  - row [ref=f4e366]:
+                    - cell "Demo EMA · TP/SL BTCUSDT · spot · 15m" [ref=f4e88]:
+                      - link "Demo EMA · TP/SL" [ref=f4e89] [cursor=pointer]:
+                        - /url: /backtests/e9d85b78-58ff-495f-8b0b-2b8e5ac64b8a
+                      - generic [ref=f4e90]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e91]
+                  - row [ref=f4e367]:
+                    - cell "Demo EMA · baseline BTCUSDT · spot · 15m" [ref=f4e95]:
+                      - link "Demo EMA · baseline" [ref=f4e96] [cursor=pointer]:
+                        - /url: /backtests/2c252ee4-aa0a-4f1c-b560-7482d7122cdd
+                      - generic [ref=f4e97]: BTCUSDT · spot · 15m
+                    - cell "Completed" [ref=f4e98]
+            - navigation "Job pages" [ref=f4e101]:
+              - generic [ref=f4e102]:
+                - text: Rows per page
+                - combobox "Page size (1–250)" [ref=f4e103]:
+                  - option "5"
+                  - option "10"
+                  - option "25"
+                  - option "50" [selected]
+                  - option "100"
+                  - option "250"
+              - button "First page" [disabled] [ref=f4e105]
+              - button "Next page" [disabled] [ref=f4e109]
+            - paragraph [ref=f4e112]: Newest first. Risk filtering applies within each server page; an empty page can still have a next page.
+            - group [ref=f4e113]:
+              - generic "Search, instrument and date filters" [ref=f4e114] [cursor=pointer]
+        - region "Backtest detail" [ref=f4e368]:
+          - generic [ref=f4e369]:
+            - generic [ref=f4e370]:
+              - heading "S10 PG-only retained history proof" [level=2] [ref=f4e371]
+              - status [ref=f4e382]:
+                - generic [ref=f4e383]: Updating…
+            - generic [ref=f4e372]:
+              - status [ref=f4e373]: Queued
+              - region "Measured progress" [ref=f4e374]:
+                - paragraph [ref=f4e375]: Progress measurement unavailable
+                - paragraph [ref=f4e376]: Measured at · Oct 14, 2026, 7:49 AM UTC
+                - paragraph [ref=f4e377]: Completion estimate unavailable
+                - paragraph [ref=f4e378]: Active job state refreshes automatically after the server delay.
+                - button "Cancel backtest" [ref=f4e379] [cursor=pointer]
+              - group [ref=f4e380]:
+                - generic "Job information" [ref=f4e381] [cursor=pointer]
+  - contentinfo [ref=f4e120]:
+    - text: Artifact-backed backtests
+    - generic [ref=f4e121]: Library snapshots · live selected job
+```

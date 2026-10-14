@@ -59,7 +59,6 @@
       "enum": [
         "release_config",
         "postgresql",
-        "clickhouse",
         "redis_checkpoint",
         "openbao",
         "artifacts",
@@ -139,10 +138,10 @@
       "type": "string"
     },
     "schema": {
-      "const": "io.roehub.installation-backup-policy/v1alpha1",
-      "default": "io.roehub.installation-backup-policy/v1alpha1",
+      "const": "io.roehub.installation-backup-policy/v2alpha1",
+      "default": "io.roehub.installation-backup-policy/v2alpha1",
       "enum": [
-        "io.roehub.installation-backup-policy/v1alpha1"
+        "io.roehub.installation-backup-policy/v2alpha1"
       ],
       "title": "Schema",
       "type": "string"
@@ -186,25 +185,6 @@
               },
               "owner": {
                 "const": "postgresql"
-              }
-            },
-            "required": [
-              "owner",
-              "consistency_mode"
-            ],
-            "type": "object"
-          },
-          "maxContains": 1,
-          "minContains": 1
-        },
-        {
-          "contains": {
-            "properties": {
-              "consistency_mode": {
-                "const": "database_snapshot"
-              },
-              "owner": {
-                "const": "clickhouse"
               }
             },
             "required": [
@@ -315,8 +295,8 @@
       "items": {
         "$ref": "#/$defs/BackupPolicySource"
       },
-      "maxItems": 8,
-      "minItems": 8,
+      "maxItems": 7,
+      "minItems": 7,
       "title": "Sources",
       "type": "array",
       "uniqueItems": true

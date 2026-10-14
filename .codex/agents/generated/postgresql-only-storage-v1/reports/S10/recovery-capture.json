@@ -1,0 +1,25 @@
+{
+  "kind": "legacy-local-scoped-recovery",
+  "backup_root": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/backups/s10-before-20261014",
+  "key_directory": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/s10-recovery-keys",
+  "files": {
+    "installation-config.tar.gz.age": {
+      "bytes": 71737,
+      "ciphertext_sha256": "3af865951aaa8b2861639e6f037a90a47fa66806bdcdd9f5e626d136a761fe3f",
+      "decrypted_sha256": "ed6b0cd1014a620e671746ca26b0fa37d43823175f1f70e977fec2672329dba9",
+      "decrypt_verified": true
+    },
+    "postgres-before.dump.age": {
+      "bytes": 2206014,
+      "ciphertext_sha256": "6bb9b76e7ffda7deeedc268470e2c73afd39bce59d159ae2fc2f82522d7095e9",
+      "decrypted_sha256": "fad513d2d115174b066c8e6c955c4a944eb813fa92d54c9564ecdabb1f661d52",
+      "decrypt_verified": true
+    },
+    "artifacts-before.tar.gz.age": {
+      "bytes": 47486707,
+      "ciphertext_sha256": "36b65fa27ac1a0905922664f578c11c846ec22db2421ebc5138c90aec8b80a0f",
+      "decrypted_sha256": "3b27c72be4533b18fdfd4c6252c15dbfa20b4d4390c32ac8289d9aaa8b3b1bbf",
+      "decrypt_verified": true
+    }
+  }
+}

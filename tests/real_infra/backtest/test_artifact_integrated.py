@@ -140,11 +140,8 @@ def test_retry_rechecks_revoked_membership(dispatch, tmp_path, revoked):
 
 
 def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, live_jobs, tmp_path):
-    import os
-    import re
     from pathlib import Path
 
-    import clickhouse_connect
     import numpy as np
 
     from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import compose_managed_app
@@ -162,221 +159,204 @@ def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, liv
         snapshot_for,
     )
     from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
-    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
-        ClickHouseStoredArtifactCoordinates,
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.stored_coordinates import (  # noqa: E501
+        PostgresStoredArtifactCoordinates,
     )
     from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
         ArtifactRequestedRow,
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
-        ClickHouseCanonicalCandleIndexReader,
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+        PostgresCanonicalCandleIndexReader,
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
-        ClickHouseCanonicalCandleReader,
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+        PostgresCanonicalCandleReader,
     )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-        ClickHouseConnectGateway,
-    )
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (  # noqa: E501
-        ClickHouseRawKlineWriter,
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
     )
     from trading.contexts.market_data.application.services.stored_candle_signal import (
         StoredCandleSignalWriter,
     )
 
-    port = os.environ.get("ROEHUB_BASE_TEST_CLICKHOUSE_PORT")
-    if not port:
-        pytest.skip("explicit disposable ClickHouse required")
     m = dispatch
-    client = clickhouse_connect.get_client(
-        host="127.0.0.1", port=int(port),
-        username=os.environ.get("CH_USER", "default"),
-        password=os.environ.get("CH_PASSWORD", ""),
+    gateway = m["source_gateway"]
+    f, w = worker(m, tmp_path)
+    defaults = n.YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path=Path("configs/dev/indicators.yaml")
     )
-    db = "s09_" + uuid4().hex
-    try:
-        ddl = (
-            Path("migrations/clickhouse/market_data_ddl.sql").read_text().replace("market_data", db)
-        )
-        ddl = re.sub(r"/\*.*?\*/", "", ddl, flags=re.S)
-        ddl = re.sub(r"--[^\n]*", "", ddl)
-        for statement in ddl.split(";"):
-            if statement.strip() and not statement.strip().startswith("USE "):
-                client.command(statement)
-        gateway = ClickHouseConnectGateway(client)
-        f, w = worker(m, tmp_path)
-        defaults = n.YamlBacktestGridDefaultsProvider.from_yaml(
-            config_path=Path("configs/dev/indicators.yaml")
-        )
-        runner = replace(
-            w.publisher.runner,
-            canonical_candle_reader=ClickHouseCanonicalCandleReader(gateway, db),
-            indicator_grid_builder=n._signal_grid_builder_v2(),
-            defaults_provider=defaults,
-            signal_rules_engine=n.BacktestSignalRulesEngineV2(defaults_provider=defaults),
-            indicator_compute=NumbaIndicatorCompute(
-                defs=n.all_defs(),
-                config=IndicatorsComputeNumbaConfig(
-                    numba_num_threads=1, numba_cache_dir=tmp_path / "jit"
-                ),
+    runner = replace(
+        w.publisher.runner,
+        canonical_candle_reader=PostgresCanonicalCandleReader(gateway),
+        indicator_grid_builder=n._signal_grid_builder_v2(),
+        defaults_provider=defaults,
+        signal_rules_engine=n.BacktestSignalRulesEngineV2(defaults_provider=defaults),
+        indicator_compute=NumbaIndicatorCompute(
+            defs=n.all_defs(),
+            config=IndicatorsComputeNumbaConfig(
+                numba_num_threads=1, numba_cache_dir=tmp_path / "jit"
             ),
-        )
-        clock = [NOW]
-        app = compose_managed_app(
-            installation_id=m["installation"],
-            gateway=m["db"],
-            catalog=m["catalog"],
-            access=m["repo"].access,
-            publisher=replace(w.publisher, runner=runner),
-            stored_coordinates=ClickHouseStoredArtifactCoordinates(gateway, db),
-            candle_index=ClickHouseCanonicalCandleIndexReader(gateway, db),
-            root=f.builder.root,
-            root_id="backtest-primary",
-            root_revision=1,
-            budget_bytes=10737418240,
-            host_lock=FileBacktestArtifactPublisherHostLock(tmp_path / "host.lock"),
-            now=lambda: clock[0],
-        )
+        ),
+    )
+    clock = [NOW]
+    app = compose_managed_app(
+        installation_id=m["installation"],
+        gateway=m["db"],
+        catalog=m["catalog"],
+        access=m["repo"].access,
+        publisher=replace(w.publisher, runner=runner),
+        stored_coordinates=PostgresStoredArtifactCoordinates(gateway),
+        candle_index=PostgresCanonicalCandleIndexReader(gateway),
+        root=f.builder.root,
+        root_id="backtest-primary",
+        root_revision=1,
+        budget_bytes=10737418240,
+        host_lock=FileBacktestArtifactPublisherHostLock(tmp_path / "host.lock"),
+        now=lambda: clock[0],
+    )
 
-        def committed(instrument):
-            app.reconciler.observe(instrument, now=clock[0])
+    def committed(instrument):
+        app.reconciler.observe(instrument, now=clock[0])
 
-        writer = StoredCandleSignalWriter(ClickHouseRawKlineWriter(gateway, db), committed)
-        rows = n._build_canonical_rows_v2(bar_indexes=tuple(i for i in range(10080) if i != 1007))
-        writer.write_1m(rows)
-        assert (
-            client.query(f"SELECT count() FROM {db}.canonical_candles_1m FINAL").first_row[0]
-            == 10079
-        )
-        assert app.cycle() == "observed"
-        r = app.worker.repository
-        assert {x["state"] for x in r.rows("SELECT state FROM backtest_artifact_requests")} == {
-            "ready"
-        }
-        pointer = f.loader.load_current_pointer(f.coordinates)
-        manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
-        assert {p.timeframe for p in manifest.prices} == set(DURATIONS)
-        assert not manifest.signals.manifests
-        # Each materialized timeframe is checked against an independent scalar rollup.
-        one = next(p for p in manifest.prices if p.timeframe == "1m")
-        opens = np.load(manifest.path.parent / one.open_time.path)
-        values = np.load(manifest.path.parent / one.ohlcv.path)
-        for section in manifest.prices:
-            duration = DURATIONS[section.timeframe] * 60000
-            expected = []
-            for bucket in sorted(set(opens // duration)):
-                ix = np.flatnonzero(opens // duration == bucket)
-                if len(ix) == DURATIONS[section.timeframe] and opens[ix[0]] == bucket * duration:
-                    v = values[ix]
-                    expected.append(
-                        [
-                            v[0, 0],
-                            max(v[:, 1]),
-                            min(v[:, 2]),
-                            v[-1, 3],
-                            sum(float(x) for x in v[:, 4]),
-                        ]
-                    )
-            np.testing.assert_allclose(
-                np.load(manifest.path.parent / section.ohlcv.path), expected, rtol=1e-6
-            )
-        service = ArtifactHttpService(r, m["installation"])
-        c = item(m).coordinate
-        selected = profile(m["catalog"], names=("ma.sma",), tp=(), sl=())
-        result = service.submit(
-            m["org"],
-            m["actor"],
-            "integrated-enable",
-            Command(
-                items=(
-                    CommandItem(
-                        coordinate=c, expected_version=0, patch=PolicyPatch(profile=selected)
-                    ),
+    writer = StoredCandleSignalWriter(PostgresRawKlineWriter(gateway), committed)
+    rows = n._build_canonical_rows_v2(bar_indexes=tuple(i for i in range(10080) if i != 1007))
+    for offset in range(0, len(rows), 1000):
+        PostgresRawKlineWriter(gateway).write_1m(rows[offset : offset + 1000])
+    # Coalesced post-commit hint observes the completed bounded bulk import.
+    committed(rows[0].candle.instrument_id)
+    assert (
+        gateway.run(
+            lambda c: c.execute(
+                "SELECT count(*) FROM market_data.canonical_candles_1m"
+            ).fetchone()
+        )[0]
+        == 10079
+    )
+    assert app.cycle() == "observed"
+    r = app.worker.repository
+    assert {x["state"] for x in r.rows("SELECT state FROM backtest_artifact_requests")} == {
+        "ready"
+    }
+    pointer = f.loader.load_current_pointer(f.coordinates)
+    manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
+    assert {p.timeframe for p in manifest.prices} == set(DURATIONS)
+    assert not manifest.signals.manifests
+    # Each materialized timeframe is checked against an independent scalar rollup.
+    one = next(p for p in manifest.prices if p.timeframe == "1m")
+    opens = np.load(manifest.path.parent / one.open_time.path)
+    values = np.load(manifest.path.parent / one.ohlcv.path)
+    for section in manifest.prices:
+        duration = DURATIONS[section.timeframe] * 60000
+        expected = []
+        for bucket in sorted(set(opens // duration)):
+            ix = np.flatnonzero(opens // duration == bucket)
+            if len(ix) == DURATIONS[section.timeframe] and opens[ix[0]] == bucket * duration:
+                v = values[ix]
+                expected.append(
+                    [
+                        v[0, 0],
+                        max(v[:, 1]),
+                        min(v[:, 2]),
+                        v[-1, 3],
+                        sum(float(x) for x in v[:, 4]),
+                    ]
                 )
-            ),
-            "policy",
+        np.testing.assert_allclose(
+            np.load(manifest.path.parent / section.ohlcv.path), expected, rtol=1e-6
         )
-        assert result.items[0].request_id is not None
-        assert app.cycle() == "observed"
-        pointer = f.loader.load_current_pointer(f.coordinates)
-        manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
-        assert {x.indicator_id for x in manifest.signals.manifests} == {"ma.sma"}
-        original_hash = pointer.manifest_sha256
-        original_next = r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
-        service.submit(
-            m["org"],
-            m["actor"],
-            "integrated-manual",
-            Command(items=(CommandItem(coordinate=c, expected_version=1),)),
-            "update_now",
-        )
-        assert app.cycle() == "observed"
-        assert (
-            r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
-            == original_next
-        )
-        # New persisted tail is deferred until the next occurrence and survives reconstruction.
-        writer.write_1m(n._build_canonical_rows_v2(bar_indexes=tuple(range(10080, 10140))))
-        count = len(r.rows("SELECT * FROM backtest_artifact_builds"))
-        assert app.cycle() == "observed"
-        assert len(r.rows("SELECT * FROM backtest_artifact_builds")) == count
-        clock[0] += timedelta(days=1)
-        assert app.cycle() == "observed"
-        pointer = f.loader.load_current_pointer(f.coordinates)
-        assert pointer.manifest_sha256 != original_hash
-        snapshot = snapshot_for(f, pointer.active_slot)
-        _, context = prep._input_context(f, pointer.active_slot)
-        refs = tuple(
-            ref
-            for ref in context.references
-            if ref.domain.role.startswith(("prices.", "mappings."))
-            and ref.domain.timeframe in ("1m", "15m")
-        )
-        snapshot = replace(
-            snapshot,
-            source_file_identities=refs,
-            consumed_domains=tuple(ref.domain for ref in refs),
-        )
-        domain = next(ref.domain for ref in refs if ref.domain.role == "prices.15m.ohlcv")
-        for indicator, provenance in [("ma.sma", "reused"), ("ma.ema", "generated")]:
-            assert runner.indicator_grid_builder is not None
-            grid_spec = defaults.compute_defaults(indicator_id=indicator)
-            assert grid_spec is not None
-            grid = runner.indicator_grid_builder.materialize_indicator(grid=grid_spec)
-            chosen = selected.indicators[0].params["window"].expand()[0]
-            # Canonical native grid identity: source first axis, window second in this fixture.
-            axes = {a.name: a.values for a in grid.axes}
-            row_id = axes["source"].index("close") * len(axes["window"]) + axes["window"].index(
-                chosen
+    service = ArtifactHttpService(r, m["installation"])
+    c = item(m).coordinate
+    selected = profile(m["catalog"], names=("ma.sma",), tp=(), sl=())
+    result = service.submit(
+        m["org"],
+        m["actor"],
+        "integrated-enable",
+        Command(
+            items=(
+                CommandItem(
+                    coordinate=c, expected_version=0, patch=PolicyPatch(profile=selected)
+                ),
             )
-            requested = (ArtifactRequestedRow(indicator, "close", row_id, (("window", chosen),)),)
-            recipe = BacktestInputRecipe(
-                snapshot=snapshot,
-                requested_start_utc=domain.origin_utc,
-                requested_end_utc=domain.end_utc,
-                rows=requested,
-                rule_version="signals/v1",
-                defaults_sha256=runner.derivative_defaults_sha256(requested),
-                compute_version="numba/v1",
-                precision_version="f32-f64/v1",
-                funding_policy="not_applicable",
-                funding_fingerprint=None,
-                tp_levels_pct=(),
-                sl_levels_pct=(),
-            )
-            _, _, prepared = prep._prepare_inputs(
-                (f, runner, snapshot, None), context, recipe, tmp_path / indicator
-            )
-            assert provenance in prepared.provenance
-            assert recipe.snapshot.manifest_sha256 == pointer.manifest_sha256
-            assert f.loader.load_current_pointer(f.coordinates) == pointer
-        complete_backtest(live_jobs, f, runner, snapshot, tmp_path / "full-job")
-        builds = r.rows("SELECT * FROM backtest_artifact_builds")
-        assert all(x["state"] == "ready" for x in builds)
-        assert all(len(x["snapshot"]["frozen_source"]["revision"]) == 64 for x in builds)
-    finally:
-        client.command(f"DROP DATABASE IF EXISTS {db}")
-        client.close()
+        ),
+        "policy",
+    )
+    assert result.items[0].request_id is not None
+    assert app.cycle() == "observed"
+    pointer = f.loader.load_current_pointer(f.coordinates)
+    manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
+    assert {x.indicator_id for x in manifest.signals.manifests} == {"ma.sma"}
+    original_hash = pointer.manifest_sha256
+    original_next = r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
+    service.submit(
+        m["org"],
+        m["actor"],
+        "integrated-manual",
+        Command(items=(CommandItem(coordinate=c, expected_version=1),)),
+        "update_now",
+    )
+    assert app.cycle() == "observed"
+    assert (
+        r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
+        == original_next
+    )
+    # New persisted tail is deferred until the next occurrence and survives reconstruction.
+    writer.write_1m(n._build_canonical_rows_v2(bar_indexes=tuple(range(10080, 10140))))
+    count = len(r.rows("SELECT * FROM backtest_artifact_builds"))
+    assert app.cycle() == "observed"
+    assert len(r.rows("SELECT * FROM backtest_artifact_builds")) == count
+    clock[0] += timedelta(days=1)
+    assert app.cycle() == "observed"
+    pointer = f.loader.load_current_pointer(f.coordinates)
+    assert pointer.manifest_sha256 != original_hash
+    snapshot = snapshot_for(f, pointer.active_slot)
+    _, context = prep._input_context(f, pointer.active_slot)
+    refs = tuple(
+        ref
+        for ref in context.references
+        if ref.domain.role.startswith(("prices.", "mappings."))
+        and ref.domain.timeframe in ("1m", "15m")
+    )
+    snapshot = replace(
+        snapshot,
+        source_file_identities=refs,
+        consumed_domains=tuple(ref.domain for ref in refs),
+    )
+    domain = next(ref.domain for ref in refs if ref.domain.role == "prices.15m.ohlcv")
+    for indicator, provenance in [("ma.sma", "reused"), ("ma.ema", "generated")]:
+        assert runner.indicator_grid_builder is not None
+        grid_spec = defaults.compute_defaults(indicator_id=indicator)
+        assert grid_spec is not None
+        grid = runner.indicator_grid_builder.materialize_indicator(grid=grid_spec)
+        chosen = selected.indicators[0].params["window"].expand()[0]
+        # Canonical native grid identity: source first axis, window second in this fixture.
+        axes = {a.name: a.values for a in grid.axes}
+        row_id = axes["source"].index("close") * len(axes["window"]) + axes["window"].index(
+            chosen
+        )
+        requested = (ArtifactRequestedRow(indicator, "close", row_id, (("window", chosen),)),)
+        recipe = BacktestInputRecipe(
+            snapshot=snapshot,
+            requested_start_utc=domain.origin_utc,
+            requested_end_utc=domain.end_utc,
+            rows=requested,
+            rule_version="signals/v1",
+            defaults_sha256=runner.derivative_defaults_sha256(requested),
+            compute_version="numba/v1",
+            precision_version="f32-f64/v1",
+            funding_policy="not_applicable",
+            funding_fingerprint=None,
+            tp_levels_pct=(),
+            sl_levels_pct=(),
+        )
+        _, _, prepared = prep._prepare_inputs(
+            (f, runner, snapshot, None), context, recipe, tmp_path / indicator
+        )
+        assert provenance in prepared.provenance
+        assert recipe.snapshot.manifest_sha256 == pointer.manifest_sha256
+        assert f.loader.load_current_pointer(f.coordinates) == pointer
+    complete_backtest(live_jobs, f, runner, snapshot, tmp_path / "full-job")
+    builds = r.rows("SELECT * FROM backtest_artifact_builds")
+    assert all(x["state"] == "ready" for x in builds)
+    assert all(len(x["snapshot"]["frozen_source"]["revision"]) == 64 for x in builds)
 
 
 def complete_backtest(live_jobs, fixture, runner, snapshot, directory):
@@ -529,28 +509,36 @@ def test_budget_increase_is_used_without_worker_restart(dispatch, tmp_path):
     assert m["repo"].rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "ready"
 
 
-@pytest.mark.parametrize('code,reason', [(202,'transient_database'),
-                                       (241,'transient_database')])
-def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+@pytest.mark.parametrize(
+    "code,reason", [("53300", "transient_database"), ("53200", "transient_database")]
+)
+def test_postgres_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
     """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
-    from clickhouse_connect.driver.exceptions import DatabaseError
+    from psycopg.errors import lookup
+
+    DatabaseError = lookup(code)
 
     from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
-    m=dispatch
-    submit(m,(item(m),))
-    _,w=worker(m,tmp_path)
+
+    m = dispatch
+    submit(m, (item(m),))
+    _, w = worker(m, tmp_path)
+
     class Pressure(Source):
         def read_1m_arrays(self, instrument_id, time_range):
-            raise DatabaseError(f'Code: {code}. synthetic admission refusal')
-    runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
-    failing=replace(w,publisher=replace(w.publisher,runner=runner))
+            raise DatabaseError("synthetic admission refusal")
+
+    runner = replace(w.publisher.runner, canonical_candle_reader=Pressure(180))
+    failing = replace(w, publisher=replace(w.publisher, runner=runner))
     try:
-        failing.run_once(m['installation'])
+        failing.run_once(m["installation"])
     except DatabaseError:
         pass
     else:
-        pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
-    assert list(m['repo'].rows('SELECT state FROM backtest_artifact_builds')) == [
-        {'state':'retry_wait'}]
-    assert list(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')) == [
-        {'state':'retry_wait','reason':reason}]
+        pytest.fail(str(m["repo"].rows("SELECT state,reason FROM backtest_artifact_requests")))
+    assert list(m["repo"].rows("SELECT state FROM backtest_artifact_builds")) == [
+        {"state": "retry_wait"}
+    ]
+    assert list(m["repo"].rows("SELECT state,reason FROM backtest_artifact_requests")) == [
+        {"state": "retry_wait", "reason": reason}
+    ]

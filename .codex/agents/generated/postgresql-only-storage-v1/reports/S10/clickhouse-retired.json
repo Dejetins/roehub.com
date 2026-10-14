@@ -1,0 +1,21 @@
+{
+  "removed_container": "1824ac077231b9956576b491387f7cb2850b78f247a97e454ef8a8797eb96e6f",
+  "retained_inert_volume": "roehub-navigator-ch",
+  "volume_deleted": false,
+  "archived_obsolete_files": {
+    "private/clickhouse.env": "dbde0c924177211a71a38d41367ad5e3e13ee982947f7463f4e290cfd73b98b3",
+    "private/clickhouse-workloads/interactive.password": "1d8f8ee9c96f140b5b570159fd3f742f1f5c73293689a58d65dafb90d8a6b1be",
+    "private/clickhouse-workloads/artifacts.password": "95d51728a0c80e85dc69f8dc2bba39f1bbbfb316053fc4a8d83b92906af20b9d",
+    "private/clickhouse-workloads/users.xml": "b79818f3fe4943eec8a957b380d62e0bdd084e487fc520690fbbb97a492e4392",
+    "private/clickhouse-workloads/backfill.password": "6548999109e6c9da4b0951468f0cbdb466b28e4e723372672baec82ab5ff0620",
+    "private/clickhouse-workloads/stream.password": "871bb5ba10ae078327c2920190c36530f26452ac3b927523c84ab22a8c5943d6",
+    "config/clickhouse-capacity.xml": "43f6fff40fa4d3f40b03b46d1d6bd9957665fbc14e8b589f2524a34c17c8e2d5",
+    "config/clickhouse-observability.xml": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+    "config/clickhouse-profiles.xml": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4",
+    "config/clickhouse-query-limits.xml": "9a11a9080b04a94f85bd82673d8ae998dde1cbbc4460445837c39dd7e9b9d1a6",
+    "config/clickhouse-workloads-entrypoint.sh": "51f28b7ff77c359e73f0b5a7de8a82313d7f85361eca4e1bad455a19a5341f37",
+    "render_runtime.py": "c15f083fb24c32c099c9b868fe844e46aa55aa52f9c5c520b95a8812d2abcd4c"
+  },
+  "archive_root": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/retired-s10/obsolete-config",
+  "renderer_replaced": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/render_runtime.py"
+}

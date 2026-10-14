@@ -25,6 +25,13 @@ loading host-platform images. It requires Python 3.9 or newer, OpenSSH `ssh-keyg
 `skopeo`, Docker Engine and Docker Compose v2, but does not access a registry or
 source checkout.
 
+## Current service inventory
+
+The current profile inventory and removed-service compatibility notes are in
+[the installation runbook](docs/runbooks/offline-release-installation.md#состав-self-host-после-удаления-внешних-функций).
+Generated Compose profiles are the source of service membership; historical
+stage reports do not describe the current deployment.
+
 ## Operations Notes
 
 - Целевая модель Roehub — независимая self-hosted установка из подписанного

@@ -1,0 +1,21 @@
+{
+  "owned_source_files": {
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py": "e3e48765537d199e4515a82c66d647d45af4decc03c2b271f0c8be2526f1708b",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py": "d7b7e11679a869fd0a7ca87860b8f13b6521aa22c74b90984c52516dcb629aaf",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py": "8b4a97d2e8f439ad44da0e5f44e21038805ae2f43edea4c535749edc539ca328",
+    "tests/real_infra/market_data/test_postgres_readers_frontier.py": "cd1e645447d052503d9e6604a3218edb7a082730112914f6d8fa046278c573cf",
+    "tests/real_infra/market_data/test_transactional_ingestion_postgres.py": "335db78d84e87a519715cf69d201eed20ab6ab411b8246ed16f9db83a5942530",
+    "tests/unit/tools/test_postgres_production_hash.py": "d4ba1b99dcee7b3dc3b338f7be9f6ef3f37ad5d340453719214ab31218f36414",
+    "tools/qa/postgres_production_analyze.py": "758f1f9ac4b43608d47f84ae81b32307cf2c2e9c74ef6ebeae063d82fd03d502",
+    "tools/qa/postgres_production_driver.py": "3eadb477f8fd00caba25aba340da349cb50ba2e04c20252913862d4c6eda32d6",
+    "tools/qa/postgres_production_hash.py": "644caa910b7cfd113ffb59755dad98634449646c8f4cb86b1a54fcff56c970e2",
+    "tools/qa/postgres_production_monitor.py": "7e0cce92de2514de4a2cdb643b034674f55af005056038aa4484049e40607d56",
+    "tools/qa/postgres_production_soak.py": "3e6d6604864dadf7202786faae8887f83b121fc567a6ff47a6947735b98cec3f",
+    "tools/qa/postgres_production_verify.py": "396c17d69c6b871647a46d25977bcb8bb45361ac8e75937197fe41b51cbc5ac4",
+    "tools/qa/postgres_production_workload.py": "8ecfdba6d4bf05d27042b648e55e096847b569d0f0d69c7908ff3fe197211e6a"
+  },
+  "owned_evidence_directory": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09",
+  "owned_report": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09.md",
+  "foreign_changes_excluded": true,
+  "no_existing_files_deleted": true
+}

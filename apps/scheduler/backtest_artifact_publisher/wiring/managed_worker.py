@@ -45,8 +45,8 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_p
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactCoordinatesV2,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
-    transient_clickhouse_error,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_errors import (
+    transient_postgres_error,
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -197,6 +197,8 @@ class ManagedArtifactWorker:
             runner = self.publisher.runner
             if runner.canonical_candle_reader is None:
                 raise ManagementError("source_unavailable")
+            with repo.source_guard(build):
+                pass
             source = freeze_source(
                 reader=runner.canonical_candle_reader,
                 coordinates=coordinates,
@@ -388,8 +390,34 @@ class ManagedArtifactWorker:
                     n=reservation,
                     b=build["build_id"],
                 )
+
+            def committed(result):
+                p = result.publication.published_pointer
+                publication = dict(
+                    generation=p.slot_generation,
+                    slot=p.active_slot,
+                    manifest_sha256=p.manifest_sha256,
+                )
+                coverage = dict(
+                    state=result.state,
+                    source_sha256=result.source_sha256,
+                    timeframes=dict(result.timeframes),
+                    source=target.model_dump(mode="json"),
+                )
+                save_receipt(
+                    self.storage.root / ".managed-attempts" / str(build["owner_token"]),
+                    build,
+                    publication,
+                    coverage,
+                )
+                repo.finish_base(build=build, publication=publication, coverage=coverage)
+
             base = replace(
                 self.publisher,
+                publisher=replace(
+                    self.publisher.publisher, source_guard=lambda: repo.source_guard(build)
+                ),
+                on_publication=committed,
                 runner=replace(
                     runner, funding_rate_coverage_reader=funding, progress_observer=native_event
                 ),
@@ -408,32 +436,6 @@ class ManagedArtifactWorker:
             if result is None or result.publication is None:
                 repo.finish(build=build, outcome="error", reason="source_unavailable")
                 return result
-            p = result.publication.published_pointer
-            publication = dict(
-                generation=p.slot_generation, slot=p.active_slot, manifest_sha256=p.manifest_sha256
-            )
-            coverage = dict(
-                state=result.state,
-                source_sha256=result.source_sha256,
-                timeframes=dict(result.timeframes),
-                source=target.model_dump(mode="json"),
-            )
-            save_receipt(
-                self.storage.root / ".managed-attempts" / str(build["owner_token"]),
-                build,
-                publication,
-                coverage,
-            )
-            repo.finish_base(
-                build=build,
-                publication=publication,
-                coverage=dict(
-                    state=result.state,
-                    source_sha256=result.source_sha256,
-                    timeframes=dict(result.timeframes),
-                    source=target.model_dump(mode="json"),
-                ),
-            )
             return result
         except (BasePrepublicationError, ArtifactPublicationNotStarted) as error:
             repo.finish(
@@ -441,17 +443,22 @@ class ManagedArtifactWorker:
                 outcome="error",
                 reason=str(error)
                 if isinstance(error, BasePrepublicationError)
+                or str(error)
+                in ("source_revision_changed", "source_unavailable", "legacy_source_target_invalid")
                 else "publisher_busy",
             )
             raise
         except Exception as error:
-            resource_error = transient_clickhouse_error(error)
-            transient = resource_error is not None or (isinstance(error, OSError)
-                and error.errno in (
-                errno.EAGAIN,
-                errno.EINTR,
-                errno.ETIMEDOUT,
-            ))
+            resource_error = transient_postgres_error(error)
+            transient = resource_error is not None or (
+                isinstance(error, OSError)
+                and error.errno
+                in (
+                    errno.EAGAIN,
+                    errno.EINTR,
+                    errno.ETIMEDOUT,
+                )
+            )
             reason = (
                 "publication_reconciliation_required"
                 if entered
@@ -562,7 +569,7 @@ class ManagedArtifactWorker:
                     self.publisher.publisher.recover_publications(
                         coordinates=coordinates, validation_spec=spec
                     )
-                    with self.repository.db.transaction():
+                    with self.repository.source_guard(build):
                         self.repository._fence(build, state="quarantined")
                         self.repository._exec(
                             (

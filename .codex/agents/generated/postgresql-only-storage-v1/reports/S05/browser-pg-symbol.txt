@@ -1,0 +1,240 @@
+### Page
+- Page URL: http://localhost:57917/backtests
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f5e3]:
+  - link "Skip to content" [ref=f5e4] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f5e5]:
+    - generic [ref=f5e6]: RoeHub
+    - navigation "Language" [ref=f5e7]:
+      - link "Русский" [ref=f5e8] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests
+      - link "English" [ref=f5e9] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests
+  - complementary [ref=f5e10]:
+    - navigation "Navigation" [ref=f5e11]:
+      - link "Overview" [ref=f5e12] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f5e18] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f5e21] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f5e24]:
+        - text: Data
+        - generic [ref=f5e29]: Unavailable
+      - link "Settings" [ref=f5e30] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f5e34] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f5e38]:
+    - generic [ref=f5e39]:
+      - heading "Backtests" [level=1] [ref=f5e40]
+      - generic [ref=f5e42]:
+        - region [ref=f5e43]:
+          - generic [ref=f5e44]:
+            - heading "Jobs" [level=2] [ref=f5e45]
+            - generic "Jobs on this page" [ref=f5e46]: "0"
+            - link "New backtest" [ref=f5e47] [cursor=pointer]:
+              - /url: /backtests/new
+          - tablist "Jobs" [ref=f5e60]:
+            - tab "New backtest" [active] [selected] [ref=f5e61] [cursor=pointer]
+            - tab "History" [ref=f5e62] [cursor=pointer]
+          - tabpanel "New backtest" [ref=f5e90]:
+            - region "New backtest" [ref=f5e91]:
+              - paragraph [ref=f5e93]:
+                - text: S05USDT · 1h
+                - generic [ref=f5e94]: Jan 1, 2023 — Oct 12, 2026
+                - generic [ref=f5e95]: Not checked yet
+              - generic [ref=f5e98]:
+                - region [ref=f5e99]:
+                  - heading "Calculation console" [level=2] [ref=f5e101]
+                  - generic [ref=f5e102]:
+                    - group "Calculation console" [ref=f5e103]:
+                      - generic [ref=f5e106]:
+                        - generic [ref=f5e107] [cursor=pointer]: Job label (optional)
+                        - textbox "Job label (optional)" [ref=f5e108]:
+                          - /placeholder: Name
+                      - region [ref=f5e109]:
+                        - heading "Market" [level=3] [ref=f5e110]
+                        - generic [ref=f5e112]:
+                          - generic [ref=f5e113]:
+                            - generic [ref=f5e114] [cursor=pointer]: Exchange
+                            - combobox "Exchange" [ref=f5e115]:
+                              - option "Binance" [selected]
+                              - option "Bybit"
+                          - generic [ref=f5e116]:
+                            - generic [ref=f5e117] [cursor=pointer]: Market type
+                            - combobox "Market type" [ref=f5e118]:
+                              - option "Spot" [selected]
+                              - option "Futures"
+                          - generic [ref=f5e119]:
+                            - generic [ref=f5e120] [cursor=pointer]: Symbol
+                            - combobox "Symbol" [ref=f5e121]:
+                              - option "BTCUSDT"
+                              - option "ETHUSDT"
+                              - option "S05USDT" [selected]
+                          - generic [ref=f5e122]:
+                            - generic [ref=f5e123] [cursor=pointer]: Timeframe
+                            - combobox "Timeframe" [ref=f5e124]:
+                              - option "15m"
+                              - option "30m"
+                              - option "1h" [selected]
+                              - option "2h"
+                              - option "4h"
+                              - option "6h"
+                              - option "8h"
+                              - option "1d"
+                              - option "2d"
+                              - option "3d"
+                          - generic [ref=f5e125]:
+                            - generic [ref=f5e126] [cursor=pointer]: Start date
+                            - textbox "Start date" [ref=f5e127]: 2023-01-01
+                          - generic [ref=f5e128]:
+                            - generic [ref=f5e129] [cursor=pointer]: End date
+                            - textbox "End date" [ref=f5e130]: 2026-10-12
+                      - region [ref=f5e131]:
+                        - heading "Signal" [level=3] [ref=f5e132]
+                        - generic [ref=f5e133]:
+                          - region "Indicator 1" [ref=f5e134]:
+                            - generic [ref=f5e135]:
+                              - generic [ref=f5e136]: "1"
+                              - button "Move up" [disabled] [ref=f5e137]
+                              - button "Move down" [disabled] [ref=f5e140]
+                              - button "Remove indicator" [ref=f5e143] [cursor=pointer]
+                            - generic [ref=f5e147]:
+                              - generic [ref=f5e148]:
+                                - generic [ref=f5e149] [cursor=pointer]: Indicator
+                                - combobox "Indicator" [ref=f5e150]:
+                                  - option "ma.dema" [selected]
+                                  - option "ma.ema"
+                                  - option "ma.hma"
+                                  - option "ma.lwma"
+                                  - option "ma.rma"
+                                  - option "ma.sma"
+                                  - option "ma.tema"
+                                  - option "ma.vwma"
+                                  - option "ma.wma"
+                                  - option "ma.zlema"
+                                  - option "momentum.cci"
+                                  - option "momentum.fisher"
+                                  - option "momentum.roc"
+                                  - option "momentum.rsi"
+                                  - 'option "momentum.stoch — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "momentum.trix"
+                                  - option "momentum.williams_r"
+                                  - 'option "structure.candle_stats — Unavailable: this API requires a window axis." [disabled]'
+                                  - 'option "structure.candle_stats_atr_norm — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.distance_to_ma_norm"
+                                  - option "structure.percent_rank"
+                                  - 'option "structure.pivots — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.zscore"
+                                  - option "trend.adx"
+                                  - option "trend.aroon"
+                                  - option "trend.donchian"
+                                  - option "trend.linreg_slope"
+                                  - 'option "trend.psar — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "trend.vortex"
+                                  - option "volatility.atr"
+                                  - option "volatility.hv"
+                                  - option "volatility.stddev"
+                                  - 'option "volatility.tr — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volatility.variance"
+                                  - 'option "volume.ad_line — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.cmf"
+                                  - option "volume.mfi"
+                                  - 'option "volume.obv — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.volume_sma"
+                                  - option "volume.vwap"
+                              - generic [ref=f5e151]:
+                                - generic [ref=f5e152]: Price sources
+                                - group [ref=f5e153]:
+                                  - generic "Price sources close" [ref=f5e154] [cursor=pointer]:
+                                    - generic [ref=f5e155]: close
+                                    - text: ⌄
+                              - generic [ref=f5e156]:
+                                - generic [ref=f5e157] [cursor=pointer]: Window start
+                                - spinbutton "Window start" [ref=f5e158]: "5"
+                              - generic [ref=f5e159]:
+                                - generic [ref=f5e160] [cursor=pointer]: Window stop
+                                - spinbutton "Window stop" [ref=f5e161]: "5"
+                              - generic [ref=f5e162]:
+                                - generic [ref=f5e163] [cursor=pointer]: Window step
+                                - spinbutton "Window step" [ref=f5e164]: "1"
+                            - group [ref=f5e165]:
+                              - generic "Materialized window values" [ref=f5e166] [cursor=pointer]
+                          - button "Add indicator" [ref=f5e167] [cursor=pointer]
+                      - region [ref=f5e169]:
+                        - heading "Trade" [level=3] [ref=f5e170]
+                        - generic [ref=f5e172]:
+                          - generic [ref=f5e173]:
+                            - generic [ref=f5e174] [cursor=pointer]: Direction
+                            - combobox "Direction" [ref=f5e175]:
+                              - option "Long only" [selected]
+                              - option "Short"
+                              - option "Long/short reversal"
+                          - generic [ref=f5e176]:
+                            - generic [ref=f5e177] [cursor=pointer]: Initial cash (quote)
+                            - spinbutton "Initial cash (quote)" [ref=f5e178]: "10000"
+                          - generic [ref=f5e179]:
+                            - generic [ref=f5e180] [cursor=pointer]: Fee (%)
+                            - spinbutton "Fee (%)" [ref=f5e181]: "0.075"
+                          - generic [ref=f5e182]:
+                            - generic [ref=f5e183] [cursor=pointer]: Slippage (%)
+                            - spinbutton "Slippage (%)" [ref=f5e184]: "0.01"
+                          - generic [ref=f5e185]:
+                            - generic [ref=f5e186] [cursor=pointer]: Position sizing
+                            - combobox "Position sizing" [ref=f5e187]:
+                              - option "All available capital" [selected]
+                              - option "Fixed quote amount"
+                              - option "Fixed equity share"
+                              - option "Equity share with minimum amount"
+                              - option "Equity share with maximum amount"
+                      - region [ref=f5e188]:
+                        - heading "Risk" [level=3] [ref=f5e189]
+                        - generic [ref=f5e191] [cursor=pointer]:
+                          - switch "Take profit / Stop loss" [ref=f5e192]
+                          - text: Take profit / Stop loss
+                      - region [ref=f5e193]:
+                        - heading "Ranking" [level=3] [ref=f5e194]
+                        - generic [ref=f5e195]:
+                          - generic [ref=f5e196]:
+                            - generic [ref=f5e197]:
+                              - generic [ref=f5e198] [cursor=pointer]: Primary metric
+                              - combobox "Primary metric" [ref=f5e199]:
+                                - option "Total return (%)" [selected]
+                                - option "Return after funding (%)"
+                                - option "Maximum drawdown (%)"
+                                - option "Return / maximum drawdown"
+                                - option "Profit factor"
+                                - option "Trade Sharpe ratio"
+                                - option "Winning trades (%)"
+                            - generic [ref=f5e200]:
+                              - generic [ref=f5e201] [cursor=pointer]: Ranking direction
+                              - combobox "Ranking direction" [ref=f5e202]:
+                                - option "Ascending"
+                                - option "Descending" [selected]
+                            - generic [ref=f5e203]:
+                              - generic [ref=f5e204] [cursor=pointer]: Top N
+                              - spinbutton "Top N" [ref=f5e205]: "10"
+                          - group [ref=f5e206]:
+                            - generic "Server policies" [ref=f5e207] [cursor=pointer]
+                    - generic [ref=f5e208]:
+                      - status [ref=f5e209]: Not checked yet
+                      - button "Reset form" [ref=f5e210] [cursor=pointer]
+                      - button "Check configuration" [ref=f5e211] [cursor=pointer]
+                      - button "Submit backtest" [disabled] [ref=f5e212]
+                - group [ref=f5e213]:
+                  - generic "Preflight review Data coverage, cost and effective settings" [ref=f5e214] [cursor=pointer]:
+                    - text: Preflight review
+                    - generic [ref=f5e215]: Data coverage, cost and effective settings
+        - region "Select a backtest" [ref=f5e83]:
+          - generic [ref=f5e84]:
+            - heading "Select a backtest" [level=2] [ref=f5e85]
+            - paragraph [ref=f5e86]: Open a job to read its identity, state and research inputs.
+            - paragraph [ref=f5e87]: Open a job to observe execution. Result views and exports are not available yet.
+  - contentinfo [ref=f5e88]:
+    - text: Artifact-backed backtests
+    - generic [ref=f5e89]: Library snapshots · live selected job
+```

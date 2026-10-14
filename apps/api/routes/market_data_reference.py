@@ -33,11 +33,11 @@ from trading.contexts.identity.application.ports.current_user import CurrentUser
 from trading.contexts.market_data.adapters.outbound.persistence.artifact_inventory_reader import (
     FileSystemActiveArtifactInventoryReader,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseInstrumentCoverageReader,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.instrument_coverage_reader import (  # noqa: E501
+    PostgresInstrumentCoverageReader,
 )
 from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
 from trading.contexts.market_data.application.use_cases import (
@@ -61,7 +61,7 @@ def build_market_data_reference_router(
     current_user_dependency: CurrentUserDependency,
     organization_scope_resolver: ResearchOrganizationScopeResolver | None,
     instrument_selection_repository: PostgresInstrumentSelectionRepository | None = None,
-    coverage_reader: ClickHouseInstrumentCoverageReader | None = None,
+    coverage_reader: PostgresInstrumentCoverageReader | None = None,
     artifact_inventory_reader: FileSystemActiveArtifactInventoryReader | None = None,
     history_readiness: HistoryReadiness | None = None,
 ) -> APIRouter:
@@ -118,7 +118,7 @@ def build_market_data_reference_router(
         Raises:
             HTTPException: 401 when authentication dependency rejects request.
         Side Effects:
-            Executes one use-case read over ClickHouse reference table.
+            Executes one use-case read over PostgreSQL reference table.
         """
         _resolve_research_scope(
             resolver=organization_scope_resolver,
@@ -154,7 +154,7 @@ def build_market_data_reference_router(
         Raises:
             HTTPException: 401 for unauthenticated requests, 422 for invalid query values.
         Side Effects:
-            Executes one use-case read over ClickHouse reference tables.
+            Executes one use-case read over PostgreSQL reference tables.
         """
         _resolve_research_scope(
             resolver=organization_scope_resolver,

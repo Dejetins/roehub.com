@@ -1553,15 +1553,12 @@
       ],
       "actions": [
         "member_role_change",
-        "installation_operation",
-        "plugin_install_or_update",
-        "plugin_rollback"
+        "installation_operation"
       ],
       "capability_refs": [
         "admin.members.manage",
         "admin.operations.execute",
         "admin.overview.read",
-        "admin.plugins.manage",
         "audit.organization.read",
         "installation.recovery.execute",
         "installation.resources.manage",
@@ -1662,46 +1659,6 @@
       "remaining_work": [
         "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
         "Bind separate artifact/backtest budgets and installation ceilings to actual APIs."
-      ],
-      "disposition": "product"
-    },
-    {
-      "screen_id": "screen.admin.extensions",
-      "kind": "route_screen",
-      "label": "Extensions and providers",
-      "canonical_route": "/admin/extensions",
-      "navigation_group_id": "system",
-      "source_surface_ids": [],
-      "journey_ids": [
-        "journey.administer_and_recover"
-      ],
-      "required_states": [
-        "loading",
-        "ready",
-        "validation",
-        "install_pending",
-        "rollback_confirmation",
-        "permission_forbidden",
-        "error_retry"
-      ],
-      "actions": [],
-      "capability_refs": [],
-      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
-      "source_refs": [
-        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
-        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.extensions",
-        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.extensions",
-        "apps/api/routes/extensions.py"
-      ],
-      "implemented_scope": "Plugin administration lifecycle exists.",
-      "delivery_status": [
-        "implemented",
-        "requires_ui",
-        "requires_api"
-      ],
-      "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
-        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
       ],
       "disposition": "product"
     },
@@ -1875,42 +1832,6 @@
         "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
       ],
       "disposition": "product"
-    },
-    {
-      "screen_id": "screen.qa.plugin_panel_lab",
-      "kind": "qa_only_screen",
-      "label": "Feature-flagged plugin panel laboratory",
-      "canonical_route": "/__qa/plugin-panels",
-      "navigation_group_id": null,
-      "source_surface_ids": [
-        "platform.qa.plugin_panel_lab"
-      ],
-      "journey_ids": [],
-      "required_states": [
-        "disabled_404",
-        "loading",
-        "renderer_state",
-        "query_error"
-      ],
-      "actions": [
-        "data_source_query"
-      ],
-      "capability_refs": [
-        "qa.plugin.query"
-      ],
-      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
-      "source_refs": [
-        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
-        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.qa.plugin_panel_lab",
-        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.qa.plugin_panel_lab",
-        "apps/web/main/app.py"
-      ],
-      "implemented_scope": "Protected feature-flagged panel laboratory exists.",
-      "delivery_status": [
-        "implemented"
-      ],
-      "remaining_work": [],
-      "disposition": "qa_only"
     },
     {
       "screen_id": "contract.diagnostics.health",
@@ -2280,8 +2201,8 @@
     }
   ],
   "counts": {
-    "screen_records": 44,
+    "screen_records": 42,
     "journeys": 18,
-    "source_surfaces": 43
+    "source_surfaces": 42
   }
 }

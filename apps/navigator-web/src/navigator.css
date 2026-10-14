@@ -126,7 +126,6 @@
 .navigator-app .navigator-inspector .job-information[open],.navigator-app .navigator-inspector .report-actions[open]{position:static;inset:auto;max-height:none;overflow:visible;box-shadow:none;background:transparent;width:auto;border:0;padding:0;margin:0 0 16px}
 .navigator-app .navigator-inspector .job-information:not([open]){width:auto;text-align:left}
 .navigator-app .navigator-inspector .report-actions[open]{margin-top:18px}
-.navigator-app .navigator-grid .job-status{position:static;inset:auto}
 .navigator-app .navigator-inspector .report-actions{position:static;inset:auto;width:auto;max-height:none;box-shadow:none}
 .navigator-app .navigator-table .variant-ranking{max-height:none;height:auto;overflow:visible}
 .navigator-app .navigator-grid .strategy-list-slot .library{width:100%;max-width:100%}
@@ -153,7 +152,6 @@
 .navigator-grid .navigator-research-inputs h3{font-size:13px;margin:0}
 .navigator-grid .navigator-inspector .navigator-research-inputs dl{gap:5px;margin:18px 0}
 .navigator-grid .navigator-inspector .navigator-research-inputs dd{margin-bottom:12px}
-.navigator-app .navigator-grid .backtest-detail-workspace .job-detail .job-status{position:static;inset:auto;padding:0}
 .navigator-app .navigator-grid .backtest-detail-workspace .results .navigator-result-actions .report-actions{position:static;inset:auto;width:auto;max-height:none;box-shadow:none}
 @media(min-width:651px){.navigator-grid .navigator-library{height:calc(100dvh - 60px)}}
 /* Compact object navigator: ten records per API page, count is actual returned rows. */
@@ -201,7 +199,10 @@
 /* Shared upper workspace: one type scale and control geometry on all routes. */
 .navigator-app{--workspace-title-size:13px;--workspace-control-size:28px;--workspace-control-font:12px;--workspace-inset:12px}
 .navigator-app .navigator-grid .navigator-library>.panel-head{min-height:48px;box-sizing:border-box;padding:10px var(--workspace-inset);display:flex;align-items:center;gap:6px;margin:0}
-.navigator-app .navigator-grid .navigator-library>.panel-head>.actions{margin-inline-start:auto;gap:6px;flex-wrap:nowrap}
+.navigator-app .navigator-grid .navigator-library>.library-head{flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+.navigator-app .navigator-grid .library-head>.library-title{display:flex;align-items:center;gap:6px;min-height:var(--workspace-control-size)}
+.navigator-app .navigator-grid .library-head>.library-actions{display:grid;grid-template-columns:repeat(5,var(--workspace-control-size));align-items:center;gap:6px;min-height:var(--workspace-control-size);margin:0}
+.navigator-app .navigator-grid .library-actions>.library-action{display:flex;align-items:center;grid-row:1;min-width:0;height:var(--workspace-control-size)}
 .navigator-app .navigator-grid .navigator-library>.panel-head h2{font-size:var(--workspace-title-size);font-weight:600;line-height:20px;margin:0}
 .navigator-app .navigator-grid .navigator-library>.panel-head .count{font-size:10px;line-height:16px}
 .navigator-app .navigator-grid .navigator-library>.panel-head :is(.library-icon-action,.overview-icon){width:var(--workspace-control-size);height:var(--workspace-control-size);min-height:var(--workspace-control-size);padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex:none}
@@ -287,7 +288,7 @@
 .export-format-popup{position:absolute;top:34px;left:0;z-index:5;width:100px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px #0005}
 .export-controls .export-format-popup button{display:block;width:100%;height:30px;border:0;border-radius:6px;text-align:left;padding:0 10px;background:transparent}
 .export-controls .export-format-popup button:hover,.export-controls .export-format-popup button:focus-visible{background:var(--surface-hover,#293139)}
-.navigator-app .navigator-inspector .result-command>button.library-icon-action{width:28px;height:28px;min-height:28px;padding:0;border-radius:50%}
+.navigator-app .navigator-inspector .result-command>button.library-icon-action{width:var(--workspace-control-size);height:var(--workspace-control-size);min-height:var(--workspace-control-size);padding:0;border-radius:50%}
 .export-format-popup{border-color:var(--border,#39424b)}
 
 .navigator-table-tools .result-export{position:relative;margin:0;padding:0;border:0}
@@ -336,3 +337,31 @@
 .security-legacy-sessions p { max-width: 650px; margin-top: 6px; font-size: 12px; }
 .security-legacy-sessions > button { flex-shrink: 0; }
 @media(max-width: 800px) { .security-legacy-sessions { align-items: flex-start; flex-direction: column; } }
+
+/* Shared action meaning and compact spacing across Navigator surfaces. */
+.navigator-app{--action-danger:#cf827e;--action-save:#7fa99b;--action-danger-bg:var(--canvas);--action-save-bg:var(--canvas);--action-gap:6px}
+.navigator-app button:is(.danger,:has(>svg.lucide-trash-2),:has(+dialog[aria-labelledby="delete-title"])),
+.navigator-app dialog[aria-labelledby="delete-title"] .filter-fields>button:last-child,
+.navigator-app .operation-dialog[data-action="delete"] button[type="submit"],
+.navigator-app .storage-cleanup-preview .work-actions>button:first-child{color:var(--action-danger);border-color:var(--line);background:var(--action-danger-bg)}
+.navigator-app button:has(+dialog[aria-labelledby="save-title"]),
+.navigator-app dialog[aria-labelledby="save-title"] .filter-fields>button:last-child,
+.navigator-app .work-form button.primary[type="submit"],
+.navigator-app .storage-footer button.primary[type="submit"],
+.navigator-app .artifact-editor-footer button[type="submit"],
+.navigator-app dialog[aria-labelledby="portfolio-editor-title"] button[type="submit"]{color:var(--action-save);border-color:var(--line);background:var(--action-save-bg)}
+.navigator-app .navigator-result-actions>.result-command,
+.navigator-app .navigator-result-actions>div:has(.report-actions){display:inline-block;vertical-align:top;max-width:100%}
+.navigator-app .navigator-result-actions>div:has(.report-actions){margin-inline-start:var(--action-gap)}
+.navigator-app .navigator-grid .navigator-result-actions .report-actions{margin:0;padding:0;border:0;gap:var(--action-gap)}
+.navigator-app .navigator-grid .navigator-table>.overview-toolbar{gap:var(--action-gap)}
+.navigator-app .navigator-grid .navigator-table .navigator-table-header{padding-inline-end:0}
+.navigator-app .navigator-table-tools{display:flex;align-items:center;gap:var(--action-gap)}
+.navigator-app :is(.work-actions,.operations-lifecycle){gap:var(--action-gap)}
+
+/* Use the full workspace width and extra desktop height for analytical panels. */
+.navigator-app>.workspace{width:100%;max-width:none;justify-self:stretch}
+@media(min-width:981px) and (min-height:959px){
+ .navigator-app .navigator-grid:not(.workpages-grid){--nav-chart-height:calc(60dvh - 120.8px);--nav-table-height:calc(40dvh - 33.2px)}
+ .navigator-app .navigator-grid .navigator-chart:not(.overview-expanded) :is(.result-chart,.price-chart,.operations-chart),.navigator-app .navigator-grid .overview-performance:not(.overview-expanded) .overview-chart{height:calc(var(--nav-chart-height) - 114px)!important;min-height:340px!important}
+}

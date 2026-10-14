@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {requestJson} from './api';
 
 export const profileSchema = z.object({user_id:z.string(), username:z.string().nullable(), email:z.string().nullable(),
-  timezone:z.string(), locale:z.enum(['ru','en']), telegram_discord:z.string().nullable(), subscription_status:z.string(), updated_at:z.string()});
+  timezone:z.string(), locale:z.enum(['ru','en']), telegram_discord:z.string().nullable(),  updated_at:z.string()});
 export const preferencesSchema = z.object({theme:z.enum(['graphite','terminal-orange','matrix-green','high-contrast']), locale:z.enum(['ru','en']),
   density:z.enum(['compact','comfortable']), autorefresh:z.object({preset_key:z.string(), refresh_interval_seconds:z.number(),
     allowed_presets:z.array(z.string()), min_custom_interval_seconds:z.number(), max_custom_interval_seconds:z.number()}), updated_at:z.string()});

@@ -103,10 +103,17 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     strategy_router = _build_ping_router(path="/strategies/ping")
     indicators_router = _build_ping_router(path="/indicators/ping")
     market_data_router = _build_ping_router(path="/market-data/markets")
-    extensions_router = _build_ping_router(path="/plugins/ping")
     admin_router = _build_ping_router(path="/admin/ping")
     ui_dashboard_router = _build_ping_router(path="/ui/dashboard/summary")
+    monkeypatch.setattr(
+        app_module, "build_ui_backtests_router",
+        lambda **_kwargs: _build_ping_router(path="/ui/backtests/ping"),
+    )
 
+    monkeypatch.setattr(
+        app_module, "build_ui_strategies_dashboard_router",
+        lambda **_kwargs: _build_ping_router(path="/ui/strategies/ping"),
+    )
     monkeypatch.setattr(app_module, "build_indicators_registry", lambda *, environ: object())
     monkeypatch.setattr(
         app_module,
@@ -146,14 +153,6 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
             organization_repository=object(),
             organization_access_service=object(),
             clock=object(),
-        ),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_extensions_api_module",
-        lambda *, environ, current_user_dependency, organization_repository: SimpleNamespace(
-            router=extensions_router,
-            service=object(),
         ),
     )
     monkeypatch.setattr(

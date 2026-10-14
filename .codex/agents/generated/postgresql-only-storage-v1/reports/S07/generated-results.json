@@ -1,0 +1,83 @@
+[
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.docs.generate_runbooks"
+    ],
+    "exit": 0,
+    "log": "generate-0.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.artifacts.generate_schemas"
+    ],
+    "exit": 0,
+    "log": "generate-1.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.backup.generate_schemas"
+    ],
+    "exit": 2,
+    "log": "generate-2.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.jobs.generate_schemas"
+    ],
+    "exit": 0,
+    "log": "generate-3.log"
+  },
+  {
+    "command": [
+      "python",
+      "tools/release/oss_metadata.py",
+      "--write"
+    ],
+    "exit": 0,
+    "log": "generate-4.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.docs.generate_docs_index"
+    ],
+    "exit": 0,
+    "log": "generate-5.log"
+  },
+  {
+    "command": [
+      "python",
+      "-m",
+      "tools.docs.generate_project_map"
+    ],
+    "exit": 0,
+    "log": "generate-6.log"
+  },
+  {
+    "command": [
+      "python",
+      "tools/release/generate_runtime_topology.py",
+      "--write"
+    ],
+    "exit": 0,
+    "log": "generate-7.log"
+  },
+  {
+    "command": [
+      "python",
+      "tools/release/runtime_input_inventory.py",
+      "--write"
+    ],
+    "exit": 0,
+    "log": "generate-8.log"
+  }
+]

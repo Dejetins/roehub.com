@@ -1,0 +1,1 @@
+{"status": "fail", "check": "draft", "errors": ["Draft check cannot reclassify an activated ledger"], "proof_boundary": "artifact-structure-and-file-binding"}

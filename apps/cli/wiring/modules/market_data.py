@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping, Protocol, Sequence
 
 from apps.cli.wiring.clients.parquet import ParquetSourceFactory
-from apps.cli.wiring.db.clickhouse import ClickHouseWriterFactory
+from apps.cli.wiring.db.postgres import PostgresWriterFactory
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
@@ -21,8 +21,7 @@ if TYPE_CHECKING:
 
 
 class Backfill1mUseCase(Protocol):
-    def run(self, command: "Backfill1mCommand") -> "Backfill1mReport":
-        ...
+    def run(self, command: "Backfill1mCommand") -> "Backfill1mReport": ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +35,9 @@ class MarketDataBackfill1mWiring:
     environ: Mapping[str, str]
     market_data_config_path: str
 
-    def use_case(self, *, parquet_paths: Sequence[str], batch_size: int | None) -> Backfill1mUseCase:  # noqa: E501
+    def use_case(
+        self, *, parquet_paths: Sequence[str], batch_size: int | None
+    ) -> Backfill1mUseCase:  # noqa: E501
         """
         Build a fully wired backfill use-case instance for CLI command execution.
 
@@ -49,7 +50,7 @@ class MarketDataBackfill1mWiring:
 
         Assumptions/Invariants:
         - `market_data_config_path` points to a readable runtime config file.
-        - ClickHouse settings are supplied through environment.
+        - PostgreSQL settings are supplied through environment.
 
         Errors/Exceptions:
         - Propagates config parsing, source creation, and writer wiring errors.
@@ -64,15 +65,15 @@ class MarketDataBackfill1mWiring:
             paths=parquet_paths,
             batch_size=batch_size,
         )
-        writer = ClickHouseWriterFactory(environ=self.environ).writer()
+        writer = PostgresWriterFactory(environ=self.environ).writer()
 
         # use-case у тебя именно здесь:
         from trading.contexts.market_data.application.use_cases.backfill_1m_candles import (
             Backfill1mCandlesUseCase,
         )
 
-        # ВАЖНО: твой use-case принимает int, поэтому None преобразуем в "один батч"
-        effective_batch_size = batch_size if batch_size is not None else 2_147_483_647
+        # Keep the transactional PG writer bound for explicit and default imports.
+        effective_batch_size = min(batch_size, 8192) if batch_size is not None else 8192
 
         return Backfill1mCandlesUseCase(
             source=source,

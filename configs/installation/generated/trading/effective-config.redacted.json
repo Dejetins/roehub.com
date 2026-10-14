@@ -20,9 +20,6 @@
       "enabled": false
     }
   },
-  "oidc": {
-    "enabled": false
-  },
   "openbao": {
     "address": "http://openbao:8200",
     "mode": "embedded",
@@ -48,16 +45,8 @@
     "cpus": 4,
     "memory_mb": 4096
   },
-  "schema": "io.roehub.runtime-config/v1alpha1",
+  "schema": "io.roehub.runtime-config/v2alpha1",
   "stores": {
-    "clickhouse": {
-      "credentials_ref": "<secret-reference:redacted>",
-      "database": "roehub",
-      "host": "clickhouse",
-      "mode": "embedded",
-      "port": 8123,
-      "tls": false
-    },
     "postgresql": {
       "credentials_ref": "<secret-reference:redacted>",
       "database": "roehub",

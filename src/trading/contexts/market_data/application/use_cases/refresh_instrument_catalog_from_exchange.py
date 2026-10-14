@@ -62,7 +62,8 @@ class RefreshInstrumentCatalogFromExchangeUseCase:
                 )
         if self.before_write is not None:
             self.before_write()
-        self.writer.upsert_enrichment(payload)
+        for offset in range(0, len(payload), 1000):
+            self.writer.upsert_enrichment(payload[offset : offset + 1000])
         if self.snapshot_writer is not None:
             if self.before_write is not None:
                 self.before_write()
